@@ -1,0 +1,395 @@
+.sb-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.sb-nav-btn {
+  width: 38px;
+  height: 38px;
+}
+
+.sb-range {
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.sb-jump {
+  position: relative;
+}
+
+.sb-jump__input {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 20;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem;
+  background: var(--card-bg);
+  box-shadow: var(--shadow);
+}
+
+.sb-search {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--muted);
+}
+
+.sb-search input {
+  border: none;
+  outline: none;
+  flex: 1;
+  background: none;
+  font-size: 0.88rem;
+}
+
+.sb-toggle {
+  display: flex;
+  padding: 0.2rem;
+  border-radius: 9px;
+  background: var(--field-bg);
+}
+
+.sb-toggle button {
+  border: none;
+  background: none;
+  padding: 0.45rem 0.9rem;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.sb-toggle button.is-active {
+  background: var(--card-bg);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.sb-toggle--icons button {
+  padding: 0.45rem 0.6rem;
+}
+
+/* Table */
+.sb-table-wrap {
+  margin-top: 1.25rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+}
+
+.sb-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: max-content;
+  min-width: 100%;
+}
+
+.sb-table th,
+.sb-table td {
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 0;
+  vertical-align: middle;
+}
+
+.sb-table thead th {
+  padding: 0.7rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: left;
+  background: var(--card-bg);
+}
+
+/* Sticky frozen columns: Job # (0-72), Job (72-302), divider (302-320) */
+.sb-col-jobno,
+.sb-col-job,
+.sb-col-divider {
+  position: sticky;
+  z-index: 2;
+  background: var(--card-bg);
+}
+
+thead .sb-col-jobno,
+thead .sb-col-job,
+thead .sb-col-divider {
+  z-index: 4;
+}
+
+.sb-col-jobno {
+  left: 0;
+  padding: 0.6rem 0.75rem 0.6rem 1rem !important;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+td.sb-col-jobno {
+  position: sticky;
+}
+
+.sb-col-job {
+  left: 72px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem !important;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  border-right: 1px solid var(--border) !important;
+}
+
+.sb-job-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.sb-col-job svg {
+  flex-shrink: 0;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+th.sb-col-divider,
+td.sb-col-divider {
+  left: 302px;
+  width: 18px;
+  padding: 0 !important;
+  background: var(--field-bg) !important;
+  border-right: 1px solid var(--border) !important;
+  border-left: 1px solid var(--border) !important;
+}
+
+.sb-divider-inner {
+  position: sticky;
+  top: 50vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+}
+
+.sb-divider-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.sb-divider-btn:hover {
+  background: var(--border);
+  color: var(--ink);
+}
+
+.sb-col-meta {
+  width: 120px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sb-day-head {
+  width: 140px;
+  font-size: 0.8rem;
+}
+
+.sb-day-head--compact {
+  width: 46px;
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+.sb-day-head.is-today {
+  color: var(--ink);
+  background: rgba(245, 223, 26, 0.15);
+}
+
+.sb-day-head__date {
+  margin-top: 0.15rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.sb-row-bar {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  border-radius: 2px;
+}
+
+td.sb-col-jobno {
+  position: sticky;
+}
+
+.sb-cell {
+  padding: 0.4rem !important;
+  position: relative;
+}
+
+.sb-cell--compact {
+  padding: 0.15rem !important;
+}
+
+.sb-add {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 0.5rem;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.sb-add:hover {
+  background: var(--field-bg);
+  color: var(--ink);
+}
+
+.sb-empty {
+  width: 100%;
+  height: 28px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.sb-empty:hover {
+  background: var(--field-bg);
+}
+
+.sb-pill {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  border: 1.5px solid;
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sb-cell--compact .sb-pill {
+  height: 22px;
+  padding: 0;
+  border-radius: 4px;
+  border-width: 0;
+}
+
+.sb-pill__name {
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-pill__hours {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--text);
+}
+
+.sb-pill__note-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.sb-note-pill {
+  width: 100%;
+  border: none;
+  background: var(--field-bg);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.78rem;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-cell--compact .sb-note-pill {
+  height: 22px;
+  padding: 0;
+  border-radius: 4px;
+}
+
+/* Cell menu popover */
+.cell-menu {
+  position: fixed;
+  z-index: 60;
+  width: 180px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 0.4rem;
+}
+
+.cell-menu__option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.6rem 0.7rem;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.cell-menu__option:hover {
+  background: var(--field-bg);
+}

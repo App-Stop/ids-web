@@ -1,0 +1,19 @@
+import { Icon } from './icons'
+import { formatMoney, type Job } from '../../lib/dashboardData'
+
+export default function JobSummaryChip({ job }: { job: Job }) {
+  return (
+    <div className="job-chip">
+      <div className="job-chip__body">
+        <span className="job-head__meta">
+          Bid #{job.bidNo} &middot; Job #{job.jobNo}
+        </span>
+        <strong>{job.name}</strong>
+        <span className="job-chip__sub">
+          {job.gc} &middot; {formatMoney(job.contractAmount)}
+        </span>
+      </div>
+      <Icon.ChevronRight width={16} height={16} />
+    </div>
+  )
+}
