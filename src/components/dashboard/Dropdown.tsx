@@ -12,12 +12,15 @@ export default function Dropdown({
   placeholder = '-',
   selectedLabel,
   onChange,
+  staticLabel,
 }: {
   value: string | null
   options: DropdownOption[]
   placeholder?: string
   selectedLabel?: ReactNode
   onChange: (id: string) => void
+  /** When set, the trigger always shows this text instead of the selection (checkmark still tracks value). */
+  staticLabel?: string
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -33,7 +36,7 @@ export default function Dropdown({
   return (
     <div className="dd" ref={ref}>
       <button type="button" className="dd__trigger" onClick={() => setOpen((o) => !o)}>
-        <span className="dd__value">{value ? selectedLabel : placeholder}</span>
+        <span className="dd__value">{staticLabel ?? (value ? selectedLabel : placeholder)}</span>
         <Icon.ChevronDown className="dd__chevron" />
       </button>
       {open && (

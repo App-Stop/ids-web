@@ -88,4 +88,16 @@ export const Icon = {
       <circle cx="12" cy="19" r="1.6" />
     </svg>
   ),
+  ZoomIn: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...base} {...p}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3M11 8v6M8 11h6" /></svg>
+  ),
+  ZoomOut: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...base} {...p}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3M8 11h6" /></svg>
+  ),
+  AlertTriangle: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...base} {...p}><path d="M10.3 3.9 1.9 18a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4M12 17h.01" /></svg>
+  ),
+  Edit: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...base} {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z" /></svg>
+  ),
 }

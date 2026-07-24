@@ -4,6 +4,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import ScheduleBoard from './pages/ScheduleBoard'
+import JobsManagement from './pages/JobsManagement'
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/schedule-board" element={<ScheduleBoard />} />
+      <Route path="/jobs-management" element={<JobsManagement />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

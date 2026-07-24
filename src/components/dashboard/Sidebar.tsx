@@ -6,7 +6,7 @@ import { Icon } from './icons'
 const OPERATIONS = [
   { label: 'Dashboard', icon: Icon.Grid, path: '/dashboard' },
   { label: 'Schedule Board', icon: Icon.Calendar, path: '/schedule-board' },
-  { label: 'Jobs Management', icon: Icon.Wrench, path: null },
+  { label: 'Jobs Management', icon: Icon.Wrench, path: '/jobs-management' },
 ]
 
 const MANAGEMENT = [

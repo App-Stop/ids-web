@@ -206,8 +206,8 @@ export default function ScheduleBoard() {
             <colgroup>
               <col style={{ width: JOBNO_W }} />
               <col style={{ width: JOB_W }} />
-              <col style={{ width: DIVIDER_W }} />
               {metaVisible && META_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}
+              <col style={{ width: DIVIDER_W }} />
               {visibleDays.map((d) => (
                 <col key={toISO(d)} style={{ width: dayW }} />
               ))}
@@ -216,7 +216,6 @@ export default function ScheduleBoard() {
               <tr>
                 <th className="sb-col-jobno">Job #</th>
                 <th className="sb-col-job">Job</th>
-                <th className="sb-col-divider" />
                 {metaVisible && (
                   <>
                     <th className="sb-col-meta">IDS Super</th>
@@ -225,6 +224,7 @@ export default function ScheduleBoard() {
                     <th className="sb-col-meta">Contract</th>
                   </>
                 )}
+                <th className="sb-col-divider" />
                 {visibleDays.map((d) => {
                   const iso = toISO(d)
                   const isToday = iso === TODAY
@@ -254,6 +254,14 @@ export default function ScheduleBoard() {
                     <span className="sb-job-name" title={row.name}>{row.name}</span>
                     <Icon.ChevronRight width={14} height={14} />
                   </td>
+                  {metaVisible && (
+                    <>
+                      <td className="sb-col-meta">{row.idsSuper}</td>
+                      <td className="sb-col-meta">{row.gcSuper}</td>
+                      <td className="sb-col-meta">{row.gc}</td>
+                      <td className="sb-col-meta">${row.contract.toLocaleString('en-US')}</td>
+                    </>
+                  )}
                   {rowIndex === 0 && (
                     <td className="sb-col-divider" rowSpan={filteredJobs.length}>
                       <div className="sb-divider-inner">
@@ -267,14 +275,6 @@ export default function ScheduleBoard() {
                         </button>
                       </div>
                     </td>
-                  )}
-                  {metaVisible && (
-                    <>
-                      <td className="sb-col-meta">{row.idsSuper}</td>
-                      <td className="sb-col-meta">{row.gcSuper}</td>
-                      <td className="sb-col-meta">{row.gc}</td>
-                      <td className="sb-col-meta">${row.contract.toLocaleString('en-US')}</td>
-                    </>
                   )}
                   {visibleDays.map((d) => {
                     const iso = toISO(d)

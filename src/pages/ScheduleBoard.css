@@ -119,18 +119,16 @@
   background: var(--card-bg);
 }
 
-/* Sticky frozen columns: Job # (0-72), Job (72-302), divider (302-320) */
+/* Sticky frozen columns: Job # (0-72), Job (72-302) */
 .sb-col-jobno,
-.sb-col-job,
-.sb-col-divider {
+.sb-col-job {
   position: sticky;
   z-index: 2;
   background: var(--card-bg);
 }
 
 thead .sb-col-jobno,
-thead .sb-col-job,
-thead .sb-col-divider {
+thead .sb-col-job {
   z-index: 4;
 }
 
@@ -173,7 +171,6 @@ td.sb-col-jobno {
 
 th.sb-col-divider,
 td.sb-col-divider {
-  left: 302px;
   width: 18px;
   padding: 0 !important;
   background: var(--field-bg) !important;

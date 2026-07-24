@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Icon } from './icons'
 import NewActionMenu from './NewActionMenu'
 
 export default function Topbar({
   onAddJob,
   onCreateCrew,
+  extra,
 }: {
   onAddJob: () => void
   onCreateCrew: () => void
+  extra?: ReactNode
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -19,6 +21,8 @@ export default function Topbar({
       </label>
 
       <div className="topbar__actions">
+        {extra}
+
         <button type="button" className="icon-btn icon-btn--bordered">
           <Icon.Bell />
           <i className="dot-badge" />
