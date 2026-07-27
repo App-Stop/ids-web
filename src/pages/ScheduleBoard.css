@@ -1,3 +1,50 @@
+.sb-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sb-legend {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 0.75rem 2rem;
+  padding-top: 0.3rem;
+}
+
+.sb-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sb-legend__item:hover {
+  background: var(--field-bg);
+  transform: translateX(2px);
+}
+
+.sb-legend__item i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.sb-legend__item:hover i {
+  transform: scale(1.3);
+}
+
 .sb-toolbar {
   display: flex;
   align-items: center;
@@ -81,17 +128,16 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
-.sb-toggle--icons button {
-  padding: 0.45rem 0.6rem;
-}
-
 /* Table */
 .sb-table-wrap {
   margin-top: 1.25rem;
   overflow-x: auto;
+  overflow-y: visible;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--card-bg);
+  position: relative;
+  z-index: 1;
 }
 
 .sb-table {
@@ -146,14 +192,17 @@ td.sb-col-jobno {
 
 .sb-col-job {
   left: 72px;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
   padding: 0.6rem 0.75rem !important;
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--ink);
   border-right: 1px solid var(--border) !important;
+}
+
+.sb-job-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .sb-job-name {
@@ -163,7 +212,7 @@ td.sb-col-jobno {
   min-width: 0;
 }
 
-.sb-col-job svg {
+.sb-job-inner svg {
   flex-shrink: 0;
   color: var(--muted);
   margin-left: auto;
@@ -171,9 +220,9 @@ td.sb-col-jobno {
 
 th.sb-col-divider,
 td.sb-col-divider {
-  width: 18px;
+  width: 24px;
   padding: 0 !important;
-  background: var(--field-bg) !important;
+  background: #dcdce2 !important;
   border-right: 1px solid var(--border) !important;
   border-left: 1px solid var(--border) !important;
 }
@@ -235,6 +284,15 @@ td.sb-col-divider {
   color: var(--muted);
 }
 
+.sb-row-bar-hit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  cursor: pointer;
+}
+
 .sb-row-bar {
   position: absolute;
   left: 0;
@@ -244,17 +302,14 @@ td.sb-col-divider {
   border-radius: 2px;
 }
 
-td.sb-col-jobno {
-  position: sticky;
-}
-
 .sb-cell {
   padding: 0.4rem !important;
   position: relative;
+  overflow: visible;
 }
 
 .sb-cell--compact {
-  padding: 0.15rem !important;
+  padding: 0.3rem 0.15rem !important;
 }
 
 .sb-add {
@@ -298,16 +353,31 @@ td.sb-col-jobno {
   gap: 0.4rem;
   border: 1.5px solid;
   border-radius: 8px;
-  padding: 0.5rem 0.65rem;
+  padding: 0.5rem 0.4rem 0.5rem 0.65rem;
   font-size: 0.8rem;
   cursor: pointer;
   text-align: left;
+  transition: all 0.2s ease;
+  overflow: hidden;
 }
 
+.sb-pill:hover {
+  filter: brightness(0.95);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.sb-pill:active {
+  transform: translateY(0);
+}
+
+/* Monthly bars: solid color, fully rounded, floating pill like a mini
+   Gantt block â€” no border, no text, no note badge. This is now the
+   only monthly look (the old "detailed" list-style month view is gone). */
 .sb-cell--compact .sb-pill {
-  height: 22px;
+  height: 30px;
   padding: 0;
-  border-radius: 4px;
+  border-radius: 15px;
   border-width: 0;
 }
 
@@ -325,68 +395,152 @@ td.sb-col-jobno {
   color: var(--text);
 }
 
-.sb-pill__note-badge {
+.sb-pill__note-wrap {
   position: absolute;
   top: 4px;
   right: 4px;
+  z-index: 1;
+}
+
+.sb-pill__note-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
   background: var(--card-bg);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   color: var(--muted);
-}
-
-.sb-note-pill {
-  width: 100%;
-  border: none;
-  background: var(--field-bg);
-  border-radius: 8px;
-  padding: 0.5rem 0.65rem;
-  font-size: 0.78rem;
-  color: var(--text);
-  text-align: left;
   cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-.sb-cell--compact .sb-note-pill {
-  height: 22px;
-  padding: 0;
-  border-radius: 4px;
+.sb-pill__note-badge:hover {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+  transform: scale(1.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
-/* Cell menu popover */
-.cell-menu {
-  position: fixed;
-  z-index: 60;
-  width: 180px;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
-  padding: 0.4rem;
-}
-
-.cell-menu__option {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 0.6rem 0.7rem;
-  border: none;
-  background: none;
-  border-radius: 8px;
+.sb-pill__tooltip {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 220px;
+  background: #fff;
+  color: var(--ink);
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--ink);
-  cursor: pointer;
+  line-height: 1.4;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  z-index: 100;
+  white-space: normal;
 }
 
-.cell-menu__option:hover {
-  background: var(--field-bg);
+.sb-pill__tooltip i {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) rotate(225deg);
+  width: 8px;
+  height: 8px;
+  margin-bottom: -5px;
+  background: #fff;
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  z-index: -1;
+}
+
+.sb-pill__note-wrap:hover .sb-pill__tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.sb-jobno-tooltip--fixed {
+  position: fixed;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  pointer-events: none;
+  z-index: 200;
+}
+
+.sb-jobno-tooltip__pill {
+  display: inline-block;
+  padding: 0.4rem 0.9rem;
+  border: none;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.sb-jobno-tooltip__pill:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* Drag handle */
+.sb-pill__drag-handle {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 16px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: grab;
+  border-radius: 4px;
+  touch-action: none;
+}
+
+.sb-pill__drag-handle:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.sb-pill__drag-handle:active {
+  cursor: grabbing;
+}
+
+.sb-pill__drag-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--ink);
+  opacity: 0.45;
+}
+
+/* Drop target highlight */
+.sb-cell--drop-target {
+  background: rgba(34, 197, 94, 0.12);
+  outline: 2px dashed rgba(34, 197, 94, 0.55);
+  outline-offset: -2px;
+}
+
+/* Drag overlay ghost */
+.sb-pill--overlay {
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: grabbing;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
 }

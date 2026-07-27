@@ -1,0 +1,388 @@
+/* Shared modal shell ------------------------------------------------- */
+
+.cm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 20, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 1.5rem;
+}
+
+.cm-card {
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  width: 100%;
+}
+
+.cm-card--narrow {
+  max-width: 420px;
+}
+
+.cm-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.cm-card__title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.cm-card__title--pad {
+  margin-bottom: 1.1rem;
+}
+
+.cm-close {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 6px;
+  display: flex;
+}
+
+.cm-close:hover {
+  background: var(--field-bg);
+  color: var(--ink);
+}
+
+.cm-subtitle {
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin: 0.35rem 0 1.1rem;
+}
+
+.cm-card__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.4rem;
+}
+
+.cm-card__footer--center {
+  justify-content: center;
+}
+
+.cm-card__footer--split {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cm-card__footer-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+/* Add-new chooser ----------------------------------------------------- */
+
+.cm-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cm-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cm-choice:hover {
+  background: var(--field-bg);
+  transform: translateY(-1px);
+}
+
+/* Multiple jobs -------------------------------------------------------- */
+
+.cm-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: 420px;
+  width: 100%;
+}
+
+.cm-stack__label {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding-left: 0.2rem;
+}
+
+.cm-job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.cm-job-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  background: var(--card-bg);
+  cursor: pointer;
+  text-align: left;
+  color: var(--muted);
+  transition: all 0.15s ease;
+}
+
+.cm-job-row:hover {
+  background: var(--field-bg);
+}
+
+.cm-job-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.cm-job-row__meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.cm-job-row__name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Form fields ----------------------------------------------------------- */
+
+.cm-field-row {
+  display: flex;
+  gap: 0.85rem;
+}
+
+.cm-field-row .cm-field {
+  flex: 1;
+}
+
+.cm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.cm-field__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.cm-input {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.88rem;
+  color: var(--ink);
+  background: var(--card-bg);
+  outline: none;
+}
+
+.cm-input:focus-within {
+  border-color: var(--ink);
+}
+
+.cm-input--split {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.cm-input__bare {
+  border: none;
+  outline: none;
+  background: none;
+  flex: 1;
+  font-size: 0.88rem;
+  color: var(--ink);
+  min-width: 0;
+}
+
+.cm-input__suffix,
+.cm-input__prefix {
+  color: var(--muted);
+  font-size: 0.88rem;
+  flex-shrink: 0;
+}
+
+.cm-field__dropdown {
+  width: 100%;
+}
+
+.cm-field__dropdown .md-trigger {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.cm-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: none;
+  background: none;
+  color: #ef4444;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.4rem 0.2rem;
+}
+
+.cm-remove:hover {
+  text-decoration: underline;
+}
+
+/* Delete confirmation ----------------------------------------------------- */
+
+.cm-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.cm-confirm__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.cm-confirm__title {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 0.35rem;
+}
+
+.cm-confirm__sub {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* MenuDropdown ------------------------------------------------------------ */
+
+.md-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.md-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.md-trigger__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 40;
+  min-width: 220px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 0.35rem;
+}
+
+.md-panel--right {
+  left: auto;
+  right: 0;
+}
+
+.md-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: none;
+  background: none;
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.md-option:hover {
+  background: var(--field-bg);
+}
+
+.md-option__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-option svg:last-child {
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+.md-avatar {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--field-bg);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.md-avatar__dot {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--card-bg);
+}

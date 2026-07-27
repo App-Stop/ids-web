@@ -7,12 +7,12 @@ const OPERATIONS = [
   { label: 'Dashboard', icon: Icon.Grid, path: '/dashboard' },
   { label: 'Schedule Board', icon: Icon.Calendar, path: '/schedule-board' },
   { label: 'Jobs Management', icon: Icon.Wrench, path: '/jobs-management' },
+  { label: 'Cost Tracking', icon: Icon.Dollar, path: null },
 ]
 
 const MANAGEMENT = [
-  { label: 'Crew Management', icon: Icon.Users, path: null },
+  { label: 'Crew Management', icon: Icon.Users, path: '/Crew' },
   { label: 'Timesheet', icon: Icon.List, path: null },
-  { label: 'Cost Reports', icon: Icon.Dollar, path: null },
 ]
 
 export default function Sidebar({ active }: { active: string }) {

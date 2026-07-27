@@ -3,6 +3,7 @@ import Sidebar from '../components/dashboard/Sidebar'
 import Topbar from '../components/dashboard/Topbar'
 import Dropdown from '../components/dashboard/Dropdown'
 import Avatar from '../components/dashboard/Avatar'
+import ZoomControl from '../components/dashboard/ZoomControl'
 import CreateJobModal, { type JobFormData } from '../components/dashboard/CreateJobModal'
 import { Icon } from '../components/dashboard/icons'
 import { crewLeads, formatMoney, type Job } from '../lib/dashboardData'
@@ -141,15 +142,11 @@ export default function JobsManagement() {
           onAddJob={() => setShowCreate(true)}
           onCreateCrew={() => {}}
           extra={
-            <div className="jm-zoom">
-              <button type="button" className="icon-btn" onClick={() => setZoom((z) => Math.max(0.7, +(z - 0.1).toFixed(1)))}>
-                <Icon.ZoomIn width={16} height={16} />
-              </button>
-              <span className="jm-zoom__divider" />
-              <button type="button" className="icon-btn" onClick={() => setZoom((z) => Math.min(1.3, +(z + 0.1).toFixed(1)))}>
-                <Icon.ZoomOut width={16} height={16} />
-              </button>
-            </div>
+            <ZoomControl
+              zoom={zoom}
+              onZoomIn={() => setZoom((z) => Math.min(1.3, +(z + 0.1).toFixed(1)))}
+              onZoomOut={() => setZoom((z) => Math.max(0.7, +(z - 0.1).toFixed(1)))}
+            />
           }
         />
 

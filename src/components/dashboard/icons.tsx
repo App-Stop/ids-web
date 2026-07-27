@@ -100,4 +100,12 @@ export const Icon = {
   Edit: (p: SVGProps<SVGSVGElement>) => (
     <svg {...base} {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z" /></svg>
   ),
+  HardHat: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...base} {...p}>
+      <path d="M4 18a8 8 0 0 1 16 0" />
+      <path d="M2 18h20" />
+      <path d="M12 10V4" />
+      <path d="M9 4h6" />
+    </svg>
+  ),
 }

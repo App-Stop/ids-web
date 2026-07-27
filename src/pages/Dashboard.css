@@ -190,6 +190,20 @@
   position: relative;
 }
 
+.zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.zoom-control__pct {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  min-width: 34px;
+  text-align: right;
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;

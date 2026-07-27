@@ -1,0 +1,371 @@
+.cm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 18, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  overflow: auto;
+  z-index: 50;
+}
+
+.cm-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--card-bg);
+  border-radius: 18px;
+  padding: 1.75rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.cm-card--narrow {
+  max-width: 380px;
+}
+
+.cm-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cm-card__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.cm-card__title--pad {
+  margin-bottom: 1rem;
+}
+
+.cm-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.cm-close:hover {
+  background: var(--field-bg);
+  color: var(--ink);
+}
+
+.cm-subtitle {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.cm-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+}
+
+.cm-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cm-choice:hover {
+  background: var(--field-bg);
+}
+
+.cm-choice svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.cm-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cm-stack__label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cm-job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.cm-job-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.cm-job-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.cm-job-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.cm-job-row__name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cm-card__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+}
+
+.cm-card__footer--center {
+  justify-content: center;
+}
+
+.cm-card__footer--split {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cm-card__footer-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.cm-remove {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: none;
+  background: none;
+  color: #dc2626;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.6rem 0;
+}
+
+.cm-confirm {
+  text-align: center;
+}
+
+.cm-confirm__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #fee2e2;
+  color: #dc2626;
+  margin-bottom: 0.9rem;
+}
+
+.cm-confirm__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.cm-confirm__sub {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.cm-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9rem;
+}
+
+.cm-field {
+  display: block;
+  margin-top: 1.1rem;
+}
+
+.cm-field__label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cm-field__dropdown {
+  width: 100%;
+}
+
+.cm-input {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.cm-input:focus {
+  border-color: var(--yellow-dark);
+}
+
+.cm-input--split {
+  padding: 0;
+  overflow: hidden;
+}
+
+.cm-input__bare {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+  background: none;
+}
+
+.cm-input__prefix {
+  padding: 0.7rem 0 0.7rem 0.85rem;
+  color: var(--muted);
+}
+
+.cm-input__suffix {
+  padding: 0.7rem 0.85rem;
+  background: var(--field-bg);
+  color: var(--muted);
+  border-left: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+/* Menu dropdown (used for filters like Status/Sort/Crew/Job pickers) */
+.md-wrap {
+  position: relative;
+}
+
+.md-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 140px;
+}
+
+.md-trigger__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: 280px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 0.4rem;
+  z-index: 30;
+}
+
+.md-panel--right {
+  left: auto;
+  right: 0;
+}
+
+.md-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.md-option:hover {
+  background: var(--field-bg);
+}
+
+.md-option__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--field-bg);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.md-avatar__dot {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--card-bg);
+}

@@ -5,6 +5,7 @@ import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import ScheduleBoard from './pages/ScheduleBoard'
 import JobsManagement from './pages/JobsManagement'
+import Crew from './pages/Crew'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/schedule-board" element={<ScheduleBoard />} />
       <Route path="/jobs-management" element={<JobsManagement />} />
+      <Route path="/Crew" element={<Crew />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
