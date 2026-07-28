@@ -9,7 +9,7 @@ import MemberFormModal, { type MemberFormData } from '../components/dashboard/Me
 // Reused as-is from the Dashboard page, per existing pattern.
 import CreateCrewModal from '../components/dashboard/CreateCrewModal'
 import AssignJobModal from '../components/dashboard/AssignJobModal'
-import { jobs as masterJobs } from '../lib/dashboardData'
+import { crewLeads, jobs as masterJobs } from '../lib/dashboardData'
 import {
   crewRows as initialCrewRows,
   rosterRows as initialRosterRows,
@@ -51,6 +51,18 @@ function StatusPill({ status }: { status: Status }) {
   return <span className={`crew-status crew-status--${status.toLowerCase()}`}>{status}</span>
 }
 
+function JobNameTooltip({ names, x, y }: { names: string[]; x: number; y: number }) {
+  return (
+    <div className="crew-job-tooltip crew-job-tooltip--fixed" style={{ left: x, top: y }}>
+      {names.map((name) => (
+        <span key={name} className="crew-job-tooltip__item">
+          {name}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function Crew() {
   const [tab, setTab] = useState<Tab>('crew')
   const [crewRows, setCrewRows] = useState(initialCrewRows)
@@ -61,6 +73,7 @@ export default function Crew() {
   const [sort, setSort] = useState<SortKey>('name-asc')
   const [jobFilter, setJobFilter] = useState<string | null>(null) // Crew tab
   const [crewFilter, setCrewFilter] = useState<string | null>(null) // Roster tab
+  const [jobHover, setJobHover] = useState<{ x: number; y: number; names: string[] } | null>(null)
 
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
 
@@ -141,6 +154,13 @@ export default function Crew() {
     if (flow.type !== 'editMember') return
     const targetId = flow.member.id
     setRosterRows((list) => list.filter((r) => r.id !== targetId))
+    setFlow({ type: 'none' })
+  }
+
+  function removeCrew() {
+    if (flow.type !== 'editCrew') return
+    const targetId = flow.crew.id
+    setCrewRows((list) => list.filter((r) => r.id !== targetId))
     setFlow({ type: 'none' })
   }
 
@@ -266,12 +286,47 @@ export default function Crew() {
                       ) : (
                         <button type="button" className="crew-job-cell" onClick={() => setFlow({ type: 'multipleJobs', crew: row })}>
                           <span className="crew-job-cell__name">{row.jobs[0].jobName}</span>
-                          {row.jobs.length > 1 && <span className="crew-job-cell__more">+{row.jobs.length - 1}</span>}
+                          {row.laborNames.length > 1 && (
+                            <span
+                              className="crew-job-cell__more"
+                              onMouseEnter={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setJobHover({
+                                  x: rect.left + rect.width / 2,
+                                  y: rect.bottom + 10,
+                                  names: row.laborNames,
+                                })
+                              }}
+                              onMouseLeave={() => setJobHover(null)}
+                            >
+                              +{row.laborNames.length - 1}
+                            </span>
+                          )}
                           <Icon.ChevronRight width={14} height={14} />
                         </button>
                       )}
                     </td>
-                    <td>{row.workers}</td>
+                    <td>
+                      <span className="crew-workers-cell">
+                        {row.workers}
+                        {row.laborNames.length > 1 && (
+                          <span
+                            className="crew-workers-cell__more"
+                            onMouseEnter={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setJobHover({
+                                x: rect.left + rect.width / 2,
+                                y: rect.bottom + 10,
+                                names: row.laborNames,
+                              })
+                            }}
+                            onMouseLeave={() => setJobHover(null)}
+                          >
+                            +{row.laborNames.length - 1}
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td>{row.rate}</td>
                     <td>
                       <StatusPill status={row.status} />
@@ -353,6 +408,7 @@ export default function Crew() {
           jobs={masterJobs}
           onCancel={() => setFlow({ type: 'none' })}
           onSubmit={(data) => {
+            const selectedLead = crewLeads.find((item) => item.id === data.crewLeadId)
             setCrewRows((list) => [
               ...list,
               {
@@ -360,11 +416,21 @@ export default function Crew() {
                 crewId: String(Math.floor(1000 + Math.random() * 9000)),
                 name: data.crewName,
                 avatar: `https://i.pravatar.cc/64?img=${Math.floor(Math.random() * 70)}`,
-                color: '#94a3b8',
-                jobs: [],
-                workers: 1,
-                rate: 25,
-                status: 'Unassigned',
+                color: data.color ?? '#94a3b8',
+                jobs: data.jobId
+                  ? [
+                      {
+                        bidNo: '0000',
+                        jobNo: '000',
+                        date: new Date().toISOString().slice(0, 10),
+                        jobName: masterJobs.find((job) => job.id === data.jobId)?.name ?? 'Assigned Job',
+                      },
+                    ]
+                  : [],
+                workers: data.laborNames.length,
+                laborNames: data.laborNames,
+                rate: selectedLead?.rate ?? 25,
+                status: data.status === 'active' ? 'Active' : data.status === 'inactive' ? 'Inactive' : 'Unassigned',
               },
             ])
             setFlow({ type: 'none' })
@@ -373,23 +439,53 @@ export default function Crew() {
       )}
 
       {flow.type === 'editCrew' && (
-        // NOTE: assumes CreateCrewModal accepts an optional `crew` prop for
-        // edit mode, mirroring how CreateJobModal takes an optional `job`.
-        // If your existing CreateCrewModal doesn't support this yet, add a
-        // `crew?: { name; color; rate }` prop and prefill the form from it.
         <CreateCrewModal
           jobs={masterJobs}
-          crew={{ name: flow.crew.name, color: flow.crew.color, rate: flow.crew.rate }}
+          crew={{
+            name: flow.crew.name,
+            color: flow.crew.color,
+            rate: flow.crew.rate,
+            laborNames: flow.crew.laborNames,
+            status: flow.crew.status.toLowerCase() as 'active' | 'inactive' | 'unassigned',
+            jobId: flow.crew.jobs[0] ? masterJobs.find((job) => job.name === flow.crew.jobs[0].jobName)?.id ?? null : null,
+          }}
           onCancel={() => setFlow({ type: 'none' })}
           onSubmit={(data) => {
             const targetId = flow.crew.id
+            const selectedJob = data.jobId ? masterJobs.find((job) => job.id === data.jobId) : undefined
+            const selectedLead = crewLeads.find((item) => item.id === data.crewLeadId)
             setCrewRows((list) =>
-              list.map((r) => (r.id === targetId ? { ...r, name: data.crewName, color: data.color ?? r.color } : r)),
+              list.map((r) =>
+                r.id === targetId
+                  ? {
+                      ...r,
+                      name: data.crewName,
+                      color: data.color ?? r.color,
+                      workers: data.laborNames.length,
+                      laborNames: data.laborNames,
+                      rate: selectedLead?.rate ?? r.rate,
+                      status: data.status === 'active' ? 'Active' : data.status === 'inactive' ? 'Inactive' : 'Unassigned',
+                      jobs: selectedJob
+                        ? [
+                            {
+                              bidNo: '0000',
+                              jobNo: '000',
+                              date: new Date().toISOString().slice(0, 10),
+                              jobName: selectedJob.name,
+                            },
+                          ]
+                        : r.jobs,
+                    }
+                  : r,
+              ),
             )
             setFlow({ type: 'none' })
           }}
+          onRemove={removeCrew}
         />
       )}
+
+      {jobHover && <JobNameTooltip names={jobHover.names} x={jobHover.x} y={jobHover.y} />}
 
       {flow.type === 'addMember' && (
         <MemberFormModal

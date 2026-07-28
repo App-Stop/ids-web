@@ -7,12 +7,12 @@ const OPERATIONS = [
   { label: 'Dashboard', icon: Icon.Grid, path: '/dashboard' },
   { label: 'Schedule Board', icon: Icon.Calendar, path: '/schedule-board' },
   { label: 'Jobs Management', icon: Icon.Wrench, path: '/jobs-management' },
-  { label: 'Cost Tracking', icon: Icon.Dollar, path: null },
+  { label: 'Cost Tracking', icon: Icon.Dollar, path: '/cost-tracking' },
 ]
 
 const MANAGEMENT = [
   { label: 'Crew Management', icon: Icon.Users, path: '/Crew' },
-  { label: 'Timesheet', icon: Icon.List, path: null },
+  { label: 'Timesheet', icon: Icon.List, path: '/timesheet' },
 ]
 
 export default function Sidebar({ active }: { active: string }) {
@@ -63,7 +63,7 @@ export default function Sidebar({ active }: { active: string }) {
         ))}
       </nav>
 
-      <div className="sidebar__user">
+      <button type="button" className="sidebar__user sidebar__user--button" onClick={() => navigate('/profile')}>
         <span className="avatar avatar--muted">HY</span>
         {!collapsed && (
           <>
@@ -74,7 +74,7 @@ export default function Sidebar({ active }: { active: string }) {
             <Icon.Settings width={16} height={16} />
           </>
         )}
-      </div>
+      </button>
     </aside>
   )
 }

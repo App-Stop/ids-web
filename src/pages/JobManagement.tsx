@@ -142,12 +142,12 @@ export default function JobsManagement() {
           onAddJob={() => setShowCreate(true)}
           onCreateCrew={() => {}}
           extra={
-            <ZoomControl
-              zoom={zoom}
-              onZoomIn={() => setZoom((z) => Math.min(1.3, +(z + 0.1).toFixed(1)))}
-              onZoomOut={() => setZoom((z) => Math.max(0.7, +(z - 0.1).toFixed(1)))}
-            />
-          }
+              <ZoomControl
+                        zoom={zoom}
+                        onZoomIn={() => setZoom((z) => Math.min(1.5, +(z + 0.05).toFixed(2)))}
+                        onZoomOut={() => setZoom((z) => Math.max(0.75, +(z - 0.05).toFixed(2)))}
+                      />
+                    }
         />
 
         <h1 className="dash__title">Jobs</h1>

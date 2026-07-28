@@ -106,6 +106,19 @@
   border-top: 1px solid var(--border);
 }
 
+.sidebar__user--button {
+  width: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.sidebar__user--button:hover {
+  background: var(--field-bg);
+}
+
 .sidebar__user-info {
   display: flex;
   flex-direction: column;

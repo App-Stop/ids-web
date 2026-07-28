@@ -15,6 +15,7 @@ export interface CrewRow {
   color: string
   jobs: CrewJobAssignment[]
   workers: number
+  laborNames: string[]
   rate: number
   status: Status
 }
@@ -57,6 +58,7 @@ export const crewRows: CrewRow[] = [
       { bidNo: '1039', jobNo: '004', date: '06-20-2026', jobName: 'Riverbend School Renovation' },
     ],
     workers: 4,
+    laborNames: ['Maya R.', 'Liam T.', 'Sophia K.', 'Ethan B.'],
     rate: 30,
     status: 'Active',
   },
@@ -68,6 +70,7 @@ export const crewRows: CrewRow[] = [
     color: '#22c55e',
     jobs: [{ bidNo: '1051', jobNo: '007', date: '07-05-2026', jobName: 'Riverside Bridge Repair' }],
     workers: 5,
+    laborNames: ['Avery N.', 'Noah P.', 'Mila S.', 'Cole R.', 'June H.'],
     rate: 40,
     status: 'Inactive',
   },
@@ -79,6 +82,7 @@ export const crewRows: CrewRow[] = [
     color: '#ef4444',
     jobs: [],
     workers: 4,
+    laborNames: ['Rico M.', 'Landon F.', 'Tessa J.', 'Owen P.'],
     rate: 25,
     status: 'Unassigned',
   },
@@ -93,6 +97,7 @@ export const crewRows: CrewRow[] = [
       { bidNo: '1044', jobNo: '003', date: '06-28-2026', jobName: 'Downtown Highrise Demolition' },
     ],
     workers: 4,
+    laborNames: ['Zane D.', 'Ivy M.', 'Marco L.', 'Aria S.'],
     rate: 30,
     status: 'Active',
   },
@@ -109,6 +114,7 @@ export const crewRows: CrewRow[] = [
       { bidNo: '1035', jobNo: '010', date: '07-08-2026', jobName: 'Old Mill Warehouse Tear Down' },
     ],
     workers: 6,
+    laborNames: ['Nia C.', 'Leo W.', 'Mina T.'],
     rate: 35,
     status: 'Active',
   },
@@ -120,6 +126,7 @@ export const crewRows: CrewRow[] = [
     color: '#3b82f6',
     jobs: [],
     workers: 5,
+    laborNames: ['Finn J.', 'Luca P.', 'Ruby A.'],
     rate: 45,
     status: 'Unassigned',
   },

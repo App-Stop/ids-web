@@ -1,0 +1,385 @@
+.profile-page__main {
+  padding-right: 2.25rem;
+}
+
+.profile-page__header {
+  margin-top: 1.75rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.profile-page__title {
+  margin-top: 0;
+}
+
+.profile-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: none;
+  background: none;
+  color: #ef4444;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.profile-tabs {
+  margin-top: 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #ececec;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.profile-tab {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.5rem 0.8rem;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.profile-tab.is-active {
+  background: var(--card-bg);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.profile-card {
+  margin-top: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card-bg);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.03);
+}
+
+.profile-card--settings {
+  max-width: 560px;
+  padding: 1rem 1rem 1.15rem;
+}
+
+.profile-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.profile-photo {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #e4e4e4;
+  color: #8b8b8b;
+  font-size: 1.4rem;
+  font-weight: 500;
+}
+
+.profile-upload-btn {
+  padding: 0.5rem 0.8rem;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem 0.85rem;
+}
+
+.profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.profile-field span {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.profile-field input {
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 0.7rem;
+  background: var(--card-bg);
+  color: var(--ink);
+  font-size: 0.88rem;
+  outline: none;
+}
+
+.profile-field input:read-only {
+  background: var(--field-bg);
+  color: var(--muted);
+}
+
+.profile-password {
+  margin-top: 1.35rem;
+}
+
+.profile-password h2,
+.profile-card--notifications h2 {
+  margin: 0 0 0.9rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.profile-password__grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.profile-field--full input {
+  max-width: 245px;
+}
+
+.profile-actions {
+  margin-top: 1.2rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.profile-actions--end {
+  justify-content: flex-end;
+}
+
+.profile-secondary-btn {
+  border-color: var(--border);
+  background: var(--card-bg);
+  color: var(--ink);
+}
+
+.profile-card--team {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.profile-team {
+  display: flex;
+  flex-direction: column;
+  gap: 1.05rem;
+}
+
+.profile-table {
+  display: grid;
+}
+
+.profile-table__head,
+.profile-table__row {
+  display: grid;
+  grid-template-columns: 34px 88px 1.4fr 130px 140px 70px;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.profile-table__head {
+  padding: 0.95rem 1rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-table__row {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.profile-table__row:last-child {
+  border-bottom: none;
+}
+
+.profile-table__check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--yellow);
+}
+
+.profile-member {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.profile-member__avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #d8d8d8;
+  color: #5f5f5f;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.profile-role-pill {
+  min-width: 122px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+.profile-edit-btn {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-team__footer {
+  display: flex;
+  justify-content: center;
+  padding: 0;
+}
+
+.profile-add-team-btn {
+  min-width: 92px;
+}
+
+.profile-card--notifications {
+  max-width: 560px;
+  padding: 1rem 1rem 0.9rem;
+}
+
+.profile-notifications {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.profile-notification {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.profile-notification h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.profile-notification p {
+  margin: 0.18rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.profile-notification__toggles {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-shrink: 0;
+  padding-top: 0.05rem;
+}
+
+.profile-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.profile-toggle__box {
+  width: 19px;
+  height: 19px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-bg);
+  color: transparent;
+}
+
+.profile-toggle.is-active .profile-toggle__box {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--ink);
+}
+
+@media (max-width: 920px) {
+  .profile-page__header,
+  .profile-notification {
+    flex-direction: column;
+  }
+
+  .profile-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .profile-card--settings,
+  .profile-card--notifications,
+  .profile-card--team {
+    max-width: 100%;
+  }
+
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-field--full input {
+    max-width: none;
+  }
+
+  .profile-table__head,
+  .profile-table__row {
+    grid-template-columns: 28px 80px 1fr 110px 120px 52px;
+  }
+}
+
+@media (max-width: 720px) {
+  .profile-page__main {
+    padding: 1.25rem 1rem 2.5rem;
+  }
+
+  .profile-table__head,
+  .profile-table__row {
+    min-width: 680px;
+  }
+
+  .profile-card--team {
+    overflow-x: auto;
+  }
+}

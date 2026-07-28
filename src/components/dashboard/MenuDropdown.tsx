@@ -60,7 +60,10 @@ export default function MenuDropdown({
   return (
     <div className={`md-wrap ${className}`} onBlur={handleBlur} tabIndex={-1}>
       <button type="button" className="btn btn--outline md-trigger" onClick={() => setOpen((o) => !o)}>
-        <span className="md-trigger__label">{label}</span>
+        <span className="md-trigger__label">
+          {showDot && selected?.color && value !== null ? <PersonDot color={selected.color} /> : null}
+          <span>{label}</span>
+        </span>
         <Icon.ChevronDown width={14} height={14} />
       </button>
 

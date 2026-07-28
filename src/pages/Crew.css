@@ -1,30 +1,40 @@
 .crew-toolbar {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
   margin-top: 1.5rem;
   flex-wrap: wrap;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card-bg);
 }
 
 .crew-search {
-  flex: 0 1 320px;
+  flex: 1;
+  min-width: 200px;
 }
 
 .crew-count {
   font-size: 0.85rem;
+  font-weight: 600;
   color: var(--muted);
   white-space: nowrap;
 }
 
 .crew-tab-toggle {
-  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .crew-add-btn {
-  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
 }
 
-/* Table */
+/* Table ---------------------------------------------------------------- */
+
 .crew-table-wrap {
   margin-top: 1.25rem;
   overflow-x: auto;
@@ -41,11 +51,12 @@
 
 .crew-table th,
 .crew-table td {
+  padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--border);
-  padding: 0.85rem 0.9rem;
   text-align: left;
-  white-space: nowrap;
   font-size: 0.85rem;
+  color: var(--ink);
+  white-space: nowrap;
 }
 
 .crew-table thead th {
@@ -63,18 +74,10 @@
   width: 40px;
 }
 
-.crew-col-check input {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-}
-
 .crew-id-cell {
-  font-weight: 700;
-  color: var(--ink);
-  border-left-width: 4px;
-  border-left-style: solid;
-  border-left-color: var(--border);
+  font-weight: 600;
+  border-left: 3px solid transparent;
+  padding-left: 0.85rem !important;
 }
 
 .crew-name-cell {
@@ -82,16 +85,14 @@
   align-items: center;
   gap: 0.6rem;
   font-weight: 600;
-  color: var(--ink);
 }
 
 .crew-avatar {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background: var(--field-bg);
 }
 
 .crew-job-cell {
@@ -101,49 +102,53 @@
   border: none;
   background: none;
   padding: 0;
-  font: inherit;
-  color: var(--ink);
-  font-weight: 600;
   cursor: pointer;
-  max-width: 220px;
+  color: var(--ink);
+  font-size: 0.85rem;
 }
 
 .crew-job-cell__name {
+  max-width: 26rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.crew-job-cell__more {
-  flex-shrink: 0;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  background: var(--field-bg);
-  color: var(--text);
-  font-size: 0.72rem;
-  font-weight: 700;
+.crew-job-cell:hover .crew-job-cell__name {
+  text-decoration: underline;
 }
 
-.crew-job-cell svg {
-  flex-shrink: 0;
+.crew-job-cell__more {
   color: var(--muted);
+  font-weight: 600;
+  position: relative;
+}
+
+.crew-workers-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.crew-workers-cell__more {
+  color: var(--muted);
+  font-weight: 600;
+  cursor: default;
 }
 
 .crew-job-cell__unassigned {
   color: var(--muted);
-  font-weight: 500;
 }
 
 .crew-assign-link {
-  margin-left: 0.6rem;
   border: none;
   background: none;
-  padding: 0;
-  font: inherit;
+  color: #eab308;
   font-weight: 700;
-  font-size: 0.82rem;
-  color: var(--yellow-dark);
+  font-size: 0.85rem;
   cursor: pointer;
+  margin-left: 0.5rem;
+  padding: 0;
 }
 
 .crew-assign-link:hover {
@@ -151,56 +156,77 @@
 }
 
 .crew-assigned-cell {
-  display: inline-block;
-  padding-left: 0.7rem;
-  border-left-width: 4px;
-  border-left-style: solid;
-  border-left-color: var(--border);
+  border-left: 3px solid transparent;
+  padding-left: 0.6rem;
   font-weight: 600;
+}
+
+.crew-edit-btn {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0.35rem;
+  border-radius: 6px;
+  display: inline-flex;
+}
+
+.crew-edit-btn:hover {
+  background: var(--field-bg);
   color: var(--ink);
 }
 
-.crew-status {
+.crew-job-tooltip--fixed {
+  position: fixed;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  pointer-events: none;
+  z-index: 200;
+}
+
+.crew-job-tooltip__item {
   display: inline-block;
-  padding: 0.25rem 0.65rem;
+  max-width: 280px;
+  padding: 0.45rem 0.8rem;
+  border-radius: 18px;
+  background: #111827;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+
+/* Status pills ----------------------------------------------------------- */
+
+.crew-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.7rem;
   border-radius: 999px;
-  border: 1px solid;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 700;
+  border: 1.5px solid;
 }
 
 .crew-status--active {
   color: #16a34a;
-  border-color: #16a34a;
-  background: rgba(22, 163, 74, 0.1);
+  border-color: #86efac;
+  background: rgba(34, 197, 94, 0.08);
 }
 
 .crew-status--inactive {
   color: #ea580c;
-  border-color: #ea580c;
-  background: rgba(234, 88, 12, 0.1);
+  border-color: #fdba74;
+  background: rgba(249, 115, 22, 0.08);
 }
 
 .crew-status--unassigned {
   color: var(--muted);
   border-color: var(--border);
   background: var(--field-bg);
-}
-
-.crew-edit-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card-bg);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.crew-edit-btn:hover {
-  background: var(--field-bg);
-  color: var(--ink);
 }

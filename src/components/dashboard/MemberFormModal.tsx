@@ -40,7 +40,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
   if (confirmingRemove) {
     return (
       <div className="cm-overlay" onClick={onCancel}>
-        <div className="cm-card cm-card--narrow cm-confirm" onClick={(e) => e.stopPropagation()}>
+        <div className="cm-card cm-card--narrow cm-card--member cm-confirm" onClick={(e) => e.stopPropagation()}>
           <div className="cm-confirm__icon">
             <Icon.AlertTriangle width={26} height={26} />
           </div>
@@ -61,7 +61,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
 
   return (
     <div className="cm-overlay" onClick={onCancel}>
-      <div className="cm-card cm-card--narrow" onClick={(e) => e.stopPropagation()}>
+      <div className="cm-card cm-card--narrow cm-card--member" onClick={(e) => e.stopPropagation()}>
         <h2 className="cm-card__title cm-card__title--pad">{mode === 'add' ? 'Add New Member' : 'Edit Member'}</h2>
 
         <div className="cm-field-row">

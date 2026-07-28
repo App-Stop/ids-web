@@ -25,6 +25,10 @@
   max-width: 380px;
 }
 
+.cm-card--member {
+  max-width: 480px;
+}
+
 .cm-card__header {
   display: flex;
   align-items: center;
@@ -170,6 +174,11 @@
   gap: 0.6rem;
 }
 
+.modal-actions__group {
+  display: flex;
+  gap: 0.6rem;
+}
+
 .cm-remove {
   display: flex;
   align-items: center;
@@ -234,6 +243,20 @@
   width: 100%;
 }
 
+.cm-field__dropdown .md-wrap {
+  width: 100%;
+}
+
+.cm-field__dropdown .md-trigger {
+  width: 100%;
+  min-width: 0;
+}
+
+.cm-field__dropdown .md-panel {
+  width: 100%;
+  max-width: none;
+}
+
 .cm-input {
   display: flex;
   align-items: center;
@@ -279,6 +302,60 @@
   white-space: nowrap;
 }
 
+.crew-chip-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 48px;
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.crew-chip-input:focus-within {
+  border-color: var(--yellow-dark);
+}
+
+.crew-chip-input__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--field-bg);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.crew-chip-input__remove {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.crew-chip-input__remove:hover {
+  color: var(--ink);
+}
+
+.crew-chip-input__field {
+  flex: 1;
+  min-width: 140px;
+  border: none;
+  outline: none;
+  padding: 0.35rem 0.4rem;
+  font: inherit;
+  background: none;
+}
+
 /* Menu dropdown (used for filters like Status/Sort/Crew/Job pickers) */
 .md-wrap {
   position: relative;
@@ -293,6 +370,10 @@
 }
 
 .md-trigger__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

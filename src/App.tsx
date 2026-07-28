@@ -4,8 +4,11 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import ScheduleBoard from './pages/ScheduleBoard'
-import JobsManagement from './pages/JobsManagement'
+import JobsManagement from './pages/JobManagement'
 import Crew from './pages/Crew'
+import CostTracking from './pages/CostTracking'
+import Timesheet from './pages/Timesheet'
+import Profile from './pages/Profile'
 
 function App() {
   return (
@@ -16,7 +19,10 @@ function App() {
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/schedule-board" element={<ScheduleBoard />} />
       <Route path="/jobs-management" element={<JobsManagement />} />
+      <Route path="/cost-tracking" element={<CostTracking />} />
       <Route path="/Crew" element={<Crew />} />
+      <Route path="/timesheet" element={<Timesheet />} />
+      <Route path="/profile" element={<Profile />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

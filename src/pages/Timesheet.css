@@ -1,0 +1,304 @@
+.ts-page {
+  background: var(--bg);
+}
+
+.ts-main {
+  padding-bottom: 2.5rem;
+}
+
+.ts-topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ts-topbar__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ts-search {
+  flex: 1;
+  min-width: 220px;
+  max-width: 380px;
+}
+
+.ts-header-row {
+  margin-top: 1.4rem;
+}
+
+.ts-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card-bg);
+}
+
+.ts-toolbar__left,
+.ts-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ts-log-action,
+.ts-log-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ts-table-wrap {
+  margin-top: 1rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card-bg);
+}
+
+.ts-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.ts-table th,
+.ts-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: var(--ink);
+  vertical-align: middle;
+}
+
+.ts-table thead th {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--card-bg);
+}
+
+.ts-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ts-col-check {
+  width: 40px;
+}
+
+.ts-col-check input {
+  width: 16px;
+  height: 16px;
+}
+
+.ts-id-cell {
+  font-weight: 600;
+}
+
+.ts-member-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+}
+
+.ts-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.ts-action-btn:hover {
+  background: var(--field-bg);
+  color: var(--ink);
+}
+
+.ts-date-field,
+.ts-time-field {
+  position: relative;
+  width: 100%;
+}
+
+.ts-date-field__trigger,
+.ts-time-field__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.ts-date-field__native,
+.ts-time-field__native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ts-field-row {
+  gap: 0.75rem;
+}
+
+.ts-field-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.ts-override-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.ts-override-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: #f5d400;
+}
+
+.ts-member-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.ts-modal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ts-modal-head__meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.ts-modal-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.9rem 0 1rem;
+}
+
+.ts-modal-person {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ts-confirm-card {
+  max-width: 420px;
+  text-align: center;
+}
+
+.ts-confirm-card__icon {
+  color: #f59e0b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.ts-confirm-card__sub {
+  margin-top: 0.4rem;
+  color: var(--muted);
+}
+
+.ts-remove-btn {
+  border: none;
+  background: none;
+  color: #ef4444;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+}
+
+.ts-remove-btn:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 980px) {
+  .ts-topbar,
+  .ts-toolbar {
+    align-items: stretch;
+  }
+
+  .ts-topbar {
+    flex-direction: column;
+  }
+
+  .ts-topbar__actions {
+    margin-left: 0;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .ts-toolbar {
+    flex-direction: column;
+  }
+
+  .ts-toolbar__left,
+  .ts-toolbar__right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 720px) {
+  .ts-search,
+  .ts-toolbar__left,
+  .ts-toolbar__right {
+    width: 100%;
+  }
+
+  .ts-toolbar__right {
+    justify-content: stretch;
+  }
+
+  .ts-log-btn,
+  .ts-log-action {
+    width: 100%;
+    justify-content: center;
+  }
+}
