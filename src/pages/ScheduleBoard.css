@@ -621,6 +621,16 @@ td.sb-col-divider {
   overflow: visible;
 }
 
+/* Hide vertical day grid lines through crew assignment bars */
+.sb-table--days td.sb-cell--occupied {
+  border-right-color: transparent;
+}
+
+/* Restore the divider when the next day is empty */
+.sb-table--days td.sb-cell--occupied + td.sb-cell:not(.sb-cell--occupied) {
+  box-shadow: inset 1px 0 0 var(--border);
+}
+
 /* Cell that owns a bar stacks above later days so the RIGHT handle is reachable */
 .sb-cell:has(.sb-pill-wrap) {
   z-index: 5;

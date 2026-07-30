@@ -201,7 +201,7 @@ function AssignmentPill({
           compact
             ? { background: color }
             : {
-                background: `${color}1A`,
+                background: `color-mix(in srgb, ${color} 14%, #fff)`,
                 borderColor: color,
               }
         }
@@ -222,11 +222,13 @@ function DayCell({
   jobId,
   iso,
   compact,
+  occupied = false,
   children,
 }: {
   jobId: string
   iso: string
   compact: boolean
+  occupied?: boolean
   children: React.ReactNode
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -237,7 +239,7 @@ function DayCell({
   return (
     <td
       ref={setNodeRef}
-      className={`${compact ? 'sb-cell sb-cell--compact' : 'sb-cell'}${isOver ? ' sb-cell--drop-target' : ''}`}
+      className={`${compact ? 'sb-cell sb-cell--compact' : 'sb-cell'}${occupied ? ' sb-cell--occupied' : ''}${isOver ? ' sb-cell--drop-target' : ''}`}
     >
       {children}
     </td>
@@ -694,7 +696,7 @@ export default function ScheduleBoard() {
                             }
 
                             return (
-                              <DayCell key={iso} jobId={row.id} iso={iso} compact={compact}>
+                              <DayCell key={iso} jobId={row.id} iso={iso} compact={compact} occupied>
                                 {isSpanStart ? (
                                   <AssignmentPill
                                     assignment={assignment}
