@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ArrowDown } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Topbar from '../components/dashboard/Topbar'
@@ -13,6 +13,7 @@ import AssignJobModal from '../components/dashboard/AssignJobModal'
 import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import ZoomControl from '../components/dashboard/ZoomControl'
+import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import {
   assignableCrews,
   crewLeads,
@@ -123,10 +124,13 @@ export default function Crew() {
   const [jobFilter, setJobFilter] = useState<string | null>(null) // Crew tab
   const [crewFilter, setCrewFilter] = useState<string | null>(null) // Roster tab
   const [jobHover, setJobHover] = useState<{ x: number; y: number; names: string[] } | null>(null)
+  const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
   const [jobNotes, setJobNotes] = useState<Record<string, string>>({
     'c8742:1042:001': 'Coordinate with suppliers and schedule weekly progress meetings.',
   })
   const [zoom, setZoom] = useState(1)
+  const tableWrapRef = useRef<HTMLDivElement>(null)
+  useClickDragScroll(tableWrapRef)
 
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
 
@@ -250,8 +254,20 @@ export default function Crew() {
           }
         />
 
-        <h1 className="dash__title">Crew</h1>
-        <p className="dash__subtitle">Manage your crew leads and rosters</p>
+        <div className="crew-header-row">
+          <div>
+            <h1 className="dash__title">Crew</h1>
+            <p className="dash__subtitle">Manage your crew leads and rosters</p>
+          </div>
+          <div className="sb-legend">
+            {crewRows.map((crew) => (
+              <span key={crew.id} className="sb-legend__item">
+                <i style={{ background: crew.color }} />
+                {crew.name}
+              </span>
+            ))}
+          </div>
+        </div>
 
         <div className="crew-toolbar">
           <label className="crew-search">
@@ -331,7 +347,7 @@ export default function Crew() {
           </button>
         </div>
 
-        <div className="crew-table-wrap">
+        <div className="crew-table-wrap" ref={tableWrapRef}>
           {tab === 'crew' ? (
             <table className="crew-table">
               <colgroup>
@@ -350,11 +366,11 @@ export default function Crew() {
                     <input type="checkbox" />
                   </th>
                   <th>Crew ID</th>
-                  <th>Crew Name</th>
+                  <th className="crew-center">Crew Name</th>
                   <th>Job Name</th>
-                  <th>Workers</th>
-                  <th>Hourly Rate ($)</th>
-                  <th>
+                  <th className="crew-center">Workers</th>
+                  <th className="crew-center">Hourly Rate ($)</th>
+                  <th className="crew-center">
                     <span className="crew-th-sort">
                       Status
                       <ArrowDown size={14} weight="regular" />
@@ -370,10 +386,24 @@ export default function Crew() {
                       <input type="checkbox" />
                     </td>
                     <td className="crew-id-cell">
-                      <span className="crew-id-bar" style={{ background: row.color }} />
+                      <span
+                        className="crew-id-bar-hit"
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setCrewHover({
+                            x: rect.right + 8,
+                            y: rect.top + rect.height / 2,
+                            color: row.color,
+                            names: [row.name],
+                          })
+                        }}
+                        onMouseLeave={() => setCrewHover(null)}
+                      >
+                        <span className="crew-id-bar" style={{ background: row.color }} />
+                      </span>
                       #{row.crewId}
                     </td>
-                    <td>
+                    <td className="crew-center">
                       <div className="crew-name-cell">
                         <img className="crew-avatar" src={row.avatar} alt="" />
                         {row.name}
@@ -405,7 +435,7 @@ export default function Crew() {
                         </button>
                       )}
                     </td>
-                    <td>
+                    <td className="crew-center">
                       <span
                         className="crew-workers-cell"
                         onMouseEnter={(e) => {
@@ -421,8 +451,8 @@ export default function Crew() {
                         {row.workers}
                       </span>
                     </td>
-                    <td>{row.rate}</td>
-                    <td>
+                    <td className="crew-center">{row.rate}</td>
+                    <td className="crew-center">
                       <StatusPill status={row.status} />
                     </td>
                     <td>
@@ -467,7 +497,22 @@ export default function Crew() {
                     <td className={row.crewName ? 'crew-assigned-td' : undefined}>
                       {row.crewName ? (
                         <>
-                          <span className="crew-assigned-bar" style={{ background: row.crewColor }} />
+                          <span
+                            className="crew-assigned-bar-hit"
+                            onMouseEnter={(e) => {
+                              if (!row.crewName) return
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setCrewHover({
+                                x: rect.right + 8,
+                                y: rect.top + rect.height / 2,
+                                color: row.crewColor ?? '#94a3b8',
+                                names: [row.crewName],
+                              })
+                            }}
+                            onMouseLeave={() => setCrewHover(null)}
+                          >
+                            <span className="crew-assigned-bar" style={{ background: row.crewColor ?? '#94a3b8' }} />
+                          </span>
                           <span className="crew-assigned-name">{row.crewName}</span>
                         </>
                       ) : (
@@ -589,6 +634,19 @@ export default function Crew() {
       )}
 
       {jobHover && <JobNameTooltip names={jobHover.names} x={jobHover.x} y={jobHover.y} />}
+
+      {crewHover && (
+        <div
+          className="sb-jobno-tooltip sb-jobno-tooltip--fixed"
+          style={{ left: crewHover.x, top: crewHover.y }}
+        >
+          {crewHover.names.map((name) => (
+            <span key={name} className="sb-jobno-tooltip__pill" style={{ background: crewHover.color }}>
+              {name}
+            </span>
+          ))}
+        </div>
+      )}
 
       {flow.type === 'addMember' && (
         <MemberFormModal

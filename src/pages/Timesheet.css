@@ -94,10 +94,23 @@
 
 .ts-table-wrap {
   margin-top: 1rem;
-  overflow-x: auto;
+  overflow: auto;
+  max-height: calc(100dvh - 220px);
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--card-bg);
+  overscroll-behavior: contain;
+  cursor: grab;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ts-table-wrap.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.ts-table-wrap.is-panning * {
+  cursor: grabbing !important;
 }
 
 .ts-table {
@@ -118,6 +131,9 @@
 }
 
 .ts-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--muted);

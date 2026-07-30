@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { MagnifyingGlass, Plus, CaretDown } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Topbar from '../components/dashboard/Topbar'
@@ -11,6 +11,7 @@ import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import { Icon } from '../components/dashboard/icons'
 import { assignableCrews, formatMoney, type Job, type UnassignedCrew } from '../lib/dashboardData'
 import { initialManagedJobs, STATUS_COLORS, STATUS_LABELS, type JobStatus, type ManagedJob } from '../lib/jobsManagementData'
+import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import './JobsManagement.css'
 
 type SortKey = 'newest' | 'oldest' | 'rateLowHigh' | 'rateHighLow' | 'workers' | 'ascending' | 'descending'
@@ -85,6 +86,9 @@ export default function JobsManagement() {
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
+  const tableWrapRef = useRef<HTMLDivElement>(null)
+  useClickDragScroll(tableWrapRef)
+  const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
 
   let list = jobs.filter((j) => {
     const matchesSearch = !search || j.name.toLowerCase().includes(search.toLowerCase()) || j.id.includes(search)
@@ -178,8 +182,20 @@ export default function JobsManagement() {
           }
         />
 
-        <h1 className="dash__title">Jobs</h1>
-        <p className="dash__subtitle">Master list of all projects</p>
+        <div className="jm-header-row">
+          <div>
+            <h1 className="dash__title">Jobs</h1>
+            <p className="dash__subtitle">Master list of all projects</p>
+          </div>
+          <div className="sb-legend">
+            {assignableCrews.map((crew) => (
+              <span key={crew.id} className="sb-legend__item">
+                <i style={{ background: crew.color }} />
+                {crew.name}
+              </span>
+            ))}
+          </div>
+        </div>
 
         <div className="jm-toolbar">
           <label className="jm-search">
@@ -213,7 +229,11 @@ export default function JobsManagement() {
           </div>
         </div>
 
-        <div className="jm-table-wrap" style={{ zoom }}>
+        <div
+          className="jm-table-wrap"
+          style={{ zoom, width: `${100 / zoom}%` }}
+          ref={tableWrapRef}
+        >
           <table className="jm-table">
             <colgroup>
               <col className="jm-col-id-w" />
@@ -271,6 +291,22 @@ export default function JobsManagement() {
                         />
                         <span className="jm-id">{job.id}</span>
                       </div>
+                      <span
+                        className="jm-color-bar-hit"
+                        onMouseEnter={(e) => {
+                          if (!job.crewName || job.crewName === 'Unassigned') return
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setCrewHover({
+                            x: rect.right + 8,
+                            y: rect.top + rect.height / 2,
+                            color: job.color,
+                            names: [job.crewName],
+                          })
+                        }}
+                        onMouseLeave={() => setCrewHover(null)}
+                      >
+                        <span className="jm-color-bar" style={{ background: job.color }} />
+                      </span>
                     </td>
                     <td className="jm-name-cell jm-sticky jm-sticky--name">
                       <button
@@ -285,7 +321,6 @@ export default function JobsManagement() {
                       </button>
                     </td>
                     <td className="jm-crew-cell">
-                      <span className="jm-crew-bar" style={{ background: job.color }} />
                       <span className="jm-crew">
                         <Avatar
                           name={job.crewName}
@@ -344,6 +379,19 @@ export default function JobsManagement() {
           </table>
         </div>
       </main>
+
+      {crewHover && (
+        <div
+          className="sb-jobno-tooltip sb-jobno-tooltip--fixed"
+          style={{ left: crewHover.x, top: crewHover.y }}
+        >
+          {crewHover.names.map((name) => (
+            <span key={name} className="sb-jobno-tooltip__pill" style={{ background: crewHover.color }}>
+              {name}
+            </span>
+          ))}
+        </div>
+      )}
 
       {showCreate && <CreateJobModal onCancel={() => setShowCreate(false)} onSubmit={handleCreate} />}
       {editingJob && <CreateJobModal job={toJob(editingJob)} onCancel={() => setEditingId(null)} onSubmit={handleUpdate} />}

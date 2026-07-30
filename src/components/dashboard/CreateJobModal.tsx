@@ -82,10 +82,13 @@ function DatePickerField({
 
 export default function CreateJobModal({
   job,
+  presetJobs,
   onCancel,
   onSubmit,
 }: {
   job?: Job
+  /** Existing sheet jobs — picking one prefills the create form. */
+  presetJobs?: Job[]
   onCancel: () => void
   onSubmit: (data: JobFormData) => void
 }) {
@@ -99,11 +102,25 @@ export default function CreateJobModal({
   const [laborBudgetTotal, setLaborBudgetTotal] = useState(job?.laborBudgetTotal ?? 0)
   const [crewLeadId, setCrewLeadId] = useState<string | null>(null)
   const [note, setNote] = useState('')
+  const [presetId, setPresetId] = useState<string>('')
   const color = job?.color ?? crewColors[0]
 
   const selectedCrew = assignableCrews.find((c) => c.id === crewLeadId)
   const canSubmit =
     isEdit || Boolean(name.trim() && siteAddress.trim() && gc.trim() && startDate.trim() && endDate.trim())
+
+  function applyPreset(id: string) {
+    setPresetId(id)
+    const preset = presetJobs?.find((j) => j.id === id)
+    if (!preset) return
+    setName(preset.name)
+    setGc(preset.gc)
+    setStartDate(preset.startDate)
+    setEndDate(preset.endDate)
+    setContractAmount(preset.contractAmount)
+    setLaborBudgetTotal(preset.laborBudgetTotal)
+    setSiteAddress(preset.name)
+  }
 
   function handleSubmit() {
     if (!canSubmit) return
@@ -135,6 +152,22 @@ export default function CreateJobModal({
 
         <div className="job-form-modal__grid">
           <div className="job-form-modal__main">
+            {!isEdit && presetJobs && presetJobs.length > 0 && (
+              <>
+                <label className="field-label">Select Job from Sheet</label>
+                <Dropdown
+                  value={presetId}
+                  placeholder="Choose a job to populate fields"
+                  onChange={applyPreset}
+                  selectedLabel={presetJobs.find((j) => j.id === presetId)?.name}
+                  options={presetJobs.map((j) => ({
+                    id: j.id,
+                    label: j.name,
+                  }))}
+                />
+              </>
+            )}
+
             <label className="field-label">Name*</label>
             <input
               className="field-input"

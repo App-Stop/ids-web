@@ -285,6 +285,24 @@
   padding: 0.65rem 1.25rem 2rem;
 }
 
+/* Excel-style sheet scroll: vertical bar on the right + click-drag pan */
+.excel-scroll {
+  overflow: auto;
+  max-height: calc(100dvh - 220px);
+  overscroll-behavior: contain;
+  cursor: grab;
+  -webkit-overflow-scrolling: touch;
+}
+
+.excel-scroll.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.excel-scroll.is-panning * {
+  cursor: grabbing !important;
+}
+
 .dash__title {
   margin-top: 40px;
   font-size: 1.6rem;

@@ -4,7 +4,6 @@ import Topbar from '../components/dashboard/Topbar'
 import StatCard from '../components/dashboard/StatCard'
 import ActivityList from '../components/dashboard/ActivityList'
 import UnassignedCrewList from '../components/dashboard/UnassignedCrewList'
-import ZoomControl from '../components/dashboard/ZoomControl'
 import AssignJobModal from '../components/dashboard/AssignJobModal'
 import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
@@ -46,23 +45,15 @@ export default function Dashboard() {
   const [jobs, setJobs] = useState(initialJobs)
   const [unassigned, setUnassigned] = useState(initialUnassignedCrews)
   const [flow, setFlow] = useState<Flow>({ step: 'none' })
-  const [zoom, setZoom] = useState(1)
 
   return (
     <div className="dash">
       <Sidebar active="Dashboard" />
 
-      <main className="dash__main" style={{ zoom }}>
+      <main className="dash__main">
         <Topbar
           onAddJob={() => setFlow({ step: 'jobForm' })}
           onCreateCrew={() => setFlow({ step: 'crewForm' })}
-          extra={
-            <ZoomControl
-              zoom={zoom}
-              onZoomIn={() => setZoom((z) => Math.min(1.5, +(z + 0.05).toFixed(2)))}
-              onZoomOut={() => setZoom((z) => Math.max(0.75, +(z - 0.05).toFixed(2)))}
-            />
-          }
         />
 
         <h1 className="dash__title">Dashboard</h1>

@@ -135,12 +135,40 @@
 
 .ct-dd--filter {
   width: auto;
-  min-width: 118px;
+  min-width: 160px;
+  max-width: none;
   flex-shrink: 0;
 }
 
 .ct-dd--filter .md-wrap {
   width: auto;
+  max-width: none;
+}
+
+.ct-dd--filter .md-panel {
+  min-width: 100%;
+  width: max-content;
+  max-width: min(380px, 90vw);
+  border-radius: 9px;
+  border-top: 1px solid var(--border);
+}
+
+.ct-dd--filter .md-option {
+  white-space: nowrap;
+  text-align: left;
+}
+
+.ct-dd--filter .md-option__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ct-dd--filter .md-trigger__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
 }
 
 .ct-dd .dd__trigger,
@@ -243,10 +271,23 @@
 
 .ct-table-wrap {
   margin-top: 1rem;
-  overflow-x: auto;
+  overflow: auto;
+  max-height: calc(100dvh - 280px);
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--card-bg);
+  overscroll-behavior: contain;
+  cursor: grab;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ct-table-wrap.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.ct-table-wrap.is-panning * {
+  cursor: grabbing !important;
 }
 
 .ct-table {
@@ -267,6 +308,9 @@
 }
 
 .ct-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--muted);
@@ -456,6 +500,17 @@
 .ct-modal-dropdown .md-panel {
   width: 100%;
   max-width: none;
+}
+
+.ct-modal-dropdown .md-option {
+  white-space: nowrap;
+  text-align: left;
+}
+
+.ct-modal-dropdown .md-option__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ct-date-input {

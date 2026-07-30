@@ -1,3 +1,45 @@
+.crew-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.7rem;
+}
+
+.crew-header-row .dash__title {
+  margin-top: 40px;
+}
+
+.sb-legend {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  column-gap: 2.75rem;
+  row-gap: 0.85rem;
+  padding-top: 0.15rem;
+  margin-top: 1.75rem;
+  justify-content: start;
+}
+
+.sb-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.sb-legend__item i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .crew-toolbar {
   --ct-ctrl-h: 38px;
   display: flex;
@@ -123,10 +165,23 @@
 
 .crew-table-wrap {
   margin-top: 1.25rem;
-  overflow-x: auto;
+  overflow: auto;
+  max-height: calc(100dvh - 220px);
   border: 1px solid #e5e7eb;
   border-radius: 18px;
   background: #fff;
+  overscroll-behavior: contain;
+  cursor: grab;
+  -webkit-overflow-scrolling: touch;
+}
+
+.crew-table-wrap.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.crew-table-wrap.is-panning * {
+  cursor: grabbing !important;
 }
 
 .crew-table {
@@ -157,7 +212,20 @@
   padding-right: 1.4rem;
 }
 
+.crew-center {
+  text-align: center !important;
+}
+
+.crew-center .crew-name-cell,
+.crew-center .crew-workers-cell,
+.crew-center .crew-th-sort {
+  justify-content: center;
+}
+
 .crew-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   font-size: 0.8rem;
   font-weight: 600;
   color: #8f8f96;
@@ -204,6 +272,16 @@
   padding-left: 1rem !important;
 }
 
+.crew-id-bar-hit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: pointer;
+  z-index: 1;
+}
+
 .crew-id-bar {
   position: absolute;
   left: 0;
@@ -214,8 +292,9 @@
 }
 
 .crew-name-cell {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.6rem;
   font-weight: 600;
   min-width: 0;
@@ -280,6 +359,7 @@
 .crew-workers-cell {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-width: 1.5rem;
   cursor: default;
 }
@@ -307,6 +387,16 @@
   min-width: 160px;
 }
 
+.crew-assigned-bar-hit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: pointer;
+  z-index: 1;
+}
+
 .crew-assigned-bar {
   position: absolute;
   left: 0;
@@ -318,6 +408,29 @@
 .crew-assigned-name {
   font-weight: 600;
   color: var(--ink);
+}
+
+.sb-jobno-tooltip--fixed {
+  position: fixed;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  pointer-events: none;
+  z-index: 200;
+}
+
+.sb-jobno-tooltip__pill {
+  display: inline-block;
+  padding: 0.4rem 0.9rem;
+  border: none;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .crew-edit-btn {
@@ -415,6 +528,22 @@
 @media (max-width: 780px) {
   .crew-main .topbar__actions {
     justify-content: stretch;
+  }
+
+  .crew-header-row {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .crew-header-row .dash__title {
+    margin-top: 1.25rem;
+  }
+
+  .sb-legend {
+    grid-template-columns: repeat(2, auto);
+    column-gap: 1.25rem;
+    row-gap: 0.55rem;
+    margin-top: 0.5rem;
   }
 
   .crew-toolbar {

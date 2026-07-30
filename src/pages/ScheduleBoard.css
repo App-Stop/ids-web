@@ -193,31 +193,78 @@
   color: var(--ink);
 }
 
-/* Board: frozen meta/job columns + separator stay put; only days scroll */
+/* Board fills remaining viewport; days stretch to the right edge */
+.sb-main {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: calc(100svh - 1.7rem);
+  max-height: calc(100svh - 1.7rem);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
 .sb-board {
   margin-top: 1.25rem;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.sb-header-row,
+.sb-toolbar,
+.sb-main > .topbar {
+  flex-shrink: 0;
 }
 
 .sb-board__frame {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--card-bg);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sb-board__frozen {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   z-index: 2;
   background: var(--card-bg);
+  position: sticky;
+  left: 0;
 }
 
 .sb-board__scroll {
-  flex: 1;
+  flex: 1 1 0%;
   min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Weekly: day columns fill the remaining width — no empty strip on the right */
+.sb-board:not(.sb-board--monthly) .sb-board__scroll {
+  overflow-x: hidden;
+}
+
+.sb-board:not(.sb-board--monthly) .sb-board__scroll > .sb-table--days {
+  display: table;
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: none;
+  table-layout: fixed;
 }
 
 .sb-board--monthly:not(.sb-board--meta) .sb-board__scroll {
@@ -235,8 +282,14 @@
 }
 
 .sb-table--days {
-  width: max-content;
+  width: 100%;
   min-width: 100%;
+}
+
+.sb-board:not(.sb-board--monthly) .sb-table--days {
+  width: 100%;
+  min-width: 100%;
+  table-layout: fixed;
 }
 
 .sb-board--monthly:not(.sb-board--meta) .sb-table--days {
@@ -265,6 +318,9 @@
 }
 
 .sb-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   height: 52px;
   max-height: 52px;
   box-sizing: border-box;
@@ -565,13 +621,18 @@ td.sb-col-divider {
   overflow: visible;
 }
 
+/* Cell that owns a bar stacks above later days so the RIGHT handle is reachable */
+.sb-cell:has(.sb-pill-wrap) {
+  z-index: 5;
+}
+
 .sb-cell--compact {
   --sb-cell-inset: 8px;
   z-index: 1;
 }
 
 .sb-cell--compact:has(.sb-pill-wrap) {
-  z-index: 3;
+  z-index: 5;
 }
 
 .sb-add,
@@ -617,8 +678,22 @@ td.sb-col-divider {
   pointer-events: auto;
 }
 
+/* Keep spanning bars above neighboring cells so the RIGHT handle is hoverable */
+.sb-pill-wrap:hover,
+.sb-pill-wrap:has(.sb-pill__drag-handle:hover),
+.sb-pill-wrap:has(.sb-pill__drag-handle.is-dragging),
+.sb-pill-wrap:has(.sb-pill__note-wrap:hover) {
+  z-index: 30;
+}
+
 .sb-pill-wrap--compact {
   z-index: 4;
+}
+
+.sb-pill-wrap--compact:hover,
+.sb-pill-wrap--compact:has(.sb-pill__drag-handle:hover),
+.sb-pill-wrap--compact:has(.sb-pill__drag-handle.is-dragging) {
+  z-index: 40;
 }
 
 .sb-pill {
@@ -631,13 +706,17 @@ td.sb-col-divider {
   gap: 8px;
   border: 1px solid;
   border-radius: 8px;
-  padding: 0 8px;
+  padding: 0 40px;
   font-size: 0.8rem;
   cursor: pointer;
   text-align: left;
   transition: box-shadow 0.15s ease, filter 0.15s ease;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
+}
+
+.sb-pill-wrap:has(.sb-pill__drag-handle.is-dragging) .sb-pill {
+  opacity: 0.4;
 }
 
 .sb-pill:hover {
@@ -677,21 +756,34 @@ td.sb-col-divider {
   color: var(--text);
 }
 
+/* Wide top hit-area for note hover — leaves left/right edges free for drag handles */
 .sb-pill__note-wrap {
   position: absolute;
-  top: -10px;
-  right: 18px;
-  z-index: 5;
+  top: -16px;
+  left: 44px;
+  right: 44px;
+  height: 32px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(2px);
-  transition: right 0.15s ease, top 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+  transform: translateY(4px);
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
-/* Reveal the note bubble directly over the left side of the pink handle. */
-.sb-pill-wrap:hover .sb-pill__note-wrap,
-.sb-pill-wrap:has(.sb-pill__drag-handle:hover) .sb-pill__note-wrap {
-  right: 18px;
+/* Existing notes: whole top strip is hoverable */
+.sb-pill__note-wrap--has-note {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+/* No note yet: show add badge when hovering either drag end or the strip */
+.sb-pill-wrap:has(.sb-pill__drag-handle:hover) .sb-pill__note-wrap--add,
+.sb-pill__note-wrap--add:hover,
+.sb-pill__note-wrap--add:focus-within {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
@@ -706,19 +798,19 @@ td.sb-col-divider {
   border-radius: 50%;
   background: #fff;
   border: 1.5px solid #d9d9df;
-  color: #8b8b95;
+  color: #5f5f68;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   flex-shrink: 0;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.14);
 }
 
 .sb-pill__note-badge:hover {
   background: #fff;
   color: var(--ink);
   border-color: #cfd2d8;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.16);
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
 }
 
 .sb-pill__note-badge svg {
@@ -726,47 +818,26 @@ td.sb-col-divider {
   height: 13px;
 }
 
-.sb-pill__tooltip {
-  position: absolute;
-  top: calc(100% + 12px);
-  left: 50%;
-  transform: translateX(-50%);
+/* Fixed capsule tooltip — not clipped by the board overflow */
+.sb-pill__tooltip--fixed {
+  position: fixed;
+  transform: translate(-50%, -100%);
   width: max-content;
-  max-width: 220px;
+  max-width: 280px;
   background: #fff;
-  color: var(--ink);
-  font-size: 0.85rem;
-  font-weight: 600;
-  line-height: 1.4;
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  opacity: 0;
-  visibility: hidden;
+  color: #3f3f46;
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.35;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid #e8e8ec;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
+  z-index: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
-  transition: opacity 0.2s ease, visibility 0.2s ease;
-  z-index: 100;
-  white-space: normal;
-}
-
-.sb-pill__tooltip i {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%) rotate(225deg);
-  width: 8px;
-  height: 8px;
-  margin-bottom: -5px;
-  background: #fff;
-  border-left: 1px solid var(--border);
-  border-top: 1px solid var(--border);
-  z-index: -1;
-}
-
-.sb-pill__note-wrap:hover .sb-pill__tooltip {
-  opacity: 1;
-  visibility: visible;
 }
 
 .sb-jobno-tooltip--fixed {
@@ -798,46 +869,138 @@ td.sb-col-divider {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
-/* Drag handle — solid colored tab with white >> on hover */
+/* Day-resize handles — left = start day, right = end day (same hit size) */
 .sb-pill__drag-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0;
-  width: 0;
-  align-self: stretch;
-  margin: -6px -8px -6px 0;
-  padding-right: 0;
+  width: 20px;
+  margin: 0;
+  padding: 0;
   flex-shrink: 0;
-  cursor: grab;
-  border-radius: 0 8px 8px 0;
+  cursor: ew-resize;
   touch-action: none;
   color: #fff;
   opacity: 0;
   overflow: hidden;
-  transition: width 0.15s ease, opacity 0.15s ease, padding 0.15s ease;
+  z-index: 10;
+  transition: width 0.15s ease, opacity 0.15s ease;
 }
 
-.sb-pill:hover .sb-pill__drag-handle,
-.sb-pill-wrap:hover .sb-pill__drag-handle,
-.sb-pill__drag-handle:focus-visible {
+.sb-pill__drag-handle--start {
+  left: 0;
+  border-radius: 7px 0 0 7px;
+}
+
+.sb-pill__drag-handle--end {
+  right: 0;
+  border-radius: 0 7px 7px 0;
+}
+
+/* Only the hovered / active edge expands — not the whole pill */
+.sb-pill__drag-handle:hover,
+.sb-pill__drag-handle:focus-visible,
+.sb-pill__drag-handle.is-dragging {
   width: 40px;
   opacity: 1;
-  padding-right: 2px;
+}
+
+.sb-pill__drag-handle--start svg {
+  transform: rotate(180deg);
+}
+
+.sb-cell--compact .sb-pill__drag-handle {
+  width: 12px;
+}
+
+.sb-cell--compact .sb-pill__drag-handle--start {
+  border-radius: 8px 0 0 8px;
+}
+
+.sb-cell--compact .sb-pill__drag-handle--end {
+  border-radius: 0 8px 8px 0;
+}
+
+.sb-cell--compact .sb-pill__drag-handle:hover,
+.sb-cell--compact .sb-pill__drag-handle:focus-visible,
+.sb-cell--compact .sb-pill__drag-handle.is-dragging {
+  width: 16px;
+  opacity: 1;
 }
 
 .sb-pill__drag-handle:active {
-  cursor: grabbing;
+  cursor: ew-resize;
 }
 
 .sb-pill__drag-handle svg {
   display: block;
   flex-shrink: 0;
   stroke-width: 2.5;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.sb-pill__drag-handle:hover svg,
+.sb-pill__drag-handle:focus-visible svg,
+.sb-pill__drag-handle.is-dragging svg {
+  opacity: 1;
 }
 
 .sb-pill__drag-handle svg + svg {
   margin-left: -8px;
+}
+
+.sb-pill__drag-handle--start svg + svg {
+  margin-left: 0;
+  margin-right: -8px;
+}
+
+/* While dragging, let day cells receive the drop under pills */
+.sb-board.is-dragging .sb-pill-wrap {
+  pointer-events: none;
+}
+
+.sb-board.is-dragging .sb-pill__note-wrap {
+  pointer-events: none;
+}
+
+.sb-board.is-dragging .sb-add,
+.sb-board.is-dragging .sb-empty {
+  pointer-events: none;
+}
+
+/* Cell menu popover */
+.cell-menu {
+  position: fixed;
+  z-index: 60;
+  width: 180px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 0.4rem;
+}
+
+.cell-menu__option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.6rem 0.7rem;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.cell-menu__option:hover {
+  background: var(--field-bg);
 }
 
 /* Drop target highlight */

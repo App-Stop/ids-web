@@ -7,6 +7,9 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  pointerWithin,
+  closestCenter,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
@@ -26,11 +29,12 @@ import NoteModal from '../components/dashboard/NoteModal'
 import CreateJobModal from '../components/dashboard/CreateJobModal'
 import CreateCrewModal from '../components/dashboard/CreateCrewModal'
 import { Icon } from '../components/dashboard/icons'
-import { assignableCrews, jobs as masterJobs, crewLeads, type Job } from '../lib/dashboardData'
+import { assignableCrews, crewLeads, type Job } from '../lib/dashboardData'
 import {
   scheduleJobs as initialScheduleJobs,
   weeklyScheduleAssignments,
   monthlyScheduleAssignments,
+  sheetPickerJobs,
   TODAY,
   toISO,
   fromISO,
@@ -55,6 +59,11 @@ type Flow =
   | { type: 'editJob'; jobId: string }
   | { type: 'newJob' }
   | { type: 'newCrew' }
+
+const scheduleCollision: CollisionDetection = (args) => {
+  const hits = pointerWithin(args)
+  return hits.length > 0 ? hits : closestCenter(args)
+}
 
 const JOBNO_W = 72
 const JOB_W = 230
@@ -81,6 +90,91 @@ function toJob(row: ScheduleJob, date: string): Job {
   }
 }
 
+// --- Resize handle (left = start edge, right = end edge) -------------------
+
+function ResizeHandle({
+  assignment,
+  edge,
+  color,
+  compact,
+}: {
+  assignment: ScheduleAssignment
+  edge: 'start' | 'end'
+  color: string
+  compact: boolean
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `extend-${edge}-${assignment.id}`,
+    data: { type: 'extend' as const, edge, assignment },
+  })
+
+  return (
+    <span
+      ref={setNodeRef}
+      className={`sb-pill__drag-handle sb-pill__drag-handle--${edge}${isDragging ? ' is-dragging' : ''}`}
+      style={{ background: color }}
+      title={edge === 'start' ? 'Drag left/right to change start day' : 'Drag left/right to change end day'}
+      onClick={(e) => e.stopPropagation()}
+      {...listeners}
+      {...attributes}
+    >
+      {!compact && (
+        <>
+          <Icon.ChevronRight width={12} height={12} />
+          <Icon.ChevronRight width={12} height={12} />
+        </>
+      )}
+    </span>
+  )
+}
+
+function NoteBadge({
+  assignment,
+  onOpenNote,
+}: {
+  assignment: ScheduleAssignment
+  onOpenNote: () => void
+}) {
+  const hasNote = Boolean(assignment.note)
+  const [tipPos, setTipPos] = useState<{ x: number; y: number } | null>(null)
+
+  function showTip(el: HTMLElement) {
+    if (!assignment.note) return
+    const rect = el.getBoundingClientRect()
+    setTipPos({ x: rect.left + rect.width / 2, y: rect.top - 6 })
+  }
+
+  return (
+    <>
+      <span
+        className={`sb-pill__note-wrap${hasNote ? ' sb-pill__note-wrap--has-note' : ' sb-pill__note-wrap--add'}`}
+        onMouseEnter={(e) => showTip(e.currentTarget)}
+        onMouseLeave={() => setTipPos(null)}
+      >
+        <button
+          type="button"
+          className="sb-pill__note-badge"
+          aria-label={hasNote ? 'View note' : 'Add note'}
+          onClick={(e) => {
+            e.stopPropagation()
+            onOpenNote()
+          }}
+        >
+          {hasNote ? <Icon.Note width={12} height={12} /> : <Icon.Edit width={12} height={12} />}
+        </button>
+      </span>
+      {tipPos && assignment.note ? (
+        <span
+          className="sb-pill__tooltip sb-pill__tooltip--fixed"
+          style={{ left: tipPos.x, top: tipPos.y }}
+        >
+          {assignment.note}
+        </span>
+      ) : null}
+    </>
+  )
+}
+
 // --- Draggable pill -------------------------------------------------------
 
 function AssignmentPill({
@@ -98,11 +192,6 @@ function AssignmentPill({
   onOpenDetails: () => void
   onOpenNote: () => void
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: assignment.id,
-    data: { assignment },
-  })
-
   return (
     <div
       className={`sb-pill-wrap${compact ? ' sb-pill-wrap--compact' : ''}`}
@@ -111,55 +200,21 @@ function AssignmentPill({
       <button
         type="button"
         className="sb-pill"
-        title={assignment.crewName}
         style={
           compact
-            ? { background: color, opacity: isDragging ? 0.35 : 1 }
+            ? { background: color }
             : {
                 background: `${color}1A`,
                 borderColor: color,
-                opacity: isDragging ? 0.35 : 1,
               }
         }
         onClick={onOpenDetails}
       >
         {!compact && <span className="sb-pill__name">{assignment.crewName}</span>}
-        {!compact && (
-          <span
-            ref={setNodeRef}
-            className="sb-pill__drag-handle"
-            style={{ background: color }}
-            title="Drag to extend across days"
-            onClick={(e) => e.stopPropagation()}
-            {...listeners}
-            {...attributes}
-          >
-            <Icon.ChevronRight width={12} height={12} />
-            <Icon.ChevronRight width={12} height={12} />
-          </span>
-        )}
+        <ResizeHandle assignment={assignment} edge="start" color={color} compact={compact} />
+        <ResizeHandle assignment={assignment} edge="end" color={color} compact={compact} />
       </button>
-      {!compact && (
-        <span className="sb-pill__note-wrap">
-          <button
-            type="button"
-            className="sb-pill__note-badge"
-            aria-label={assignment.note ? 'View note' : 'Add note'}
-            onClick={(e) => {
-              e.stopPropagation()
-              onOpenNote()
-            }}
-          >
-            {assignment.note ? <Icon.Note width={12} height={12} /> : <Icon.Edit width={12} height={12} />}
-          </button>
-          {assignment.note && (
-            <span className="sb-pill__tooltip">
-              {assignment.note}
-              <i />
-            </span>
-          )}
-        </span>
-      )}
+      {!compact && <NoteBadge assignment={assignment} onOpenNote={onOpenNote} />}
     </div>
   )
 }
@@ -209,6 +264,7 @@ export default function ScheduleBoard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [lockedMonthDayW, setLockedMonthDayW] = useState<number | null>(null)
   const daysTableRef = useRef<HTMLTableElement>(null)
+  const boardScrollRef = useRef<HTMLDivElement>(null)
 
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
@@ -228,10 +284,12 @@ export default function ScheduleBoard() {
     viewMode === 'weekly'
       ? isPhone
         ? 96
-        : 150
+        : undefined
       : isPhone
         ? 42
         : lockedMonthDayW ?? undefined
+  const weeklyColPct =
+    viewMode === 'weekly' && !isPhone ? `${100 / Math.max(visibleDays.length, 1)}%` : undefined
 
   useEffect(() => {
     function handleResize() {
@@ -241,6 +299,12 @@ export default function ScheduleBoard() {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  useEffect(() => {
+    if (viewMode !== 'weekly') return
+    const scroller = boardScrollRef.current
+    if (scroller) scroller.scrollLeft = 0
+  }, [viewMode, sidebarCollapsed, metaVisible, zoom])
 
   function openMonthly() {
     setViewMode('monthly')
@@ -271,7 +335,7 @@ export default function ScheduleBoard() {
 
   const filteredJobs = jobs.filter((j) => {
     const matchesSearch = !search || j.name.toLowerCase().includes(search.toLowerCase()) || j.jobNo.includes(search)
-    const matchesFilter = !jobFilter || j.name === jobFilter
+    const matchesFilter = !jobFilter || j.id === jobFilter
     return matchesSearch && matchesFilter
   })
 
@@ -293,52 +357,29 @@ export default function ScheduleBoard() {
     if (!over) return
 
     const source = active.data.current?.assignment as ScheduleAssignment | undefined
+    const edge = (active.data.current?.edge as 'start' | 'end' | undefined) ?? 'end'
     const target = over.data.current as { jobId: string; date: string } | undefined
     if (!source || !target) return
 
-    // Dropped back inside its own current range: no-op.
-    if (
-      source.jobId === target.jobId &&
-      target.date >= source.startDate &&
-      target.date <= source.endDate
-    ) {
-      return
-    }
+    // Resize only on the same job row.
+    if (source.jobId !== target.jobId) return
 
-    if (source.jobId === target.jobId) {
-      // Same job row: extend the existing bar to cover the new day instead
-      // of creating a duplicate pill, and absorb anything it now overlaps.
-      setAssignments((list) => {
-        const newStart = target.date < source.startDate ? target.date : source.startDate
-        const newEnd = target.date > source.endDate ? target.date : source.endDate
-
-        const merged = list.filter((a) => {
-          if (a.id === source.id) return false
-          if (a.jobId === target.jobId && a.startDate >= newStart && a.endDate <= newEnd) return false
-          return true
-        })
-
-        return [...merged, { ...source, startDate: newStart, endDate: newEnd }]
-      })
-      return
-    }
-
-    // Different job row: keep the old "copy to another job" behavior.
-    setAssignments((list) => {
-      const withoutTarget = list.filter(
-        (a) => !(a.jobId === target.jobId && target.date >= a.startDate && target.date <= a.endDate),
+    if (edge === 'start') {
+      // Left handle: drop day becomes the new start (extend left or shrink from left).
+      const newStart = target.date > source.endDate ? source.endDate : target.date
+      if (newStart === source.startDate) return
+      setAssignments((list) =>
+        list.map((a) => (a.id === source.id ? { ...a, startDate: newStart } : a)),
       )
-      return [
-        ...withoutTarget,
-        {
-          ...source,
-          id: `sa-${Date.now()}`,
-          jobId: target.jobId,
-          startDate: target.date,
-          endDate: target.date,
-        },
-      ]
-    })
+      return
+    }
+
+    // Right handle: drop day becomes the new end (extend right or shrink from right).
+    const newEnd = target.date < source.startDate ? source.startDate : target.date
+    if (newEnd === source.endDate) return
+    setAssignments((list) =>
+      list.map((a) => (a.id === source.id ? { ...a, endDate: newEnd } : a)),
+    )
   }
 
   const activeRow = flow.type !== 'none' && 'jobId' in flow ? jobs.find((j) => j.id === flow.jobId) : undefined
@@ -437,22 +478,33 @@ export default function ScheduleBoard() {
             <Dropdown
               value={jobFilter ?? '__all__'}
               placeholder="All Jobs"
-              selectedLabel={jobFilter ?? 'All Jobs'}
+              selectedLabel={
+                jobFilter ? (sheetPickerJobs.find((j) => j.id === jobFilter)?.name ?? 'All Jobs') : 'All Jobs'
+              }
               onChange={(id) => setJobFilter(id === '__all__' ? null : id)}
               options={[
                 { id: '__all__', label: 'All Jobs' },
-                ...masterJobs.map((j) => ({ id: j.name, label: j.name })),
+                ...sheetPickerJobs.map((j) => ({ id: j.id, label: j.name })),
               ]}
             />
           </div>
         </div>
 
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={scheduleCollision}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
           <div
-            className={`sb-board${compact ? ' sb-board--monthly' : ''}${metaVisible ? ' sb-board--meta' : ''}`}
-            style={{ zoom }}
+            className={`sb-board${compact ? ' sb-board--monthly' : ''}${metaVisible ? ' sb-board--meta' : ''}${
+              draggingAssignment ? ' is-dragging' : ''
+            }`}
           >
-            <div className="sb-board__frame">
+            <div
+              className="sb-board__frame"
+              style={{ zoom, width: `${100 / zoom}%` }}
+            >
               <div className="sb-board__frozen">
                 <table className="sb-table sb-table--frozen">
                   <colgroup>
@@ -542,7 +594,7 @@ export default function ScheduleBoard() {
                 </table>
               </div>
 
-              <div className="sb-board__scroll">
+              <div className="sb-board__scroll" ref={boardScrollRef}>
                 <table
                   ref={daysTableRef}
                   className={`sb-table sb-table--days${compact ? ' sb-table--monthly' : ''}`}
@@ -559,7 +611,13 @@ export default function ScheduleBoard() {
                     {visibleDays.map((d) => (
                       <col
                         key={toISO(d)}
-                        style={dayW ? { width: dayW, minWidth: dayW } : undefined}
+                        style={
+                          weeklyColPct
+                            ? { width: weeklyColPct }
+                            : dayW
+                              ? { width: dayW, minWidth: dayW }
+                              : undefined
+                        }
                       />
                     ))}
                   </colgroup>
@@ -576,7 +634,7 @@ export default function ScheduleBoard() {
                             {viewMode === 'weekly' ? (
                               <>
                                 <div className="sb-day-head__weekday">
-                                  {isToday ? 'Today, ' + weekdayShort(d) : weekdayShort(d)}
+                                  {weekdayShort(d)}
                                 </div>
                                 <div className="sb-day-head__date">
                                   {d.getMonth() + 1}-{String(d.getDate()).padStart(2, '0')}-{String(d.getFullYear()).slice(2)}
@@ -679,7 +737,7 @@ export default function ScheduleBoard() {
           </div>
 
           <DragOverlay>
-            {draggingAssignment && draggingRow && (
+            {draggingAssignment && draggingRow && viewMode !== 'weekly' && (
               <div
                 className="sb-pill sb-pill--overlay"
                 style={{ background: `${draggingRow.color}1A`, borderColor: draggingRow.color }}
@@ -789,6 +847,7 @@ export default function ScheduleBoard() {
 
       {flow.type === 'newJob' && (
         <CreateJobModal
+          presetJobs={jobs.map((job) => toJob(job, TODAY))}
           onCancel={() => setFlow({ type: 'none' })}
           onSubmit={(data) => {
             const jobNo = String(4800 + jobs.length + 1)
@@ -812,7 +871,7 @@ export default function ScheduleBoard() {
 
       {flow.type === 'newCrew' && (
         <CreateCrewModal
-          jobs={masterJobs}
+          jobs={jobs.map((job) => toJob(job, TODAY))}
           onCancel={() => setFlow({ type: 'none' })}
           onSubmit={(data) => {
             const lead = crewLeads.find((c) => c.id === data.crewLeadId)

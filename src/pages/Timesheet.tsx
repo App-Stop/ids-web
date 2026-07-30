@@ -10,6 +10,7 @@ import ZoomControl from '../components/dashboard/ZoomControl'
 import { Icon } from '../components/dashboard/icons'
 import { rosterRows as initialRosterRows, type RosterRow } from '../lib/crewData'
 import { crewLeads, jobs as initialJobs, type Job } from '../lib/dashboardData'
+import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import './Dashboard.css'
 import '../components/dashboard/crew-modals.css'
 import './Timesheet.css'
@@ -354,6 +355,8 @@ export default function Timesheet() {
   const [actionMode, setActionMode] = useState<ActionChooserMode>('none')
   const [jobs, setJobs] = useState<Job[]>(initialJobs)
   const [zoom, setZoom] = useState(1)
+  const tableWrapRef = useRef<HTMLDivElement>(null)
+  useClickDragScroll(tableWrapRef)
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -522,7 +525,7 @@ export default function Timesheet() {
           </div>
         </div>
 
-        <div className="ts-table-wrap">
+        <div className="ts-table-wrap" ref={tableWrapRef}>
           <table className="ts-table">
             <thead>
               <tr>
