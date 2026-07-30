@@ -117,6 +117,8 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
             value={form.crewId}
             onChange={(id) => update('crewId', id)}
             placeholder="Select crew"
+            panelTitle="Crew Menu"
+            showAvatar
             className="cm-field__dropdown"
           />
         </label>

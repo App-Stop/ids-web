@@ -4,15 +4,16 @@ import Topbar from '../components/dashboard/Topbar'
 import StatCard from '../components/dashboard/StatCard'
 import ActivityList from '../components/dashboard/ActivityList'
 import UnassignedCrewList from '../components/dashboard/UnassignedCrewList'
+import ZoomControl from '../components/dashboard/ZoomControl'
 import AssignJobModal from '../components/dashboard/AssignJobModal'
 import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import CrewDetailsModal from '../components/dashboard/CrewDetailsModal'
 import CreateJobModal from '../components/dashboard/CreateJobModal'
 import CreateCrewModal from '../components/dashboard/CreateCrewModal'
-import { Icon } from '../components/dashboard/icons'
+import { CaretRight, Hammer, Users, Money, WarningCircle } from '@phosphor-icons/react'
 import {
-  crewLeads,
+  assignableCrews,
   initialUnassignedCrews,
   jobs as initialJobs,
   type CrewLead,
@@ -22,6 +23,12 @@ import {
 import './Dashboard.css'
 
 const TODAY = '13-07-2026'
+
+const UNASSIGNED_JOBS = [
+  'Maplewood Community Center Renovation',
+  'Riverside Bridge Repair',
+  'Oakridge High School Gym Upgrade',
+]
 
 type Flow =
   | { step: 'none' }
@@ -38,32 +45,40 @@ export default function Dashboard() {
   const [jobs, setJobs] = useState(initialJobs)
   const [unassigned, setUnassigned] = useState(initialUnassignedCrews)
   const [flow, setFlow] = useState<Flow>({ step: 'none' })
+  const [zoom, setZoom] = useState(1)
 
   return (
     <div className="dash">
       <Sidebar active="Dashboard" />
 
-      <main className="dash__main">
+      <main className="dash__main" style={{ zoom }}>
         <Topbar
           onAddJob={() => setFlow({ step: 'jobForm' })}
           onCreateCrew={() => setFlow({ step: 'crewForm' })}
+          extra={
+            <ZoomControl
+              zoom={zoom}
+              onZoomIn={() => setZoom((z) => Math.min(1.5, +(z + 0.05).toFixed(2)))}
+              onZoomOut={() => setZoom((z) => Math.max(0.75, +(z - 0.05).toFixed(2)))}
+            />
+          }
         />
 
         <h1 className="dash__title">Dashboard</h1>
         <p className="dash__subtitle">Overview of your operations</p>
 
         <div className="stat-grid">
-          <StatCard icon={<Icon.Wrench />} label="Active Jobs" value="13" sub="24 Total Jobs" />
-          <StatCard icon={<Icon.Users />} label="Crews Assigned" value="6" sub="34 Total Crew Members" />
+          <StatCard icon={<Hammer size={18} weight="regular" />} label="Active Jobs" value="13" sub="24 Total Jobs" />
+          <StatCard icon={<Users size={18} weight="regular" />} label="Crews Assigned" value="6" sub="34 Total Crew Members" />
           <StatCard
-            icon={<Icon.Panel />}
+            icon={<Money size={18} weight="regular" />}
             label="Weekly Labor Cost"
             value="$7,695"
             badge="▲ 13%"
             sub="Last week: $6,983"
           />
           <StatCard
-            icon={<Icon.AlertCircle />}
+            icon={<WarningCircle size={18} weight="regular" />}
             label="Jobs Over Budget"
             value="1"
             valueClass="text-danger"
@@ -74,10 +89,41 @@ export default function Dashboard() {
 
         <div className="dash__columns">
           <ActivityList />
-          <UnassignedCrewList
-            crews={unassigned}
-            onAssignJob={(crew) => setFlow({ step: 'assignJob', crew })}
-          />
+          <div className="dash__side-stack">
+            <UnassignedCrewList
+              crews={unassigned}
+              onAssignJob={(crew) => setFlow({ step: 'assignJob', crew })}
+            />
+            <div className="panel">
+              <div className="panel__head">
+                <h2>Unassigned Jobs</h2>
+              </div>
+              <ul className="unassigned-list">
+                {UNASSIGNED_JOBS.map((name) => (
+                  <li key={name} className="unassigned-item">
+                    <span className="unassigned-item__name">{name}</span>
+                    <CaretRight size={14} weight="bold" className="unassigned-item__chevron" />
+                    <button
+                      type="button"
+                      className="btn btn--outline btn--sm"
+                      onClick={() => {
+                        const job = jobs.find((j) => j.name === name) ?? jobs[0]
+                        if (!job) return
+                        setFlow({
+                          step: 'assignCrew',
+                          crew: unassigned[0] ?? { id: 'tmp', name: 'Unassigned', leadName: 'TBD', rate: 0 },
+                          job,
+                          note: '',
+                        })
+                      }}
+                    >
+                      Assign Crew
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
       </main>
 
@@ -114,9 +160,10 @@ export default function Dashboard() {
         <AssignCrewModal
           job={flow.job}
           onCancel={() => setFlow({ step: 'jobDetails', crew: flow.crew, job: flow.job, note: flow.note })}
-          onAssign={(crewLeadId, note) => {
-            const crewLead = crewLeads.find((c) => c.id === crewLeadId)
-            if (!crewLead) return
+          onAssign={(crewId, note) => {
+            const crew = assignableCrews.find((c) => c.id === crewId)
+            if (!crew) return
+            const crewLead: CrewLead = { id: crew.id, name: crew.leadName, rate: crew.rate, color: crew.color }
             setFlow({ step: 'crewDetails', job: flow.job, crewLead, note })
           }}
         />

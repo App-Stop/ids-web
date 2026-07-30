@@ -28,21 +28,39 @@ export interface ScheduleNote {
 }
 
 export const scheduleJobs: ScheduleJob[] = [
-  { id: 's4827', jobNo: '4827', name: 'Johnson State Prison Kitchen', color: '#e0399f', idsSuper: 'John D.', gcSuper: 'Hank Williams', gc: 'Turner Const.', contract: 50000 },
-  { id: 's5914', jobNo: '5914', name: 'Smith County Courthouse Renovation', color: '#22c55e', idsSuper: 'Alice S.', gcSuper: 'David Richards', gc: 'Skanska', contract: 90000 },
-  { id: 's3460', jobNo: '3460', name: 'Cedar Valley Library Expansion', color: '#ef4444', idsSuper: 'David L.', gcSuper: 'Michael Johnson', gc: 'Sarah D.', contract: 70000 },
-  { id: 's2049', jobNo: '2049', name: 'Smith County Courthouse Renovation', color: '#f97316', idsSuper: 'Sophia K.', gcSuper: 'Sarah Wilson', gc: 'Kevin M.', contract: 60000 },
-  { id: 's8602', jobNo: '8602', name: 'Johnson State Prison Kitchen', color: '#3b82f6', idsSuper: 'Olivia B.', gcSuper: 'Linda Martinez', gc: 'James L.', contract: 65000 },
-  { id: 's7214', jobNo: '7214', name: 'Cedar Valley Library Expansion', color: '#8b5cf6', idsSuper: 'Isabella N.', gcSuper: 'Patricia Taylor', gc: 'Daniel W.', contract: 95000 },]
-
-export const initialScheduleAssignments: ScheduleAssignment[] = [
-  { id: 'sa1', jobId: 's4827', startDate: '2026-07-20', endDate: '2026-07-20', crewName: "Hank's Crew", rate: 25, workers: 4, note: 'Coordinate with suppliers and schedule weekly progress meetings.' },
-  { id: 'sa2', jobId: 's5914', startDate: '2026-07-21', endDate: '2026-07-21', crewName: "John's Crew", rate: 32, workers: 5 },
-  { id: 'sa3', jobId: 's3460', startDate: '2026-07-20', endDate: '2026-07-20', crewName: "Bob's Crew", rate: 28, workers: 3, note: 'Watch for permit delays on the west wing.' },
-  { id: 'sa4', jobId: 's2049', startDate: '2026-07-22', endDate: '2026-07-22', crewName: "Noah's Crew", rate: 30, workers: 6 },
-  { id: 'sa5', jobId: 's8602', startDate: '2026-07-21', endDate: '2026-07-21', crewName: "Lucas's Crew", rate: 27, workers: 4, note: 'Second shift covers cleanup.' },
-  { id: 'sa6', jobId: 's7214', startDate: '2026-07-23', endDate: '2026-07-23', crewName: "Liam's Crew", rate: 33, workers: 5, note: 'Confirm dumpster pickup Friday.' },
+  { id: 's4827', jobNo: '4827', name: 'Johnson State Prison Kitchen', color: '#ea3da9', idsSuper: 'John D.', gcSuper: 'Hank Williams', gc: 'Turner Const.', contract: 50000 },
+  { id: 's5914', jobNo: '5914', name: 'Smith County Courthouse Renovation', color: '#56bd6d', idsSuper: 'Alice S.', gcSuper: 'David Richards', gc: 'Skanska', contract: 90000 },
+  { id: 's4706', jobNo: '4706', name: 'Riverside Community Center Demo', color: '#E2B900', idsSuper: 'Michael T.', gcSuper: 'John Smith', gc: 'Laura H.', contract: 80000 },
+  { id: 's3460', jobNo: '3460', name: 'Cedar Valley Library Expansion', color: '#df3021', idsSuper: 'David L.', gcSuper: 'Michael Johnson', gc: 'Sarah D.', contract: 70000 },
+  { id: 's2049', jobNo: '2049', name: 'Smith County Courthouse Renovation', color: '#e8752e', idsSuper: 'Sophia K.', gcSuper: 'Sarah Wilson', gc: 'Kevin M.', contract: 60000 },
+  { id: 's8602', jobNo: '8602', name: 'Johnson State Prison Kitchen', color: '#4193f7', idsSuper: 'Olivia B.', gcSuper: 'Linda Martinez', gc: 'James L.', contract: 65000 },
+  { id: 's7214', jobNo: '7214', name: 'Cedar Valley Library Expansion', color: '#8640f6', idsSuper: 'Isabella N.', gcSuper: 'Patricia Taylor', gc: 'Daniel W.', contract: 95000 },
 ]
+
+/** Weekly view assignments (week of TODAY 2026-07-20 … 2026-07-26). */
+export const weeklyScheduleAssignments: ScheduleAssignment[] = [
+  { id: 'wa1', jobId: 's4827', startDate: '2026-07-20', endDate: '2026-07-20', crewName: "Hank's Crew", rate: 25, workers: 4, note: 'Coordinate with suppliers and schedule weekly progress meetings.' },
+  { id: 'wa2', jobId: 's5914', startDate: '2026-07-21', endDate: '2026-07-21', crewName: "John's Crew", rate: 32, workers: 5 },
+  { id: 'wa3', jobId: 's3460', startDate: '2026-07-20', endDate: '2026-07-20', crewName: "Bob's Crew", rate: 28, workers: 3, note: 'Watch for permit delays on the west wing.' },
+  { id: 'wa4', jobId: 's2049', startDate: '2026-07-22', endDate: '2026-07-22', crewName: "Noah's Crew", rate: 30, workers: 6 },
+  { id: 'wa5', jobId: 's8602', startDate: '2026-07-21', endDate: '2026-07-21', crewName: "Lucas's Crew", rate: 27, workers: 4, note: 'Second shift covers cleanup.' },
+  { id: 'wa6', jobId: 's7214', startDate: '2026-07-23', endDate: '2026-07-23', crewName: "Liam's Crew", rate: 33, workers: 5, note: 'Confirm dumpster pickup Friday.' },
+]
+
+/** Monthly Gantt ranges matching the Schedule Board Figma (July 2026). */
+export const monthlyScheduleAssignments: ScheduleAssignment[] = [
+  { id: 'ma1', jobId: 's4827', startDate: '2026-07-01', endDate: '2026-07-02', crewName: "Hank's Crew", rate: 25, workers: 4, note: 'Coordinate with suppliers and schedule weekly progress meetings.' },
+  { id: 'ma2', jobId: 's5914', startDate: '2026-07-03', endDate: '2026-07-05', crewName: "John's Crew", rate: 32, workers: 5 },
+  { id: 'ma7', jobId: 's4706', startDate: '2026-07-08', endDate: '2026-07-12', crewName: "Dan's Crew", rate: 29, workers: 3 },
+  { id: 'ma3', jobId: 's3460', startDate: '2026-07-01', endDate: '2026-07-04', crewName: "Bob's Crew", rate: 28, workers: 3, note: 'Watch for permit delays on the west wing.' },
+  { id: 'ma3b', jobId: 's3460', startDate: '2026-07-21', endDate: '2026-07-21', crewName: "Bob's Crew", rate: 28, workers: 3 },
+  { id: 'ma4', jobId: 's2049', startDate: '2026-07-10', endDate: '2026-07-18', crewName: "Noah's Crew", rate: 30, workers: 6 },
+  { id: 'ma5', jobId: 's8602', startDate: '2026-07-06', endDate: '2026-07-09', crewName: "Lucas's Crew", rate: 27, workers: 4, note: 'Second shift covers cleanup.' },
+  { id: 'ma6', jobId: 's7214', startDate: '2026-07-13', endDate: '2026-07-17', crewName: "Liam's Crew", rate: 33, workers: 5, note: 'Confirm dumpster pickup Friday.' },
+]
+
+/** @deprecated use weeklyScheduleAssignments / monthlyScheduleAssignments */
+export const initialScheduleAssignments = weeklyScheduleAssignments
 
 export const initialScheduleNotes: ScheduleNote[] = [
   { id: 'sn1', jobId: 's4706', date: '2026-07-22', text: 'The crew performed efficiently throughout the day. To maximize productivity tomorrow, we should coordinate material delivery earlier.' },
@@ -95,6 +113,16 @@ export function monthLabel(d: Date) {
 
 export function daysInMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+}
+
+/** Full month days plus the first 2 days of the next month (Figma monthly grid). */
+export function monthGridDays(d: Date) {
+  const count = daysInMonth(d)
+  const days: Date[] = []
+  for (let i = 1; i <= count; i++) days.push(new Date(d.getFullYear(), d.getMonth(), i))
+  days.push(new Date(d.getFullYear(), d.getMonth() + 1, 1))
+  days.push(new Date(d.getFullYear(), d.getMonth() + 1, 2))
+  return days
 }
 
 export function formatMdy(iso: string) {

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { CaretRight } from '@phosphor-icons/react'
 
 export default function StatCard({
   icon,
@@ -22,6 +23,7 @@ export default function StatCard({
       <div className="stat-card__head">
         <span className="stat-card__icon">{icon}</span>
         <span className="stat-card__label">{label}</span>
+        <CaretRight size={14} weight="bold" className="stat-card__chevron" />
       </div>
       <div className="stat-card__value-row">
         <span className={`stat-card__value ${valueClass ?? ''}`}>{value}</span>

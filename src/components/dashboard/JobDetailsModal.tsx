@@ -14,7 +14,7 @@ export default function JobDetailsModal({
   onRemoveCrew,
 }: {
   job: Job
-  crew: UnassignedCrew
+  crew: UnassignedCrew | null
   note: string
   onDone: () => void
   onChangeCrew: () => void
@@ -36,13 +36,12 @@ export default function JobDetailsModal({
 
   return (
     <Modal onClose={onDone} width={460}>
-      <div className="job-head">
-        <i className="dot" style={{ background: job.color }} />
-        <span className="job-head__meta">
-          Bid #{job.bidNo} &middot; Job #{job.jobNo}
-        </span>
-      </div>
-      <h2 className="modal-title">{job.name}</h2>
+      <p className="job-head__meta">
+        Bid #{job.bidNo} &middot; Job #{job.jobNo}
+      </p>
+      <h2 className="modal-title" style={{ marginTop: '0.25rem' }}>
+        {job.name}
+      </h2>
 
       <div className="detail-grid">
         <div>
@@ -81,13 +80,17 @@ export default function JobDetailsModal({
       <hr className="divider" />
 
       <span className="field-label">Assigned Crew Lead</span>
-      <div className="crew-row">
-        <Avatar name={crew.leadName} />
-        <span className="crew-row__name">
-          {crew.leadName} (${crew.rate}/h)
-        </span>
-        <span className="crew-row__date">{job.startDate}</span>
-      </div>
+      {crew ? (
+        <div className="crew-row">
+          <Avatar name={crew.leadName} />
+          <span className="crew-row__name">
+            {crew.leadName} (${crew.rate}/h)
+          </span>
+          <span className="crew-row__date">{job.startDate}</span>
+        </div>
+      ) : (
+        <p className="crew-row__empty">No crew assigned</p>
+      )}
 
       {note && (
         <>
@@ -97,13 +100,17 @@ export default function JobDetailsModal({
       )}
 
       <div className="modal-actions modal-actions--split">
-        <button type="button" className="btn btn--danger" onClick={() => setConfirmingRemove(true)}>
-          <Icon.Trash width={16} height={16} />
-          Remove Crew
-        </button>
+        {crew ? (
+          <button type="button" className="btn btn--danger" onClick={() => setConfirmingRemove(true)}>
+            <Icon.Trash width={16} height={16} />
+            Remove Crew
+          </button>
+        ) : (
+          <span />
+        )}
         <div className="modal-actions">
           <button type="button" className="btn btn--outline" onClick={onChangeCrew}>
-            Change Crew
+            {crew ? 'Change Crew' : 'Assign Crew'}
           </button>
           <button type="button" className="btn btn--primary" onClick={onDone}>
             Done

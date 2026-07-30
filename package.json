@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:share": "vite --host",
+    "share": "npx --yes cloudflared tunnel --url http://localhost:5173",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview --host"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
+    "@phosphor-icons/react": "^2.1.10",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1"

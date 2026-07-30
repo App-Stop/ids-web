@@ -36,6 +36,8 @@ export interface CrewMenuOption {
   id: string
   label: string
   color: string
+  avatar?: string
+  avatarName?: string
 }
 
 export interface JobMenuOption {
@@ -147,13 +149,13 @@ export const rosterRows: RosterRow[] = [
 // crews shown in the Crew tab table, since not every crew has to appear
 // there to be assignable on the Roster side).
 export const crewMenuOptions: CrewMenuOption[] = [
-  { id: 'c8742', label: "Hank's Crew", color: '#e0399f' },
-  { id: 'c5917', label: "John's Crew", color: '#22c55e' },
-  { id: 'c4638', label: "Bob's Crew", color: '#ef4444' },
-  { id: 'c7291', label: "Chris's Crew", color: '#06b6d4' },
-  { id: 'c3856', label: "Noah's Crew", color: '#f97316' },
-  { id: 'c6429', label: "Lucas's Crew", color: '#3b82f6' },
-  { id: 'cliam', label: "Liam's Crew", color: '#8b5cf6' },
+  { id: 'c8742', label: "Hank's Crew", color: '#e0399f', avatar: avatar(12), avatarName: 'Hank Williams' },
+  { id: 'c5917', label: "John's Crew", color: '#22c55e', avatar: avatar(33), avatarName: 'John D.' },
+  { id: 'c4638', label: "Bob's Crew", color: '#ef4444', avatar: avatar(51), avatarName: 'Bob Martinez' },
+  { id: 'c7291', label: "Chris's Crew", color: '#06b6d4', avatar: avatar(15), avatarName: 'Chris Lee' },
+  { id: 'c3856', label: "Noah's Crew", color: '#f97316', avatar: avatar(22), avatarName: 'Noah Grant' },
+  { id: 'c6429', label: "Lucas's Crew", color: '#3b82f6', avatar: avatar(41), avatarName: 'Lucas Chen' },
+  { id: 'cliam', label: "Liam's Crew", color: '#8b5cf6', avatar: avatar(18), avatarName: 'Liam Brooks' },
 ]
 
 export const jobMenuOptions: JobMenuOption[] = [

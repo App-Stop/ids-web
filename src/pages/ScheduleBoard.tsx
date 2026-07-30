@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import {
   DndContext,
   useDraggable,
@@ -10,6 +10,12 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
+import {
+  CaretLeft,
+  CaretRight,
+  CalendarBlank,
+  MagnifyingGlass,
+} from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Topbar from '../components/dashboard/Topbar'
 import Dropdown from '../components/dashboard/Dropdown'
@@ -18,11 +24,13 @@ import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import CrewDetailsModal from '../components/dashboard/CrewDetailsModal'
 import NoteModal from '../components/dashboard/NoteModal'
 import CreateJobModal from '../components/dashboard/CreateJobModal'
+import CreateCrewModal from '../components/dashboard/CreateCrewModal'
 import { Icon } from '../components/dashboard/icons'
-import { crewLeads, jobs as masterJobs, type Job } from '../lib/dashboardData'
+import { assignableCrews, jobs as masterJobs, crewLeads, type Job } from '../lib/dashboardData'
 import {
   scheduleJobs as initialScheduleJobs,
-  initialScheduleAssignments,
+  weeklyScheduleAssignments,
+  monthlyScheduleAssignments,
   TODAY,
   toISO,
   fromISO,
@@ -30,8 +38,8 @@ import {
   getMonday,
   weekdayShort,
   monthLabel,
-  daysInMonth,
   formatMdy,
+  monthGridDays,
   type ScheduleJob,
   type ScheduleAssignment,
 } from '../lib/scheduleData'
@@ -45,11 +53,15 @@ type Flow =
   | { type: 'crewDetails'; jobId: string; date: string; assignmentId: string }
   | { type: 'assignmentNote'; jobId: string; date: string; assignmentId: string }
   | { type: 'editJob'; jobId: string }
+  | { type: 'newJob' }
+  | { type: 'newCrew' }
 
 const JOBNO_W = 72
 const JOB_W = 230
-const DIVIDER_W = 24
-const META_WIDTHS = [90, 130, 130, 100]
+const DIVIDER_W = 10
+const META_WIDTHS = [130, 130, 130, 100] as const
+/** Day column width when monthly + separator open (~15 days visible). */
+const MONTH_DAY_META_W = 56
 
 function toJob(row: ScheduleJob, date: string): Job {
   const laborBudgetTotal = Math.round(row.contract * 0.3)
@@ -90,7 +102,7 @@ function AssignmentPill({
   })
 
   return (
-    <>
+    <div className={`sb-pill-wrap${compact ? ' sb-pill-wrap--compact' : ''}`}>
       <button
         type="button"
         className="sb-pill"
@@ -98,7 +110,11 @@ function AssignmentPill({
         style={
           compact
             ? { background: color, opacity: isDragging ? 0.35 : 1 }
-            : { background: `${color}1A`, borderColor: color, opacity: isDragging ? 0.35 : 1 }
+            : {
+                background: `${color}1A`,
+                borderColor: color,
+                opacity: isDragging ? 0.35 : 1,
+              }
         }
         onClick={onOpenDetails}
       >
@@ -107,14 +123,14 @@ function AssignmentPill({
           <span
             ref={setNodeRef}
             className="sb-pill__drag-handle"
+            style={{ background: color }}
             title="Drag to extend across days"
             onClick={(e) => e.stopPropagation()}
             {...listeners}
             {...attributes}
           >
-            <span className="sb-pill__drag-dot" />
-            <span className="sb-pill__drag-dot" />
-            <span className="sb-pill__drag-dot" />
+            <Icon.ChevronRight width={12} height={12} />
+            <Icon.ChevronRight width={12} height={12} />
           </span>
         )}
       </button>
@@ -139,7 +155,7 @@ function AssignmentPill({
           )}
         </span>
       )}
-    </>
+    </div>
   )
 }
 
@@ -176,7 +192,9 @@ function DayCell({
 
 export default function ScheduleBoard() {
   const [jobs, setJobs] = useState(initialScheduleJobs)
-  const [assignments, setAssignments] = useState(initialScheduleAssignments)
+  const [weeklyAssignments, setWeeklyAssignments] = useState(weeklyScheduleAssignments)
+  const [monthlyAssignments, setMonthlyAssignments] = useState(monthlyScheduleAssignments)
+  const [crews, setCrews] = useState(assignableCrews)
 
   const [viewMode, setViewMode] = useState<ViewMode>('weekly')
   const [anchor, setAnchor] = useState(() => fromISO(TODAY))
@@ -185,6 +203,7 @@ export default function ScheduleBoard() {
   const [jumpOpen, setJumpOpen] = useState(false)
   const [metaVisible, setMetaVisible] = useState(false)
   const [zoom, setZoom] = useState(1)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
 
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
@@ -192,12 +211,29 @@ export default function ScheduleBoard() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
+  const assignments = viewMode === 'weekly' ? weeklyAssignments : monthlyAssignments
+  const setAssignments = viewMode === 'weekly' ? setWeeklyAssignments : setMonthlyAssignments
+
   const weekStart = getMonday(anchor)
   const weekDays = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(weekStart, i))
-  const monthDays = Array.from({ length: daysInMonth(anchor) }, (_, i) => new Date(anchor.getFullYear(), anchor.getMonth(), i + 1))
+  const monthDays = monthGridDays(anchor)
   const visibleDays = viewMode === 'weekly' ? weekDays : monthDays
   const compact = viewMode === 'monthly'
-  const dayW = viewMode === 'weekly' ? 150 : 46
+  const dayW =
+    viewMode === 'weekly' ? 150 : metaVisible ? MONTH_DAY_META_W : undefined
+
+  function openMonthly() {
+    setViewMode('monthly')
+    setSidebarCollapsed(true)
+  }
+
+  function toggleMeta() {
+    setMetaVisible((v) => {
+      const next = !v
+      if (next) setSidebarCollapsed(true)
+      return next
+    })
+  }
 
   const rangeLabel =
     viewMode === 'weekly'
@@ -278,24 +314,20 @@ export default function ScheduleBoard() {
 
   const activeRow = flow.type !== 'none' && 'jobId' in flow ? jobs.find((j) => j.id === flow.jobId) : undefined
 
-  const crewLegend = Array.from(
-    assignments.reduce((map, a) => {
-      const row = jobs.find((j) => j.id === a.jobId)
-      if (row && !map.has(a.crewName)) map.set(a.crewName, row.color)
-      return map
-    }, new Map<string, string>()),
-  )
-
   const draggingRow = draggingAssignment ? jobs.find((j) => j.id === draggingAssignment.jobId) : undefined
 
   return (
     <div className="dash">
-      <Sidebar active="Schedule Board" />
+      <Sidebar
+        active="Schedule Board"
+        collapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+      />
 
       <main className="dash__main">
         <Topbar
-          onAddJob={() => {}}
-          onCreateCrew={() => {}}
+          onAddJob={() => setFlow({ type: 'newJob' })}
+          onCreateCrew={() => setFlow({ type: 'newCrew' })}
           extra={
             <ZoomControl
               zoom={zoom}
@@ -310,31 +342,29 @@ export default function ScheduleBoard() {
             <h1 className="dash__title">Job Schedules</h1>
             <p className="dash__subtitle">{viewMode === 'weekly' ? 'Weekly' : 'Monthly'} crew assignments</p>
           </div>
-          {crewLegend.length > 0 && (
-            <div className="sb-legend">
-              {crewLegend.map(([name, color]) => (
-                <span key={name} className="sb-legend__item">
-                  <i style={{ background: color }} />
-                  {name}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="sb-legend">
+            {crews.map((crew) => (
+              <span key={crew.id} className="sb-legend__item">
+                <i style={{ background: crew.color }} />
+                {crew.name}
+              </span>
+            ))}
+          </div>
         </div>
 
         <div className="sb-toolbar">
-          <button type="button" className="icon-btn icon-btn--bordered sb-nav-btn" onClick={goPrev}>
-            <Icon.ArrowLeft width={16} height={16} />
+          <button type="button" className="icon-btn icon-btn--bordered sb-nav-btn" onClick={goPrev} aria-label="Previous">
+            <CaretLeft size={16} weight="bold" />
           </button>
           <span className="sb-range">{rangeLabel}</span>
-          <button type="button" className="icon-btn icon-btn--bordered sb-nav-btn" onClick={goNext}>
-            <Icon.ArrowRight width={16} height={16} />
+          <button type="button" className="icon-btn icon-btn--bordered sb-nav-btn" onClick={goNext} aria-label="Next">
+            <CaretRight size={16} weight="bold" />
           </button>
 
           <div className="sb-jump">
-            <button type="button" className="btn btn--outline" onClick={() => setJumpOpen((o) => !o)}>
-              Jump to date
-              <Icon.Calendar width={16} height={16} />
+            <button type="button" className="btn btn--outline sb-jump__btn" onClick={() => setJumpOpen((o) => !o)}>
+              <CalendarBlank size={16} weight="regular" />
+              {viewMode === 'monthly' ? 'Jump to month' : 'Jump to date'}
             </button>
             {jumpOpen && (
               <input
@@ -353,7 +383,7 @@ export default function ScheduleBoard() {
           </div>
 
           <label className="sb-search">
-            <Icon.Search width={16} height={16} />
+            <MagnifyingGlass size={16} weight="regular" />
             <input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </label>
 
@@ -361,7 +391,7 @@ export default function ScheduleBoard() {
             <button
               type="button"
               className={viewMode === 'monthly' ? 'is-active' : ''}
-              onClick={() => setViewMode('monthly')}
+              onClick={openMonthly}
             >
               Monthly
             </button>
@@ -374,179 +404,234 @@ export default function ScheduleBoard() {
             </button>
           </div>
 
-          <Dropdown
-            value={jobFilter}
-            placeholder="All Jobs"
-            onChange={setJobFilter}
-            selectedLabel={jobFilter}
-            options={masterJobs.map((j) => ({ id: j.name, label: j.name }))}
-          />
+          <div className="sb-jobs-dd">
+            <Dropdown
+              value={jobFilter ?? '__all__'}
+              placeholder="All Jobs"
+              selectedLabel={jobFilter ?? 'All Jobs'}
+              onChange={(id) => setJobFilter(id === '__all__' ? null : id)}
+              options={[
+                { id: '__all__', label: 'All Jobs' },
+                ...masterJobs.map((j) => ({ id: j.name, label: j.name })),
+              ]}
+            />
+          </div>
         </div>
 
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="sb-table-wrap" style={{ zoom }}>
-            <table className="sb-table">
-              <colgroup>
-                <col style={{ width: JOBNO_W }} />
-                <col style={{ width: JOB_W }} />
-                {metaVisible && META_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}
-                <col style={{ width: DIVIDER_W }} />
-                {visibleDays.map((d) => (
-                  <col key={toISO(d)} style={{ width: dayW }} />
-                ))}
-              </colgroup>
-              <thead>
-                <tr>
-                  <th className="sb-col-jobno">Job #</th>
-                  <th className="sb-col-job">Job</th>
-                  {metaVisible && (
-                    <>
-                      <th className="sb-col-meta">IDS Super</th>
-                      <th className="sb-col-meta">GC Super</th>
-                      <th className="sb-col-meta">General Contractor</th>
-                      <th className="sb-col-meta">Contract</th>
-                    </>
-                  )}
-                  <th className="sb-col-divider" />
-                  {visibleDays.map((d) => {
-                    const iso = toISO(d)
-                    const isToday = iso === TODAY
-                    return (
-                      <th key={iso} className={`sb-day-head ${isToday ? 'is-today' : ''} ${compact ? 'sb-day-head--compact' : ''}`}>
-                        {viewMode === 'weekly' ? (
-                          <>
-                            <div>{isToday ? 'Today, ' + weekdayShort(d) : weekdayShort(d)}</div>
-                            <div className="sb-day-head__date">{d.getMonth() + 1}-{String(d.getDate()).padStart(2, '0')}-{String(d.getFullYear()).slice(2)}</div>
-                          </>
-                        ) : (
-                          d.getDate()
-                        )}
-                      </th>
-                    )
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredJobs.map((row, rowIndex) => {
-                  const rowAssignments = assignments.filter((a) => a.jobId === row.id)
-
-                  // Walk the visible days left to right, collapsing any run of
-                  // consecutive days covered by the same assignment into a
-                  // single colSpan'd cell so a multi-day assignment renders as
-                  // one continuous bar instead of one pill per day.
-                  const dayCells: React.ReactNode[] = []
-                  let i = 0
-                  while (i < visibleDays.length) {
-                    const iso = toISO(visibleDays[i])
-                    const assignment = rowAssignments.find((a) => iso >= a.startDate && iso <= a.endDate)
-
-                    if (assignment) {
-                      let span = 1
-                      while (
-                        i + span < visibleDays.length &&
-                        toISO(visibleDays[i + span]) >= assignment.startDate &&
-                        toISO(visibleDays[i + span]) <= assignment.endDate
-                      ) {
-                        span++
-                      }
-
-                      dayCells.push(
-                        <DayCell key={assignment.id} jobId={row.id} iso={iso} compact={compact} colSpan={span}>
-                          <AssignmentPill
-                            assignment={assignment}
-                            color={row.color}
-                            compact={compact}
-                            onOpenDetails={() =>
-                              setFlow({ type: 'crewDetails', jobId: row.id, date: iso, assignmentId: assignment.id })
-                            }
-                            onOpenNote={() =>
-                              setFlow({ type: 'assignmentNote', jobId: row.id, date: iso, assignmentId: assignment.id })
-                            }
-                          />
-                        </DayCell>,
-                      )
-                      i += span
-                    } else {
-                      dayCells.push(
-                        <DayCell key={iso} jobId={row.id} iso={iso} compact={compact}>
-                          {compact ? (
-                            <button
-                              type="button"
-                              className="sb-empty"
-                              onClick={() => setFlow({ type: 'assignCrew', jobId: row.id, date: iso })}
-                            />
-                          ) : (
-                            <button
-                              type="button"
-                              className="sb-add"
-                              onClick={() => setFlow({ type: 'assignCrew', jobId: row.id, date: iso })}
-                            >
-                              <Icon.Plus width={14} height={14} />
-                              Add
-                            </button>
-                          )}
-                        </DayCell>,
-                      )
-                      i += 1
-                    }
-                  }
-
-                  return (
-                    <tr key={row.id} className="sb-row">
-                      <td className="sb-col-jobno">
-                        {rowAssignments.length > 0 && (
-                          <span
-                            className="sb-row-bar-hit"
-                            onMouseEnter={(e) => {
-                              const rect = e.currentTarget.getBoundingClientRect()
-                              setCrewHover({
-                                x: rect.right + 8,
-                                y: rect.top + rect.height / 2,
-                                color: row.color,
-                                names: rowAssignments.map((a) => a.crewName),
-                              })
-                            }}
-                            onMouseLeave={() => setCrewHover(null)}
-                          >
-                            <i className="sb-row-bar" style={{ background: row.color }} />
-                          </span>
-                        )}
-                        {row.jobNo}
-                      </td>
-                      <td className="sb-col-job">
-                        <div className="sb-job-inner">
-                          <span className="sb-job-name" title={row.name}>{row.name}</span>
-                          <Icon.ChevronRight width={14} height={14} />
-                        </div>
-                      </td>
+          <div
+            className={`sb-board${compact ? ' sb-board--monthly' : ''}${metaVisible ? ' sb-board--meta' : ''}`}
+            style={{ zoom }}
+          >
+            <div className="sb-board__frame">
+              <div className="sb-board__frozen">
+                <table className="sb-table sb-table--frozen">
+                  <colgroup>
+                    <col style={{ width: JOBNO_W }} />
+                    <col style={{ width: JOB_W }} />
+                    {metaVisible && META_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}
+                    <col style={{ width: DIVIDER_W }} />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th className="sb-col-jobno">Job #</th>
+                      <th className="sb-col-job">Job</th>
                       {metaVisible && (
                         <>
-                          <td className="sb-col-meta">{row.idsSuper}</td>
-                          <td className="sb-col-meta">{row.gcSuper}</td>
-                          <td className="sb-col-meta">{row.gc}</td>
-                          <td className="sb-col-meta">${row.contract.toLocaleString('en-US')}</td>
+                          <th className="sb-col-meta">General Contractor</th>
+                          <th className="sb-col-meta">GC Super</th>
+                          <th className="sb-col-meta">IDS Super</th>
+                          <th className="sb-col-meta sb-col-meta--contract">Contract</th>
                         </>
                       )}
-                      {rowIndex === 0 && (
-                        <td className="sb-col-divider" rowSpan={filteredJobs.length}>
-                          <div className="sb-divider-inner">
-                            <button
-                              type="button"
-                              className="sb-divider-btn"
-                              onClick={() => setMetaVisible((v) => !v)}
-                              aria-label={metaVisible ? 'Hide job details' : 'Show job details'}
-                            >
-                              <Icon.MoreVertical width={14} height={14} />
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                      {dayCells}
+                      <th className="sb-col-divider" />
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {filteredJobs.map((row, rowIndex) => {
+                      const rowAssignments = assignments.filter((a) => a.jobId === row.id)
+                      return (
+                        <tr key={row.id} className="sb-row">
+                          <td className="sb-col-jobno">{row.jobNo}</td>
+                          <td className="sb-col-job">
+                            <span
+                              className="sb-row-bar-hit"
+                              onMouseEnter={(e) => {
+                                if (rowAssignments.length === 0) return
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setCrewHover({
+                                  x: rect.right + 8,
+                                  y: rect.top + rect.height / 2,
+                                  color: row.color,
+                                  names: rowAssignments.map((a) => a.crewName),
+                                })
+                              }}
+                              onMouseLeave={() => setCrewHover(null)}
+                            >
+                              <i className="sb-row-bar" style={{ background: row.color }} />
+                            </span>
+                            <div className="sb-job-inner">
+                              <span className="sb-job-name" title={row.name}>{row.name}</span>
+                              <Icon.ChevronRight width={14} height={14} />
+                            </div>
+                          </td>
+                          {metaVisible && (
+                            <>
+                              <td className="sb-col-meta">{row.gc}</td>
+                              <td className="sb-col-meta">{row.gcSuper}</td>
+                              <td className="sb-col-meta">{row.idsSuper}</td>
+                              <td className="sb-col-meta sb-col-meta--contract">${row.contract.toLocaleString('en-US')}</td>
+                            </>
+                          )}
+                          <td className="sb-col-divider">
+                            <div className="sb-divider-inner">
+                              <button
+                                type="button"
+                                className={`sb-divider-btn${metaVisible ? ' is-open' : ''}${
+                                  rowIndex === Math.floor((filteredJobs.length - 1) / 2) ? ' is-visible' : ''
+                                }`}
+                                onClick={toggleMeta}
+                                aria-label={metaVisible ? 'Hide job details' : 'Show job details'}
+                              >
+                                <span className="sb-divider-btn__dots" aria-hidden>
+                                  <i /><i /><i />
+                                </span>
+                                <span className="sb-divider-btn__arrow" aria-hidden>
+                                  {metaVisible ? (
+                                    <Icon.ArrowLeft width={14} height={14} />
+                                  ) : (
+                                    <Icon.ArrowRight width={14} height={14} />
+                                  )}
+                                </span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="sb-board__scroll">
+                <table
+                  className={`sb-table sb-table--days${compact ? ' sb-table--monthly' : ''}`}
+                  style={
+                    compact
+                      ? ({
+                          ['--sb-day-count' as string]: visibleDays.length,
+                          ...(dayW ? { ['--sb-day-w' as string]: `${dayW}px` } : {}),
+                        } as CSSProperties)
+                      : undefined
+                  }
+                >
+                  <colgroup>
+                    {visibleDays.map((d) => (
+                      <col
+                        key={toISO(d)}
+                        style={dayW ? { width: dayW, minWidth: dayW } : undefined}
+                      />
+                    ))}
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      {visibleDays.map((d) => {
+                        const iso = toISO(d)
+                        const isToday = iso === TODAY
+                        return (
+                          <th
+                            key={iso}
+                            className={`sb-day-head ${isToday ? 'is-today' : ''} ${compact ? 'sb-day-head--compact' : ''}`}
+                          >
+                            {viewMode === 'weekly' ? (
+                              <>
+                                <div>{isToday ? 'Today, ' + weekdayShort(d) : weekdayShort(d)}</div>
+                                <div className="sb-day-head__date">{d.getMonth() + 1}-{String(d.getDate()).padStart(2, '0')}-{String(d.getFullYear()).slice(2)}</div>
+                              </>
+                            ) : (
+                              d.getDate()
+                            )}
+                          </th>
+                        )
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredJobs.map((row) => {
+                      const rowAssignments = assignments.filter((a) => a.jobId === row.id)
+                      const dayCells: React.ReactNode[] = []
+                      let i = 0
+                      while (i < visibleDays.length) {
+                        const iso = toISO(visibleDays[i])
+                        const assignment = rowAssignments.find((a) => iso >= a.startDate && iso <= a.endDate)
+
+                        if (assignment) {
+                          let span = 1
+                          while (
+                            i + span < visibleDays.length &&
+                            toISO(visibleDays[i + span]) >= assignment.startDate &&
+                            toISO(visibleDays[i + span]) <= assignment.endDate
+                          ) {
+                            span++
+                          }
+
+                          dayCells.push(
+                            <DayCell
+                              key={assignment.id}
+                              jobId={row.id}
+                              iso={iso}
+                              compact={compact}
+                              colSpan={span}
+                            >
+                              <AssignmentPill
+                                assignment={assignment}
+                                color={row.color}
+                                compact={compact}
+                                onOpenDetails={() =>
+                                  setFlow({ type: 'crewDetails', jobId: row.id, date: iso, assignmentId: assignment.id })
+                                }
+                                onOpenNote={() =>
+                                  setFlow({ type: 'assignmentNote', jobId: row.id, date: iso, assignmentId: assignment.id })
+                                }
+                              />
+                            </DayCell>,
+                          )
+                          i += span
+                        } else {
+                          dayCells.push(
+                            <DayCell key={iso} jobId={row.id} iso={iso} compact={compact}>
+                              {compact ? (
+                                <button
+                                  type="button"
+                                  className="sb-empty"
+                                  onClick={() => setFlow({ type: 'assignCrew', jobId: row.id, date: iso })}
+                                />
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="sb-add"
+                                  onClick={() => setFlow({ type: 'assignCrew', jobId: row.id, date: iso })}
+                                >
+                                  <Icon.Plus width={14} height={14} />
+                                  Add
+                                </button>
+                              )}
+                            </DayCell>,
+                          )
+                          i += 1
+                        }
+                      }
+
+                      return (
+                        <tr key={row.id} className="sb-row">
+                          {dayCells}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
           <DragOverlay>
@@ -579,9 +664,9 @@ export default function ScheduleBoard() {
         <AssignCrewModal
           job={toJob(activeRow, flow.date)}
           onCancel={() => setFlow({ type: 'none' })}
-          onAssign={(crewLeadId, note) => {
-            const lead = crewLeads.find((c) => c.id === crewLeadId)
-            if (!lead) return
+          onAssign={(crewId, note) => {
+            const crew = crews.find((c) => c.id === crewId)
+            if (!crew) return
             setAssignments((list) => [
               ...list,
               {
@@ -589,8 +674,8 @@ export default function ScheduleBoard() {
                 jobId: flow.jobId,
                 startDate: flow.date,
                 endDate: flow.date,
-                crewName: lead.name,
-                rate: lead.rate,
+                crewName: crew.name,
+                rate: crew.rate,
                 workers: 1,
                 note: note || undefined,
               },
@@ -647,6 +732,50 @@ export default function ScheduleBoard() {
                 r.id === flow.jobId ? { ...r, name: data.name, gc: data.gc, color: data.color, contract: data.contractAmount } : r,
               ),
             )
+            setFlow({ type: 'none' })
+          }}
+        />
+      )}
+
+      {flow.type === 'newJob' && (
+        <CreateJobModal
+          onCancel={() => setFlow({ type: 'none' })}
+          onSubmit={(data) => {
+            const jobNo = String(4800 + jobs.length + 1)
+            setJobs((list) => [
+              ...list,
+              {
+                id: `s${jobNo}`,
+                jobNo,
+                name: data.name,
+                color: data.color,
+                idsSuper: 'TBD',
+                gcSuper: 'TBD',
+                gc: data.gc,
+                contract: data.contractAmount,
+              },
+            ])
+            setFlow({ type: 'none' })
+          }}
+        />
+      )}
+
+      {flow.type === 'newCrew' && (
+        <CreateCrewModal
+          jobs={masterJobs}
+          onCancel={() => setFlow({ type: 'none' })}
+          onSubmit={(data) => {
+            const lead = crewLeads.find((c) => c.id === data.crewLeadId)
+            setCrews((list) => [
+              ...list,
+              {
+                id: `crew-${Date.now()}`,
+                name: data.crewName,
+                leadName: lead?.name ?? 'TBD',
+                rate: lead?.rate ?? 25,
+                color: data.color,
+              },
+            ])
             setFlow({ type: 'none' })
           }}
         />

@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { MagnifyingGlass, Plus, CalendarBlank } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Modal from '../components/dashboard/Modal'
 import Dropdown from '../components/dashboard/Dropdown'
@@ -6,9 +7,19 @@ import MenuDropdown from '../components/dashboard/MenuDropdown'
 import NewActionMenu from '../components/dashboard/NewActionMenu'
 import CreateJobModal, { type JobFormData } from '../components/dashboard/CreateJobModal'
 import CreateCrewModal, { type CrewFormData } from '../components/dashboard/CreateCrewModal'
+import JobDetailsModal from '../components/dashboard/JobDetailsModal'
+import AssignCrewModal from '../components/dashboard/AssignCrewModal'
+import ZoomControl from '../components/dashboard/ZoomControl'
 import { Icon } from '../components/dashboard/icons'
 import { crewRows as initialCrewRows, crewMenuOptions } from '../lib/crewData'
-import { crewLeads, formatMoney, jobs as initialJobs, type Job } from '../lib/dashboardData'
+import {
+  assignableCrews,
+  crewLeads,
+  formatMoney,
+  jobs as initialJobs,
+  type Job,
+  type UnassignedCrew,
+} from '../lib/dashboardData'
 import { initialManagedJobs } from '../lib/jobsManagementData'
 import './Dashboard.css'
 import './CostTracking.css'
@@ -16,6 +27,7 @@ import './CostTracking.css'
 type ViewMode = 'jobs' | 'crew'
 type RangeMode = 'Custom Range' | 'Weekly' | 'Monthly' | 'All Time'
 type ModalMode = 'none' | 'add' | 'edit'
+type JobFlow = { type: 'none' } | { type: 'details'; jobId: string } | { type: 'assignCrew'; jobId: string }
 
 type JobCostRow = {
   id: string
@@ -141,7 +153,7 @@ function DateField({ value, onChange, className = '' }: { value: string; onChang
         }}
       >
         <span>{formatToolbarDate(parseIsoDate(value))}</span>
-        <Icon.Calendar width={16} height={16} />
+        <CalendarBlank size={16} weight="regular" />
       </button>
       <input ref={ref} type="date" value={value} onChange={(e) => onChange(e.target.value)} className="ct-date-field__native" />
     </div>
@@ -198,6 +210,25 @@ function makeCrewRows(): CrewCostRow[] {
       totalCost: laborCost + dumpstersCount * dumpsterUnitCost,
     }
   })
+}
+
+function toDetailsJob(row: JobCostRow, catalog: Job[]): Job {
+  const match = catalog.find((j) => j.name === row.jobName)
+  const num = row.id.replace(/[^0-9]/g, '') || '1'
+  return {
+    id: row.jobId,
+    name: row.jobName,
+    color: row.color,
+    bidNo: match?.bidNo ?? String(1000 + Number(num)),
+    jobNo: match?.jobNo ?? num.padStart(3, '0'),
+    gc: match?.gc ?? 'Turner Const.',
+    estimator: match?.estimator ?? 'John D.',
+    startDate: match?.startDate ?? row.date,
+    endDate: match?.endDate ?? row.date,
+    contractAmount: row.contract,
+    laborBudgetUsed: row.laborBudgetUsed,
+    laborBudgetTotal: row.laborBudgetTotal,
+  }
 }
 
 function CostModal({
@@ -352,11 +383,30 @@ export default function CostTracking() {
   const [crewOptions, setCrewOptions] = useState(crewMenuOptions)
   const [startDate, setStartDate] = useState('2026-01-20')
   const [endDate, setEndDate] = useState('2026-01-21')
-  const [metaVisible, setMetaVisible] = useState(true)
+  const [metaVisible, setMetaVisible] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
   const [actionMenuPlacement, setActionMenuPlacement] = useState<'up' | 'down'>('up')
   const [showCreateJob, setShowCreateJob] = useState(false)
   const [showCreateCrew, setShowCreateCrew] = useState(false)
+  const [zoom, setZoom] = useState(1)
+  const [jobFlow, setJobFlow] = useState<JobFlow>({ type: 'none' })
+  const [jobNotes, setJobNotes] = useState<Record<string, string>>({
+    '#001': 'Coordinate with suppliers and schedule weekly progress meetings.',
+  })
+  const [jobCrews, setJobCrews] = useState<Record<string, UnassignedCrew | null>>({
+    '#001': { id: 'hank', name: "Hank's Crew", leadName: 'Hank Williams', rate: 25 },
+  })
+
+  const detailsRow =
+    jobFlow.type !== 'none' ? jobRows.find((row) => row.jobId === jobFlow.jobId || row.id === jobFlow.jobId) : undefined
+  const detailsJob = detailsRow ? toDetailsJob(detailsRow, jobs) : undefined
+  const detailsCrew = detailsRow ? (jobCrews[detailsRow.jobId] ?? jobCrews[detailsRow.id] ?? null) : null
+  const detailsNote = detailsRow ? (jobNotes[detailsRow.jobId] ?? jobNotes[detailsRow.id] ?? '') : ''
+
+  function openJobDetails(row: JobCostRow) {
+    setJobFlow({ type: 'details', jobId: row.jobId })
+  }
 
   function toggleActionMenu(button: HTMLButtonElement) {
     if (actionMenuOpen) {
@@ -395,6 +445,14 @@ export default function CostTracking() {
     const weekStart = getMonday(parseIsoDate(startDate))
     return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index))
   }, [startDate])
+
+  function toggleMeta() {
+    setMetaVisible((current) => {
+      const next = !current
+      if (next) setSidebarCollapsed(true)
+      return next
+    })
+  }
 
   function openAddModal() {
     setActiveRecord(undefined)
@@ -477,22 +535,25 @@ export default function CostTracking() {
 
   return (
     <div className="dash">
-      <Sidebar active="Cost Tracking" />
+      <Sidebar
+        active="Cost Tracking"
+        collapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+      />
 
-      <main className="dash__main ct-main">
+      <main className="dash__main ct-main" style={{ zoom }}>
         <div className="ct-topbar">
           <label className="topbar__search ct-search">
-            <Icon.Search />
+            <MagnifyingGlass size={18} weight="regular" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search anything..." />
           </label>
 
           <div className="ct-topbar__actions">
-            <button type="button" className="icon-btn icon-btn--bordered" aria-label="Zoom in">
-              <Icon.ZoomIn />
-            </button>
-            <button type="button" className="icon-btn icon-btn--bordered" aria-label="Zoom out">
-              <Icon.ZoomOut />
-            </button>
+            <ZoomControl
+              zoom={zoom}
+              onZoomIn={() => setZoom((z) => Math.min(1.5, +(z + 0.05).toFixed(2)))}
+              onZoomOut={() => setZoom((z) => Math.max(0.75, +(z - 0.05).toFixed(2)))}
+            />
             <button type="button" className="icon-btn icon-btn--bordered" aria-label="Notifications">
               <Icon.Bell />
               <i className="dot-badge" />
@@ -503,7 +564,7 @@ export default function CostTracking() {
                 className="btn btn--primary"
                 onClick={(e) => toggleActionMenu(e.currentTarget)}
               >
-                <Icon.Plus width={16} height={16} />
+                <Plus size={16} weight="bold" />
                 New Action
               </button>
               {actionMenuOpen && (
@@ -536,13 +597,15 @@ export default function CostTracking() {
         </div>
 
         <div className="ct-toolbar">
-          <Dropdown
-            value={range}
-            options={RANGE_OPTIONS.map((option) => ({ id: option.id, label: option.label }))}
-            selectedLabel={range}
-            onChange={(id) => setRange(id as RangeMode)}
-            placeholder="Custom Range"
-          />
+          <div className="ct-dd ct-dd--range">
+            <Dropdown
+              value={range}
+              options={RANGE_OPTIONS.map((option) => ({ id: option.id, label: option.label }))}
+              selectedLabel={range}
+              onChange={(id) => setRange(id as RangeMode)}
+              placeholder="Custom Range"
+            />
+          </div>
 
           {tab === 'jobs' && (
             <>
@@ -553,11 +616,11 @@ export default function CostTracking() {
           )}
 
           <label className="ct-search-inline">
-            <Icon.Search width={16} height={16} />
+            <MagnifyingGlass size={16} weight="regular" />
             <input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </label>
 
-          <div className="sb-toggle ct-toggle">
+          <div className="ct-view-toggle">
             <button type="button" className={tab === 'jobs' ? 'is-active' : ''} onClick={() => setTab('jobs')}>
               Jobs
             </button>
@@ -566,31 +629,35 @@ export default function CostTracking() {
             </button>
           </div>
 
-          {tab === 'jobs' ? (
-            <MenuDropdown
-              options={jobFilterOptions}
-              value={jobFilter}
-              onChange={setJobFilter}
-              placeholder="All Jobs"
-              includeAll
-              allLabel="All Jobs"
-              showDot={false}
-            />
-          ) : (
-            <MenuDropdown
-              options={crewFilterOptions}
-              value={crewFilter}
-              onChange={setCrewFilter}
-              placeholder="All Crews"
-              includeAll
-              allLabel="All Crews"
-            />
-          )}
+          <div className="ct-toolbar__end">
+            <div className="ct-dd ct-dd--filter">
+              {tab === 'jobs' ? (
+                <MenuDropdown
+                  options={jobFilterOptions}
+                  value={jobFilter}
+                  onChange={setJobFilter}
+                  placeholder="All Jobs"
+                  includeAll
+                  allLabel="All Jobs"
+                  showDot={false}
+                />
+              ) : (
+                <MenuDropdown
+                  options={crewFilterOptions}
+                  value={crewFilter}
+                  onChange={setCrewFilter}
+                  placeholder="All Crews"
+                  includeAll
+                  allLabel="All Crews"
+                />
+              )}
+            </div>
 
-          <button type="button" className="btn btn--primary ct-add-btn" onClick={openAddModal}>
-            <Icon.Plus width={16} height={16} />
-            Add Entry
-          </button>
+            <button type="button" className="btn btn--primary ct-add-btn" onClick={openAddModal}>
+              <Plus size={16} weight="bold" />
+              Add Entry
+            </button>
+          </div>
         </div>
 
         <div className="stat-grid ct-stats-grid">
@@ -630,19 +697,19 @@ export default function CostTracking() {
 
         <div className="ct-table-wrap">
           {tab === 'jobs' ? (
-            <table className="ct-table ct-table--grid">
+            <table className={`ct-table ct-table--grid${metaVisible ? ' ct-table--meta' : ''}`}>
               <colgroup>
-                <col style={{ width: '82px' }} />
-                <col style={{ width: '200px' }} />
+                <col style={{ width: '72px' }} />
+                <col style={{ width: '240px' }} />
+                {metaVisible && <col style={{ width: '120px' }} />}
+                {metaVisible && <col style={{ width: '140px' }} />}
                 {metaVisible && <col style={{ width: '130px' }} />}
-                {metaVisible && <col style={{ width: '152px' }} />}
-                {metaVisible && <col style={{ width: '152px' }} />}
-                {metaVisible && <col style={{ width: '152px' }} />}
-                {metaVisible && <col style={{ width: '146px' }} />}
-                {metaVisible && <col style={{ width: '146px' }} />}
-                <col className="ct-grid-divider-col" style={{ width: '20px' }} />
+                {metaVisible && <col style={{ width: '120px' }} />}
+                {metaVisible && <col style={{ width: '130px' }} />}
+                {metaVisible && <col style={{ width: '90px' }} />}
+                <col className="ct-grid-divider-col" style={{ width: '10px' }} />
                 {weekDays.map((day) => (
-                  <col key={day.toISOString()} />
+                  <col key={day.toISOString()} style={{ width: '140px' }} />
                 ))}
               </colgroup>
               <thead>
@@ -669,43 +736,49 @@ export default function CostTracking() {
               <tbody>
                 {filteredJobRows.map((row, rowIndex) => (
                   <tr key={row.id}>
-                    <td className="ct-id-cell">{row.id.replace('j', '#')}</td>
-                    <td>
-                      <div className="ct-name-cell">
-                        <span className="ct-name-cell__bar" style={{ background: row.color }} />
+                    <td className="ct-id-cell">
+                      {row.id.replace(/^#/, '')}
+                    </td>
+                    <td className="ct-job-cell">
+                      <span className="ct-job-bar" style={{ background: row.color }} />
+                      <button type="button" className="ct-name-cell" onClick={() => openJobDetails(row)}>
                         <span className="ct-job-title" title={row.jobName}>
                           {row.jobName}
                         </span>
-                        <button
-                          type="button"
-                          className="ct-name-cell__chevron"
-                          onClick={() => openEditModal(row)}
-                          aria-label={`View details for ${row.jobName}`}
-                        >
+                        <span className="ct-name-cell__chevron" aria-hidden>
                           <Icon.ChevronRight width={16} height={16} />
-                        </button>
-                      </div>
+                        </span>
+                      </button>
                     </td>
-                    {metaVisible && <td>{formatMoney(row.contract)}</td>}
+                    {metaVisible && <td className="ct-money">{formatMoney(row.contract)}</td>}
                     {metaVisible && <td>{formatMoney(row.laborBudgetTotal)}</td>}
                     {metaVisible && <td>{formatMoney(row.balanceLeft)}</td>}
                     {metaVisible && <td>{`${(row.percentSpent * 100).toFixed(1)}%`}</td>}
                     {metaVisible && <td>{formatMoney(row.cumulativeLaborCosts)}</td>}
                     {metaVisible && <td>{row.dumpstersCount}</td>}
-                    {rowIndex === 0 && filteredJobRows.length > 0 && (
-                      <td className="ct-grid-divider" rowSpan={filteredJobRows.length}>
-                        <div className="ct-grid-divider__inner">
-                          <button
-                            type="button"
-                            className="ct-grid-divider__toggle"
-                            onClick={() => setMetaVisible((current) => !current)}
-                            aria-label={metaVisible ? 'Hide details columns' : 'Show details columns'}
-                          >
-                            <Icon.MoreVertical width={14} height={14} />
-                          </button>
-                        </div>
-                      </td>
-                    )}
+                    <td className="ct-grid-divider">
+                      <div className="ct-grid-divider__inner">
+                        <button
+                          type="button"
+                          className={`ct-grid-divider__toggle${metaVisible ? ' is-open' : ''}${
+                            rowIndex === Math.floor((filteredJobRows.length - 1) / 2) ? ' is-visible' : ''
+                          }`}
+                          onClick={toggleMeta}
+                          aria-label={metaVisible ? 'Hide details columns' : 'Show details columns'}
+                        >
+                          <span className="ct-grid-divider__dots" aria-hidden>
+                            <i /><i /><i />
+                          </span>
+                          <span className="ct-grid-divider__arrow" aria-hidden>
+                            {metaVisible ? (
+                              <Icon.ArrowLeft width={14} height={14} />
+                            ) : (
+                              <Icon.ArrowRight width={14} height={14} />
+                            )}
+                          </span>
+                        </button>
+                      </div>
+                    </td>
                     {weekDays.map((day, index) => {
                       const value = row.weeklyCosts[index]
                       return (
@@ -723,7 +796,7 @@ export default function CostTracking() {
               </tbody>
             </table>
           ) : (
-            <table className="ct-table">
+            <table className="ct-table ct-table--crew">
               <thead>
                 <tr>
                   <th className="ct-col-check">
@@ -735,7 +808,7 @@ export default function CostTracking() {
                   <th>Hourly Rate ($)</th>
                   <th>Total Hours</th>
                   <th>Cost</th>
-                  <th>Action</th>
+                  <th className="ct-col-action">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -745,10 +818,10 @@ export default function CostTracking() {
                       <input type="checkbox" />
                     </td>
                     <td className="ct-id-cell">#{row.crewId}</td>
-                    <td>
+                    <td className="ct-crew-name-cell">
+                      <span className="ct-crew-name-bar" style={{ background: row.color }} />
                       <div className="ct-crew-cell">
                         <img src={row.avatar} alt="" className="ct-crew-cell__avatar" />
-                        <span className="ct-name-cell__bar" style={{ background: row.color }} />
                         <span>{row.crewName}</span>
                       </div>
                     </td>
@@ -756,7 +829,7 @@ export default function CostTracking() {
                     <td>{row.hourlyRate}</td>
                     <td>{row.totalHours}</td>
                     <td>{formatMoney(row.cost)}</td>
-                    <td>
+                    <td className="ct-col-action">
                       <button type="button" className="ct-action-btn" onClick={() => openEditModal(row)} aria-label="Edit accumulated cost">
                         <Icon.Edit width={15} height={15} />
                       </button>
@@ -778,6 +851,47 @@ export default function CostTracking() {
           record={activeRecord}
           onCancel={closeModal}
           onSubmit={handleSubmit}
+        />
+      )}
+
+      {jobFlow.type === 'details' && detailsJob && (
+        <JobDetailsModal
+          job={detailsJob}
+          crew={detailsCrew}
+          note={detailsNote}
+          onDone={() => setJobFlow({ type: 'none' })}
+          onChangeCrew={() => setJobFlow({ type: 'assignCrew', jobId: detailsJob.id })}
+          onRemoveCrew={() => {
+            setJobCrews((prev) => ({ ...prev, [detailsJob.id]: null }))
+            setJobFlow({ type: 'none' })
+          }}
+        />
+      )}
+
+      {jobFlow.type === 'assignCrew' && detailsJob && (
+        <AssignCrewModal
+          job={detailsJob}
+          onCancel={() => setJobFlow({ type: 'details', jobId: detailsJob.id })}
+          onAssign={(crewId, note) => {
+            const crew = assignableCrews.find((c) => c.id === crewId)
+            if (!crew) return
+            setJobCrews((prev) => ({
+              ...prev,
+              [detailsJob.id]: {
+                id: crew.id,
+                name: crew.name,
+                leadName: crew.leadName,
+                rate: crew.rate,
+              },
+            }))
+            if (note) {
+              setJobNotes((prev) => ({ ...prev, [detailsJob.id]: note }))
+            }
+            setJobRows((list) =>
+              list.map((row) => (row.jobId === detailsJob.id || row.id === detailsJob.id ? { ...row, color: crew.color } : row)),
+            )
+            setJobFlow({ type: 'details', jobId: detailsJob.id })
+          }}
         />
       )}
 

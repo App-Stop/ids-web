@@ -1,11 +1,14 @@
 import { useRef, useState } from 'react'
 import { Icon } from './icons'
+import Avatar from './Avatar'
 import './crew-modals.css'
 
 export interface MenuDropdownOption {
   id: string
   label: string
   color?: string
+  avatar?: string
+  avatarName?: string
 }
 
 interface MenuDropdownProps {
@@ -16,20 +19,17 @@ interface MenuDropdownProps {
   includeAll?: boolean
   allLabel?: string
   showDot?: boolean
+  showAvatar?: boolean
+  panelTitle?: string
   align?: 'left' | 'right'
   className?: string
 }
 
-function PersonDot({ color }: { color?: string }) {
-  return (
-    <span className="md-avatar">
-      <svg viewBox="0 0 24 24" width={13} height={13} fill="none">
-        <circle cx="12" cy="8" r="4" fill="currentColor" opacity={0.55} />
-        <path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="currentColor" opacity={0.55} />
-      </svg>
-      {color && <i className="md-avatar__dot" style={{ background: color }} />}
-    </span>
-  )
+function CrewAvatar({ src, name }: { src?: string; name: string }) {
+  if (src) {
+    return <img className="md-crew-avatar" src={src} alt="" />
+  }
+  return <Avatar name={name} size={22} />
 }
 
 export default function MenuDropdown({
@@ -40,6 +40,7 @@ export default function MenuDropdown({
   includeAll = false,
   allLabel = 'All',
   showDot = true,
+  showAvatar = false,
   align = 'left',
   className = '',
 }: MenuDropdownProps) {
@@ -48,55 +49,79 @@ export default function MenuDropdown({
 
   const selected = options.find((o) => o.id === value)
   const label = value === null ? (includeAll ? allLabel : placeholder) : selected?.label ?? placeholder
+  const useCrewItems = showAvatar || showDot
 
   function handleBlur() {
-    // Delay so a click on an option registers before we close the panel.
     closeTimeout.current = setTimeout(() => setOpen(false), 120)
   }
   function cancelBlur() {
     if (closeTimeout.current) clearTimeout(closeTimeout.current)
   }
 
+  function renderCrewChrome(opt: MenuDropdownOption, withLabel: boolean) {
+    return (
+      <>
+        {(showAvatar || opt.avatar || opt.avatarName) && (
+          <CrewAvatar src={opt.avatar} name={opt.avatarName ?? opt.label} />
+        )}
+        {withLabel && <span>{opt.label}</span>}
+        {showDot && opt.color && <i className="md-color-dot" style={{ background: opt.color }} />}
+      </>
+    )
+  }
+
   return (
-    <div className={`md-wrap ${className}`} onBlur={handleBlur} tabIndex={-1}>
+    <div className={`md-wrap ${open ? 'is-open' : ''} ${className}`} onBlur={handleBlur} tabIndex={-1}>
       <button type="button" className="btn btn--outline md-trigger" onClick={() => setOpen((o) => !o)}>
         <span className="md-trigger__label">
-          {showDot && selected?.color && value !== null ? <PersonDot color={selected.color} /> : null}
-          <span>{label}</span>
+          {useCrewItems && selected && value !== null ? (
+            renderCrewChrome(selected, true)
+          ) : (
+            <span>{label}</span>
+          )}
         </span>
         <Icon.ChevronDown width={14} height={14} />
       </button>
 
       {open && (
-        <div className={`md-panel ${align === 'right' ? 'md-panel--right' : ''}`} onMouseDown={cancelBlur}>
-          {includeAll && (
-            <button
-              type="button"
-              className="md-option"
-              onClick={() => {
-                onChange(null)
-                setOpen(false)
-              }}
-            >
-              <span className="md-option__label">{allLabel}</span>
-              {value === null && <Icon.Check width={14} height={14} />}
-            </button>
-          )}
-          {options.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              className="md-option"
-              onClick={() => {
-                onChange(opt.id)
-                setOpen(false)
-              }}
-            >
-              {showDot && <PersonDot color={opt.color} />}
-              <span className="md-option__label">{opt.label}</span>
-              {value === opt.id && <Icon.Check width={14} height={14} />}
-            </button>
-          ))}
+        <div className={`md-floating ${align === 'right' ? 'md-floating--right' : ''}`} onMouseDown={cancelBlur}>
+          <div className="md-panel">
+            {includeAll && (
+              <button
+                type="button"
+                className={`md-option ${value === null ? 'md-option--selected' : ''}`}
+                onClick={() => {
+                  onChange(null)
+                  setOpen(false)
+                }}
+              >
+                <span className="md-option__main">
+                  <span className="md-option__label">{allLabel}</span>
+                </span>
+                {value === null && <Icon.Check width={14} height={14} />}
+              </button>
+            )}
+            {options.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className={`md-option ${value === opt.id ? 'md-option--selected' : ''}`}
+                onClick={() => {
+                  onChange(opt.id)
+                  setOpen(false)
+                }}
+              >
+                <span className="md-option__main">
+                  {useCrewItems ? (
+                    renderCrewChrome(opt, true)
+                  ) : (
+                    <span className="md-option__label">{opt.label}</span>
+                  )}
+                </span>
+                {value === opt.id && <Icon.Check width={14} height={14} />}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

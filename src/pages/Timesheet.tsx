@@ -1,10 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
+import { MagnifyingGlass, Bell, Plus } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Modal from '../components/dashboard/Modal'
 import Dropdown from '../components/dashboard/Dropdown'
 import Avatar from '../components/dashboard/Avatar'
 import CreateJobModal, { type JobFormData } from '../components/dashboard/CreateJobModal'
 import CreateCrewModal, { type CrewFormData } from '../components/dashboard/CreateCrewModal'
+import ZoomControl from '../components/dashboard/ZoomControl'
 import { Icon } from '../components/dashboard/icons'
 import { rosterRows as initialRosterRows, type RosterRow } from '../lib/crewData'
 import { crewLeads, jobs as initialJobs, type Job } from '../lib/dashboardData'
@@ -351,6 +353,7 @@ export default function Timesheet() {
   const [activeRow, setActiveRow] = useState<AttendanceRow | undefined>()
   const [actionMode, setActionMode] = useState<ActionChooserMode>('none')
   const [jobs, setJobs] = useState<Job[]>(initialJobs)
+  const [zoom, setZoom] = useState(1)
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -462,26 +465,25 @@ export default function Timesheet() {
     <div className="dash ts-page">
       <Sidebar active="Timesheet" />
 
-      <main className="dash__main ts-main">
+      <main className="dash__main ts-main" style={{ zoom }}>
         <div className="topbar ts-topbar">
           <label className="topbar__search ts-search">
-            <Icon.Search />
+            <MagnifyingGlass size={18} weight="regular" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search anything..." />
           </label>
 
           <div className="topbar__actions ts-topbar__actions">
-            <button type="button" className="icon-btn icon-btn--bordered" aria-label="Zoom in">
-              <Icon.ZoomIn />
-            </button>
-            <button type="button" className="icon-btn icon-btn--bordered" aria-label="Zoom out">
-              <Icon.ZoomOut />
-            </button>
+            <ZoomControl
+              zoom={zoom}
+              onZoomIn={() => setZoom((z) => Math.min(1.5, +(z + 0.05).toFixed(2)))}
+              onZoomOut={() => setZoom((z) => Math.max(0.75, +(z - 0.05).toFixed(2)))}
+            />
             <button type="button" className="icon-btn icon-btn--bordered" aria-label="Notifications">
-              <Icon.Bell />
+              <Bell size={18} weight="regular" />
               <i className="dot-badge" />
             </button>
             <button type="button" className="btn btn--primary ts-log-action" onClick={() => setActionMode('chooser')}>
-              <Icon.Plus width={16} height={16} />
+              <Plus size={16} weight="bold" />
               New Action
             </button>
           </div>

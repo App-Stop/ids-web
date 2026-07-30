@@ -18,7 +18,7 @@ export default function ConfirmModal({
     <Modal onClose={onCancel} width={380}>
       <div className="confirm-modal">
         <span className="confirm-modal__icon">
-          <Icon.AlertCircle width={22} height={22} />
+          <Icon.AlertTriangle width={22} height={22} />
         </span>
         <h2 className="confirm-modal__title">{title}</h2>
         <p className="confirm-modal__message">{message}</p>

@@ -1,24 +1,56 @@
 .crew-toolbar {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.7rem;
   margin-top: 1.5rem;
   flex-wrap: wrap;
-  padding: 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--card-bg);
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #dcdcdc;
+  border-radius: 18px;
+  background: #fcfcfc;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
 }
 
 .crew-search {
+  flex: 0 0 260px;
+  min-width: 260px;
+  max-width: 260px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 32px;
+  box-sizing: border-box;
+  padding: 0 0.8rem;
+  border: 1px solid #e3e3e8;
+  border-radius: 10px;
+  background: #f5f5f6;
+  color: #98a2b3;
+}
+
+.crew-search svg {
+  flex-shrink: 0;
+  color: #667085;
+}
+
+.crew-search input {
   flex: 1;
-  min-width: 200px;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.crew-search input::placeholder {
+  color: #98a2b3;
 }
 
 .crew-count {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  color: var(--muted);
+  color: #6b7280;
   white-space: nowrap;
 }
 
@@ -26,44 +58,117 @@
   flex-shrink: 0;
 }
 
+.crew-tab-toggle.sb-toggle {
+  height: 34px;
+  padding: 2px;
+  border-radius: 10px;
+  background: #ececef;
+}
+
+.crew-tab-toggle.sb-toggle button {
+  height: 100%;
+  padding: 0 1rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.crew-tab-toggle.sb-toggle button.is-active {
+  background: #fff;
+  border-color: #dcdcdc;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+}
+
+.crew-dd {
+  flex-shrink: 0;
+}
+
+.crew-dd .md-trigger.btn {
+  height: 34px;
+  padding: 0 0.9rem;
+  border: 1px solid #dcdcdc;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+}
+
+.crew-dd .md-trigger__label {
+  color: #31343a;
+}
+
+.crew-dd--jobs .md-trigger.btn {
+  min-width: 112px;
+}
+
+.crew-dd--status .md-trigger.btn,
+.crew-dd--sort .md-trigger.btn {
+  min-width: 92px;
+}
+
 .crew-add-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
   margin-left: auto;
+  height: 40px;
+  padding: 0 1rem;
+  border-radius: 12px;
 }
 
-/* Table ---------------------------------------------------------------- */
+/* Table — horizontal lines only (no vertical grid) ------------------- */
 
 .crew-table-wrap {
   margin-top: 1.25rem;
   overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--card-bg);
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #fff;
 }
 
 .crew-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
+  table-layout: fixed;
+  min-width: 960px;
 }
 
 .crew-table th,
 .crew-table td {
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--border);
+  padding: 0.95rem 1rem;
+  border-bottom: 1px solid #ececec;
+  border-right: none;
   text-align: left;
   font-size: 0.85rem;
   color: var(--ink);
-  white-space: nowrap;
+  vertical-align: middle;
+  background: #fff;
+}
+
+.crew-table td:nth-child(3) {
+  font-weight: 600;
+}
+
+.crew-table td:nth-child(4) {
+  padding-right: 1.4rem;
 }
 
 .crew-table thead th {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--muted);
-  background: var(--card-bg);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #8f8f96;
+  background: #fff;
+  white-space: nowrap;
+}
+
+.crew-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.crew-table tbody tr:hover td {
+  background: #fff;
 }
 
 .crew-table tbody tr:last-child td {
@@ -71,13 +176,39 @@
 }
 
 .crew-col-check {
-  width: 40px;
+  width: 44px;
+  text-align: center;
 }
 
+.crew-col-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #111827;
+  border-radius: 6px;
+}
+
+/* Crew tab: full-height color bar on left of Crew ID */
 .crew-id-cell {
+  position: relative;
   font-weight: 600;
-  border-left: 3px solid transparent;
-  padding-left: 0.85rem !important;
+  width: 96px;
+  padding-left: 1rem !important;
+  color: #4b5563 !important;
+}
+
+.crew-id-cell--roster {
+  padding-left: 1rem !important;
+}
+
+.crew-id-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 0;
 }
 
 .crew-name-cell {
@@ -85,6 +216,8 @@
   align-items: center;
   gap: 0.6rem;
   font-weight: 600;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .crew-avatar {
@@ -105,66 +238,91 @@
   cursor: pointer;
   color: var(--ink);
   font-size: 0.85rem;
+  width: 100%;
+  justify-content: space-between;
+  text-align: left;
 }
 
 .crew-job-cell__name {
-  max-width: 26rem;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.crew-job-cell__tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.12rem;
+  flex-shrink: 0;
+  margin-left: 0.75rem;
+  color: #9ca3af;
 }
 
 .crew-job-cell:hover .crew-job-cell__name {
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .crew-job-cell__more {
-  color: var(--muted);
+  color: #6b7280;
   font-weight: 600;
-  position: relative;
+  white-space: nowrap;
+}
+
+.crew-job-cell__unassigned {
+  color: #a3a3a8;
+  white-space: nowrap;
 }
 
 .crew-workers-cell {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-}
-
-.crew-workers-cell__more {
-  color: var(--muted);
-  font-weight: 600;
+  min-width: 1.5rem;
   cursor: default;
-}
-
-.crew-job-cell__unassigned {
-  color: var(--muted);
 }
 
 .crew-assign-link {
   border: none;
   background: none;
-  color: #eab308;
+  color: #c8b100;
   font-weight: 700;
   font-size: 0.85rem;
   cursor: pointer;
   margin-left: 0.5rem;
   padding: 0;
+  white-space: nowrap;
 }
 
 .crew-assign-link:hover {
   text-decoration: underline;
 }
 
-.crew-assigned-cell {
-  border-left: 3px solid transparent;
-  padding-left: 0.6rem;
+/* Roster: full-height color bar on left of Crew Assigned */
+.crew-assigned-td {
+  position: relative;
+  padding-left: 1.15rem !important;
+  min-width: 160px;
+}
+
+.crew-assigned-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.crew-assigned-name {
   font-weight: 600;
+  color: var(--ink);
 }
 
 .crew-edit-btn {
+  position: relative;
   border: none;
   background: none;
-  color: var(--muted);
+  color: #6b7280;
   cursor: pointer;
   padding: 0.35rem;
   border-radius: 6px;
@@ -172,33 +330,45 @@
 }
 
 .crew-edit-btn:hover {
-  background: var(--field-bg);
-  color: var(--ink);
+  background: transparent;
+  color: #374151;
 }
 
+.crew-edit-btn__dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 1.5px solid #fff;
+}
+
+/* Workers / job hover popup — white card like Figma */
 .crew-job-tooltip--fixed {
   position: fixed;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0;
+  min-width: 120px;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   pointer-events: none;
   z-index: 200;
 }
 
 .crew-job-tooltip__item {
-  display: inline-block;
-  max-width: 280px;
-  padding: 0.45rem 0.8rem;
-  border-radius: 18px;
-  background: #111827;
-  color: #fff;
-  font-size: 0.8rem;
+  display: block;
+  padding: 0.35rem 0.15rem;
+  font-size: 0.85rem;
   font-weight: 600;
+  color: var(--ink);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }
 
 /* Status pills ----------------------------------------------------------- */
@@ -206,27 +376,36 @@
 .crew-status {
   display: inline-flex;
   align-items: center;
-  padding: 0.25rem 0.7rem;
+  justify-content: center;
+  min-width: 84px;
+  padding: 0.22rem 0.7rem;
   border-radius: 999px;
   font-size: 0.78rem;
-  font-weight: 700;
+  font-weight: 600;
   border: 1.5px solid;
+  background: #fff;
 }
 
 .crew-status--active {
   color: #16a34a;
   border-color: #86efac;
-  background: rgba(34, 197, 94, 0.08);
+  background: rgba(34, 197, 94, 0.06);
 }
 
 .crew-status--inactive {
   color: #ea580c;
   border-color: #fdba74;
-  background: rgba(249, 115, 22, 0.08);
+  background: rgba(249, 115, 22, 0.06);
 }
 
 .crew-status--unassigned {
-  color: var(--muted);
-  border-color: var(--border);
-  background: var(--field-bg);
+  color: #9ca3af;
+  border-color: #d1d5db;
+  background: #fff;
+}
+
+.crew-th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }

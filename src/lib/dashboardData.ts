@@ -17,6 +17,7 @@ export interface CrewLead {
   id: string
   name: string
   rate: number
+  color?: string
 }
 
 export interface UnassignedCrew {
@@ -50,6 +51,17 @@ export const crewLeads: CrewLead[] = [
   { id: 'c3', name: 'Milo Grant', rate: 38 },
   { id: 'c4', name: 'Nina Patel', rate: 40 },
   { id: 'c5', name: 'Eli Turner', rate: 37 },
+]
+
+/** Crews shown in Assign Crew dropdowns (avatar + name + color). */
+export const assignableCrews: { id: string; name: string; leadName: string; rate: number; color: string }[] = [
+  { id: 'hank', name: "Hank's Crew", leadName: 'Hank Williams', rate: 25, color: '#ea3da9' },
+  { id: 'john', name: "John's Crew", leadName: 'John D.', rate: 32, color: '#56bd6d' },
+  { id: 'bob', name: "Bob's Crew", leadName: 'Bob Martinez', rate: 28, color: '#df3021' },
+  { id: 'chris', name: "Chris's Crew", leadName: 'Chris Lee', rate: 28, color: '#14b8a6' },
+  { id: 'noah', name: "Noah's Crew", leadName: 'Noah Grant', rate: 30, color: '#e8752e' },
+  { id: 'lucas', name: "Lucas's Crew", leadName: 'Lucas Chen', rate: 27, color: '#4193f7' },
+  { id: 'liam', name: "Liam's Crew", leadName: 'Liam Brooks', rate: 33, color: '#8640f6' },
 ]
 
 export const initialUnassignedCrews: UnassignedCrew[] = [

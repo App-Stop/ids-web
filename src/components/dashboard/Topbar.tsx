@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Icon } from './icons'
+import { MagnifyingGlass, Bell, Plus } from '@phosphor-icons/react'
 import NewActionMenu from './NewActionMenu'
 
 export default function Topbar({
@@ -16,21 +16,21 @@ export default function Topbar({
   return (
     <header className="topbar">
       <label className="topbar__search">
-        <Icon.Search />
+        <MagnifyingGlass size={18} weight="regular" />
         <input type="text" placeholder="Search anything..." />
       </label>
 
       <div className="topbar__actions">
         {extra}
 
-        <button type="button" className="icon-btn icon-btn--bordered">
-          <Icon.Bell />
+        <button type="button" className="icon-btn icon-btn--bordered" aria-label="Notifications">
+          <Bell size={18} weight="regular" />
           <i className="dot-badge" />
         </button>
 
         <div className="topbar__new-action">
           <button type="button" className="btn btn--primary" onClick={() => setMenuOpen((o) => !o)}>
-            <Icon.Plus width={16} height={16} />
+            <Plus size={16} weight="bold" />
             New Action
           </button>
           {menuOpen && (

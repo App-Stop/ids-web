@@ -2,8 +2,7 @@ import { useState } from 'react'
 import Modal from './Modal'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
-import JobSummaryChip from './JobSummaryChip'
-import { crewLeads, type Job } from '../../lib/dashboardData'
+import { assignableCrews, type Job } from '../../lib/dashboardData'
 
 export default function AssignCrewModal({
   job,
@@ -14,35 +13,41 @@ export default function AssignCrewModal({
   onCancel: () => void
   onAssign: (crewLeadId: string, note: string) => void
 }) {
-  const [leadId, setLeadId] = useState<string | null>(null)
+  const [crewId, setCrewId] = useState<string | null>(null)
   const [note, setNote] = useState('')
-  const selected = crewLeads.find((c) => c.id === leadId)
+  const selected = assignableCrews.find((c) => c.id === crewId)
 
   return (
-    <Modal onClose={onCancel}>
+    <Modal onClose={onCancel} width={420}>
       <h2 className="modal-title">Assign Crew</h2>
+      <p className="job-head__meta" style={{ marginTop: '0.15rem' }}>
+        Bid #{job.bidNo} &middot; Job #{job.jobNo}
+      </p>
+      <p className="assign-crew__job-name">{job.name}</p>
 
-      <JobSummaryChip job={job} />
-
-      <label className="field-label">Choose Crew Lead</label>
+      <label className="field-label">Assign Crew</label>
       <Dropdown
-        value={leadId}
+        value={crewId}
         placeholder="-"
-        onChange={setLeadId}
+        onChange={setCrewId}
         selectedLabel={
           selected && (
-            <span className="dd__avatar-label">
-              <Avatar name={selected.name} size={24} />
-              {selected.name} (${selected.rate}/h)
+            <span className="dd__crew-label">
+              <Avatar name={selected.leadName} size={24} />
+              <span className="dd__crew-label__text">
+                {selected.name} (${selected.rate}/h)
+              </span>
+              <i className="dot" style={{ background: selected.color }} />
             </span>
           )
         }
-        options={crewLeads.map((c) => ({
+        options={assignableCrews.map((c) => ({
           id: c.id,
           label: (
-            <span className="dd__avatar-label">
-              <Avatar name={c.name} size={24} />
-              {c.name} (${c.rate}/h)
+            <span className="dd__crew-label">
+              <Avatar name={c.leadName} size={24} />
+              <span className="dd__crew-label__text">{c.name}</span>
+              <i className="dot" style={{ background: c.color }} />
             </span>
           ),
         }))}
@@ -63,8 +68,8 @@ export default function AssignCrewModal({
         <button
           type="button"
           className="btn btn--primary"
-          disabled={!leadId}
-          onClick={() => leadId && onAssign(leadId, note)}
+          disabled={!crewId}
+          onClick={() => crewId && onAssign(crewId, note)}
         >
           Assign Crew
         </button>

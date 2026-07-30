@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Modal from './Modal'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
+import { Icon } from './icons'
 import { crewColors, crewLeads, type Job } from '../../lib/dashboardData'
 
 export interface JobFormData {
@@ -15,6 +16,68 @@ export interface JobFormData {
   crewLeadId: string | null
   note: string
   color: string
+}
+
+/** Job dates are stored as MM-DD-YYYY; native date inputs use YYYY-MM-DD. */
+function toIsoDate(mdy: string) {
+  if (!mdy) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(mdy)) return mdy
+  const parts = mdy.split('-')
+  if (parts.length !== 3) return ''
+  const [mm, dd, yyyy] = parts
+  if (!mm || !dd || !yyyy) return ''
+  return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
+}
+
+function toMdyDate(iso: string) {
+  if (!iso) return ''
+  if (/^\d{2}-\d{2}-\d{4}$/.test(iso)) return iso
+  const parts = iso.split('-')
+  if (parts.length !== 3) return ''
+  const [yyyy, mm, dd] = parts
+  return `${mm}-${dd}-${yyyy}`
+}
+
+function DatePickerField({
+  value,
+  onChange,
+  placeholder = 'MM-DD-YYYY',
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  const iso = toIsoDate(value)
+
+  return (
+    <div className="field-date">
+      <button
+        type="button"
+        className="field-date__trigger"
+        onClick={() => {
+          const input = ref.current
+          if (!input) return
+          if ('showPicker' in input && typeof input.showPicker === 'function') {
+            input.showPicker()
+          } else {
+            input.focus()
+            input.click()
+          }
+        }}
+      >
+        <span className={value ? undefined : 'field-date__placeholder'}>{value || placeholder}</span>
+        <Icon.Calendar width={16} height={16} />
+      </button>
+      <input
+        ref={ref}
+        type="date"
+        className="field-date__native"
+        value={iso}
+        onChange={(e) => onChange(toMdyDate(e.target.value))}
+      />
+    </div>
+  )
 }
 
 export default function CreateJobModal({
@@ -71,11 +134,11 @@ export default function CreateJobModal({
           <div className="field-row">
             <div>
               <label className="field-label">Start Date*</label>
-              <input className="field-input" placeholder="MM-DD-YYYY" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <DatePickerField value={startDate} onChange={setStartDate} />
             </div>
             <div>
               <label className="field-label">End Date*</label>
-              <input className="field-input" placeholder="MM-DD-YYYY" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              <DatePickerField value={endDate} onChange={setEndDate} />
             </div>
           </div>
 

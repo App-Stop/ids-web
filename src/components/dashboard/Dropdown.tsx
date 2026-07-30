@@ -44,7 +44,7 @@ export default function Dropdown({
           {options.map((opt) => (
             <li
               key={opt.id}
-              className="dd__option"
+              className={`dd__option${opt.id === value ? ' is-selected' : ''}`}
               onClick={() => {
                 onChange(opt.id)
                 setOpen(false)

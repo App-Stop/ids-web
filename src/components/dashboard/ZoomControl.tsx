@@ -1,4 +1,4 @@
-import { Icon } from './icons'
+import { MagnifyingGlassPlus, MagnifyingGlassMinus } from '@phosphor-icons/react'
 
 export default function ZoomControl({
   zoom,
@@ -9,15 +9,20 @@ export default function ZoomControl({
   onZoomIn: () => void
   onZoomOut: () => void
 }) {
+  const pct = Math.round(zoom * 100)
+
   return (
-    <div className="zoom-control">
-      <span className="zoom-control__pct">{Math.round(zoom * 100)}%</span>
-      <button type="button" className="icon-btn" onClick={onZoomIn} aria-label="Zoom in">
-        <Icon.ZoomIn width={16} height={16} />
-      </button>
-      <button type="button" className="icon-btn" onClick={onZoomOut} aria-label="Zoom out">
-        <Icon.ZoomOut width={16} height={16} />
-      </button>
+    <div className="zoom-control" role="group" aria-label="Zoom">
+      {pct !== 100 && <span className="zoom-control__pct">{pct}%</span>}
+      <div className="zoom-control__group">
+        <button type="button" className="zoom-control__btn" onClick={onZoomIn} aria-label="Zoom in">
+          <MagnifyingGlassPlus size={18} weight="regular" />
+        </button>
+        <span className="zoom-control__divider" aria-hidden />
+        <button type="button" className="zoom-control__btn" onClick={onZoomOut} aria-label="Zoom out">
+          <MagnifyingGlassMinus size={18} weight="regular" />
+        </button>
+      </div>
     </div>
   )
 }

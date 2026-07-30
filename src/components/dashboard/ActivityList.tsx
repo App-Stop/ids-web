@@ -1,11 +1,11 @@
-import { Icon } from './icons'
+import { ArrowRight, UserPlus, Check, WarningCircle, Checks } from '@phosphor-icons/react'
 import { activity } from '../../lib/dashboardData'
 
 const KIND_ICON = {
-  labor: { icon: Icon.ArrowRight, cls: 'activity-icon--info' },
-  assigned: { icon: Icon.UserPlus, cls: 'activity-icon--accent' },
-  completed: { icon: Icon.Check, cls: 'activity-icon--success' },
-  overdue: { icon: Icon.AlertCircle, cls: 'activity-icon--danger' },
+  labor: { Icon: ArrowRight, cls: 'activity-icon--info' },
+  assigned: { Icon: UserPlus, cls: 'activity-icon--accent' },
+  completed: { Icon: Check, cls: 'activity-icon--success' },
+  overdue: { Icon: WarningCircle, cls: 'activity-icon--danger' },
 }
 
 export default function ActivityList() {
@@ -14,18 +14,18 @@ export default function ActivityList() {
       <div className="panel__head">
         <h2>Activity</h2>
         <button type="button" className="btn btn--outline btn--sm">
-          <Icon.CheckDouble width={16} height={16} />
+          <Checks size={16} weight="regular" />
           Mark all as seen
         </button>
       </div>
 
       <ul className="activity-list">
         {activity.map((item) => {
-          const { icon: IconCmp, cls } = KIND_ICON[item.kind]
+          const { Icon, cls } = KIND_ICON[item.kind]
           return (
             <li key={item.id} className="activity-item">
               <span className={`activity-icon ${cls}`}>
-                <IconCmp width={16} height={16} />
+                <Icon size={16} weight="bold" />
               </span>
               <div className="activity-item__body">
                 <span className="activity-item__title">{item.title}</span>
