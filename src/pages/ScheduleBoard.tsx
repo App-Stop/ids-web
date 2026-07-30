@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   DndContext,
   useDraggable,
@@ -60,7 +60,7 @@ const JOBNO_W = 72
 const JOB_W = 230
 const DIVIDER_W = 10
 const META_WIDTHS = [130, 130, 130, 100] as const
-/** Day column width when monthly + separator open (~15 days visible). */
+/** Fallback day width when monthly + separator open if we couldn't measure. */
 const MONTH_DAY_META_W = 56
 
 function toJob(row: ScheduleJob, date: string): Job {
@@ -87,12 +87,14 @@ function AssignmentPill({
   assignment,
   color,
   compact,
+  span = 1,
   onOpenDetails,
   onOpenNote,
 }: {
   assignment: ScheduleAssignment
   color: string
   compact: boolean
+  span?: number
   onOpenDetails: () => void
   onOpenNote: () => void
 }) {
@@ -102,7 +104,10 @@ function AssignmentPill({
   })
 
   return (
-    <div className={`sb-pill-wrap${compact ? ' sb-pill-wrap--compact' : ''}`}>
+    <div
+      className={`sb-pill-wrap${compact ? ' sb-pill-wrap--compact' : ''}`}
+      style={{ ['--sb-span' as string]: span } as CSSProperties}
+    >
       <button
         type="button"
         className="sb-pill"
@@ -165,13 +170,11 @@ function DayCell({
   jobId,
   iso,
   compact,
-  colSpan = 1,
   children,
 }: {
   jobId: string
   iso: string
   compact: boolean
-  colSpan?: number
   children: React.ReactNode
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -182,7 +185,6 @@ function DayCell({
   return (
     <td
       ref={setNodeRef}
-      colSpan={colSpan}
       className={`${compact ? 'sb-cell sb-cell--compact' : 'sb-cell'}${isOver ? ' sb-cell--drop-target' : ''}`}
     >
       {children}
@@ -191,6 +193,7 @@ function DayCell({
 }
 
 export default function ScheduleBoard() {
+  const [isPhone, setIsPhone] = useState(() => window.innerWidth <= 780)
   const [jobs, setJobs] = useState(initialScheduleJobs)
   const [weeklyAssignments, setWeeklyAssignments] = useState(weeklyScheduleAssignments)
   const [monthlyAssignments, setMonthlyAssignments] = useState(monthlyScheduleAssignments)
@@ -203,7 +206,9 @@ export default function ScheduleBoard() {
   const [jumpOpen, setJumpOpen] = useState(false)
   const [metaVisible, setMetaVisible] = useState(false)
   const [zoom, setZoom] = useState(1)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [lockedMonthDayW, setLockedMonthDayW] = useState<number | null>(null)
+  const daysTableRef = useRef<HTMLTableElement>(null)
 
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
@@ -220,19 +225,43 @@ export default function ScheduleBoard() {
   const visibleDays = viewMode === 'weekly' ? weekDays : monthDays
   const compact = viewMode === 'monthly'
   const dayW =
-    viewMode === 'weekly' ? 150 : metaVisible ? MONTH_DAY_META_W : undefined
+    viewMode === 'weekly'
+      ? isPhone
+        ? 96
+        : 150
+      : isPhone
+        ? 42
+        : lockedMonthDayW ?? undefined
+
+  useEffect(() => {
+    function handleResize() {
+      setIsPhone(window.innerWidth <= 780)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   function openMonthly() {
     setViewMode('monthly')
     setSidebarCollapsed(true)
+    setLockedMonthDayW(metaVisible ? MONTH_DAY_META_W : null)
   }
 
   function toggleMeta() {
-    setMetaVisible((v) => {
-      const next = !v
-      if (next) setSidebarCollapsed(true)
-      return next
-    })
+    if (!metaVisible) {
+      if (viewMode === 'monthly') {
+        const th = daysTableRef.current?.querySelector<HTMLElement>('thead th')
+        const measured = th ? Math.round(th.getBoundingClientRect().width) : 0
+        setLockedMonthDayW(measured > 0 ? measured : MONTH_DAY_META_W)
+      }
+      setSidebarCollapsed(true)
+      setMetaVisible(true)
+      return
+    }
+
+    setMetaVisible(false)
+    setLockedMonthDayW(null)
   }
 
   const rangeLabel =
@@ -324,7 +353,7 @@ export default function ScheduleBoard() {
         onCollapsedChange={setSidebarCollapsed}
       />
 
-      <main className="dash__main">
+      <main className="dash__main sb-main">
         <Topbar
           onAddJob={() => setFlow({ type: 'newJob' })}
           onCreateCrew={() => setFlow({ type: 'newCrew' })}
@@ -515,6 +544,7 @@ export default function ScheduleBoard() {
 
               <div className="sb-board__scroll">
                 <table
+                  ref={daysTableRef}
                   className={`sb-table sb-table--days${compact ? ' sb-table--monthly' : ''}`}
                   style={
                     compact
@@ -545,11 +575,15 @@ export default function ScheduleBoard() {
                           >
                             {viewMode === 'weekly' ? (
                               <>
-                                <div>{isToday ? 'Today, ' + weekdayShort(d) : weekdayShort(d)}</div>
-                                <div className="sb-day-head__date">{d.getMonth() + 1}-{String(d.getDate()).padStart(2, '0')}-{String(d.getFullYear()).slice(2)}</div>
+                                <div className="sb-day-head__weekday">
+                                  {isToday ? 'Today, ' + weekdayShort(d) : weekdayShort(d)}
+                                </div>
+                                <div className="sb-day-head__date">
+                                  {d.getMonth() + 1}-{String(d.getDate()).padStart(2, '0')}-{String(d.getFullYear()).slice(2)}
+                                </div>
                               </>
                             ) : (
-                              d.getDate()
+                              <span className="sb-day-head__monthday">{d.getDate()}</span>
                             )}
                           </th>
                         )
@@ -559,72 +593,82 @@ export default function ScheduleBoard() {
                   <tbody>
                     {filteredJobs.map((row) => {
                       const rowAssignments = assignments.filter((a) => a.jobId === row.id)
-                      const dayCells: React.ReactNode[] = []
-                      let i = 0
-                      while (i < visibleDays.length) {
-                        const iso = toISO(visibleDays[i])
-                        const assignment = rowAssignments.find((a) => iso >= a.startDate && iso <= a.endDate)
-
-                        if (assignment) {
-                          let span = 1
-                          while (
-                            i + span < visibleDays.length &&
-                            toISO(visibleDays[i + span]) >= assignment.startDate &&
-                            toISO(visibleDays[i + span]) <= assignment.endDate
-                          ) {
-                            span++
-                          }
-
-                          dayCells.push(
-                            <DayCell
-                              key={assignment.id}
-                              jobId={row.id}
-                              iso={iso}
-                              compact={compact}
-                              colSpan={span}
-                            >
-                              <AssignmentPill
-                                assignment={assignment}
-                                color={row.color}
-                                compact={compact}
-                                onOpenDetails={() =>
-                                  setFlow({ type: 'crewDetails', jobId: row.id, date: iso, assignmentId: assignment.id })
-                                }
-                                onOpenNote={() =>
-                                  setFlow({ type: 'assignmentNote', jobId: row.id, date: iso, assignmentId: assignment.id })
-                                }
-                              />
-                            </DayCell>,
-                          )
-                          i += span
-                        } else {
-                          dayCells.push(
-                            <DayCell key={iso} jobId={row.id} iso={iso} compact={compact}>
-                              {compact ? (
-                                <button
-                                  type="button"
-                                  className="sb-empty"
-                                  onClick={() => setFlow({ type: 'assignCrew', jobId: row.id, date: iso })}
-                                />
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="sb-add"
-                                  onClick={() => setFlow({ type: 'assignCrew', jobId: row.id, date: iso })}
-                                >
-                                  <Icon.Plus width={14} height={14} />
-                                  Add
-                                </button>
-                              )}
-                            </DayCell>,
-                          )
-                          i += 1
-                        }
-                      }
-
                       return (
                         <tr key={row.id} className="sb-row">
-                          {dayCells}
+                          {visibleDays.map((d, dayIndex) => {
+                            const iso = toISO(d)
+                            const assignment = rowAssignments.find(
+                              (a) => iso >= a.startDate && iso <= a.endDate,
+                            )
+
+                            if (!assignment) {
+                              return (
+                                <DayCell key={iso} jobId={row.id} iso={iso} compact={compact}>
+                                  {compact ? (
+                                    <button
+                                      type="button"
+                                      className="sb-empty"
+                                      onClick={() => setFlow({ type: 'assignCrew', jobId: row.id, date: iso })}
+                                    />
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="sb-add"
+                                      onClick={() => setFlow({ type: 'assignCrew', jobId: row.id, date: iso })}
+                                    >
+                                      <Icon.Plus width={14} height={14} />
+                                      Add
+                                    </button>
+                                  )}
+                                </DayCell>
+                              )
+                            }
+
+                            const prevIso = dayIndex > 0 ? toISO(visibleDays[dayIndex - 1]) : null
+                            const isSpanStart =
+                              !prevIso ||
+                              !(prevIso >= assignment.startDate && prevIso <= assignment.endDate)
+
+                            let span = 1
+                            if (isSpanStart) {
+                              while (
+                                dayIndex + span < visibleDays.length &&
+                                toISO(visibleDays[dayIndex + span]) >= assignment.startDate &&
+                                toISO(visibleDays[dayIndex + span]) <= assignment.endDate
+                              ) {
+                                span++
+                              }
+                            }
+
+                            return (
+                              <DayCell key={iso} jobId={row.id} iso={iso} compact={compact}>
+                                {isSpanStart ? (
+                                  <AssignmentPill
+                                    assignment={assignment}
+                                    color={row.color}
+                                    compact={compact}
+                                    span={span}
+                                    onOpenDetails={() =>
+                                      setFlow({
+                                        type: 'crewDetails',
+                                        jobId: row.id,
+                                        date: iso,
+                                        assignmentId: assignment.id,
+                                      })
+                                    }
+                                    onOpenNote={() =>
+                                      setFlow({
+                                        type: 'assignmentNote',
+                                        jobId: row.id,
+                                        date: iso,
+                                        assignmentId: assignment.id,
+                                      })
+                                    }
+                                  />
+                                ) : null}
+                              </DayCell>
+                            )
+                          })}
                         </tr>
                       )
                     })}
@@ -710,10 +754,16 @@ export default function ScheduleBoard() {
         (() => {
           const assignment = assignments.find((a) => a.id === flow.assignmentId)
           if (!assignment) return null
+          const matchedCrew = crews.find((c) => c.name === assignment.crewName)
           return (
             <CrewDetailsModal
               job={toJob(activeRow, flow.date)}
-              crewLead={{ id: assignment.id, name: assignment.crewName, rate: assignment.rate }}
+              crewLead={{
+                id: assignment.id,
+                name: assignment.crewName,
+                rate: assignment.rate,
+                avatar: matchedCrew?.avatar,
+              }}
               note={assignment.note ?? ''}
               workers={assignment.workers}
               onDone={() => setFlow({ type: 'none' })}
@@ -774,6 +824,7 @@ export default function ScheduleBoard() {
                 leadName: lead?.name ?? 'TBD',
                 rate: lead?.rate ?? 25,
                 color: data.color,
+                avatar: lead?.avatar ?? `https://i.pravatar.cc/64?img=${Math.floor(Math.random() * 70)}`,
               },
             ])
             setFlow({ type: 'none' })

@@ -26,7 +26,7 @@ export default function AssignJobModal({
       <h2 className="modal-title">Assign Job</h2>
 
       <div className="crew-row">
-        <Avatar name={crew.leadName} />
+        <Avatar name={crew.leadName} src={crew.avatar} />
         <span className="crew-row__name">
           {crew.leadName} (${crew.rate}/h)
         </span>
@@ -38,22 +38,10 @@ export default function AssignJobModal({
         value={jobId}
         placeholder="-"
         onChange={setJobId}
-        selectedLabel={
-          selected && (
-            <span className="dd__dot-label">
-              <i className="dot" style={{ background: selected.color }} />
-              {selected.name}
-            </span>
-          )
-        }
+        selectedLabel={selected?.name}
         options={jobs.map((j) => ({
           id: j.id,
-          label: (
-            <span className="dd__dot-label">
-              <i className="dot" style={{ background: j.color }} />
-              {j.name}
-            </span>
-          ),
+          label: j.name,
         }))}
       />
 

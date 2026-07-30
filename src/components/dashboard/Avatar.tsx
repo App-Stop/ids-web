@@ -6,10 +6,33 @@ function colorFor(name: string) {
   return COLORS[Math.abs(hash) % COLORS.length]
 }
 
-export default function Avatar({ name, size = 32 }: { name: string; size?: number }) {
+export default function Avatar({
+  name,
+  size = 32,
+  src,
+}: {
+  name: string
+  size?: number
+  src?: string | null
+}) {
+  if (src) {
+    return (
+      <img
+        className="avatar avatar--photo"
+        src={src}
+        alt=""
+        style={{
+          width: size,
+          height: size,
+        }}
+      />
+    )
+  }
+
   const initials = name
     .split(' ')
     .map((p) => p[0])
+    .filter(Boolean)
     .slice(0, 2)
     .join('')
     .toUpperCase()
@@ -21,10 +44,10 @@ export default function Avatar({ name, size = 32 }: { name: string; size?: numbe
         width: size,
         height: size,
         fontSize: size * 0.4,
-        background: colorFor(name),
+        background: colorFor(name || '?'),
       }}
     >
-      {initials}
+      {initials || '?'}
     </span>
   )
 }

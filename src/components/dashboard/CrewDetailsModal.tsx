@@ -28,7 +28,7 @@ export default function CrewDetailsModal({
 
       <span className="field-label">Assigned Crew Lead</span>
       <div className="crew-row">
-        <Avatar name={crewLead.name} />
+        <Avatar name={crewLead.name} src={crewLead.avatar} />
         <span className="crew-row__name">
           {crewLead.name} (${crewLead.rate}/h)
         </span>

@@ -14,6 +14,7 @@ import CreateCrewModal from '../components/dashboard/CreateCrewModal'
 import { CaretRight, Hammer, Users, Money, WarningCircle } from '@phosphor-icons/react'
 import {
   assignableCrews,
+  crewLeads,
   initialUnassignedCrews,
   jobs as initialJobs,
   type CrewLead,
@@ -163,7 +164,13 @@ export default function Dashboard() {
           onAssign={(crewId, note) => {
             const crew = assignableCrews.find((c) => c.id === crewId)
             if (!crew) return
-            const crewLead: CrewLead = { id: crew.id, name: crew.leadName, rate: crew.rate, color: crew.color }
+            const crewLead: CrewLead = {
+              id: crew.id,
+              name: crew.leadName,
+              rate: crew.rate,
+              color: crew.color,
+              avatar: crew.avatar,
+            }
             setFlow({ step: 'crewDetails', job: flow.job, crewLead, note })
           }}
         />
@@ -219,7 +226,7 @@ export default function Dashboard() {
             if (lead) {
               setUnassigned((list) => [
                 ...list,
-                { id: `u-${Date.now()}`, name: data.crewName, leadName: lead.name, rate: lead.rate },
+                { id: `u-${Date.now()}`, name: data.crewName, leadName: lead.name, rate: lead.rate, avatar: lead.avatar },
               ])
             }
             setFlow({ step: 'none' })

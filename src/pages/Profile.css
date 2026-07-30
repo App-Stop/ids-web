@@ -3,7 +3,7 @@
 }
 
 .profile-page__header {
-  margin-top: 1.75rem;
+  margin-top: 0.7rem;
   display: block;
 }
 
@@ -529,6 +529,26 @@
 @media (max-width: 720px) {
   .profile-page__main {
     padding: 1.25rem 1rem 2.5rem;
+  }
+
+  .profile-photo-row,
+  .profile-actions,
+  .profile-notification__toggles,
+  .profile-modal__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .profile-upload-btn,
+  .profile-actions > *,
+  .profile-modal__actions > *,
+  .profile-add-team-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .profile-tabs {
+    padding-bottom: 0.35rem;
   }
 
   .profile-table__head,

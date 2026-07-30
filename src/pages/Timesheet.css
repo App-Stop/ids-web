@@ -26,7 +26,11 @@
 }
 
 .ts-header-row {
-  margin-top: 1.4rem;
+  margin-top: 0.7rem;
+}
+
+.ts-header-row .dash__title {
+  margin-top: 40px;
 }
 
 .ts-toolbar {
@@ -37,9 +41,9 @@
   margin-top: 1rem;
   padding: 0.45rem 0.55rem;
   border: 1px solid #dcdcdc;
-  border-radius: 18px;
+  border-radius: 20px;
   background: #fcfcfc;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
 }
 
 .ts-toolbar__left,
@@ -82,9 +86,10 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  height: 40px;
+  height: 34px;
   padding: 0 1rem;
-  border-radius: 12px;
+  border-radius: 10px;
+  box-sizing: border-box;
 }
 
 .ts-table-wrap {
@@ -326,9 +331,53 @@
     justify-content: stretch;
   }
 
+  .ts-topbar__actions {
+    width: 100%;
+    gap: 0.6rem;
+  }
+
+  .ts-topbar__actions > * {
+    flex: 1 1 auto;
+  }
+
+  .ts-topbar__actions .icon-btn--bordered {
+    flex: 0 0 42px;
+  }
+
   .ts-log-btn,
   .ts-log-action {
     width: 100%;
     justify-content: center;
+  }
+
+  .ts-main {
+    padding-bottom: 0;
+  }
+
+  .ts-toolbar {
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border-radius: 20px;
+  }
+
+  .ts-toolbar__left,
+  .ts-toolbar__right {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ts-toolbar .dd,
+  .ts-toolbar .dd__trigger {
+    width: 100%;
+  }
+
+  .ts-table {
+    min-width: 900px;
+  }
+
+  .ts-modal-summary,
+  .ts-modal-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

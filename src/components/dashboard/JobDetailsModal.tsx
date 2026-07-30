@@ -82,7 +82,7 @@ export default function JobDetailsModal({
       <span className="field-label">Assigned Crew Lead</span>
       {crew ? (
         <div className="crew-row">
-          <Avatar name={crew.leadName} />
+          <Avatar name={crew.leadName} src={crew.avatar} />
           <span className="crew-row__name">
             {crew.leadName} (${crew.rate}/h)
           </span>

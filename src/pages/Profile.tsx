@@ -92,14 +92,6 @@ const INITIAL_NOTIFICATION_ITEMS: NotificationItem[] = [
   },
 ]
 
-const EMPTY_MEMBER: MemberDraft = {
-  firstName: '',
-  lastName: '',
-  emailLocalPart: '',
-  emailDomain: '@idsdemo.com',
-  role: 'Ops Manager',
-}
-
 function TabButton({ active, children, onClick }: { active: boolean; children: string; onClick: () => void }) {
   return (
     <button type="button" className={`profile-tab ${active ? 'is-active' : ''}`} onClick={onClick}>

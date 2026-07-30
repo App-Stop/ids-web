@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MagnifyingGlass, Plus, CalendarBlank } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Modal from '../components/dashboard/Modal'
@@ -281,6 +281,7 @@ function CostModal({
           placeholder="Select crew"
           includeAll={false}
           showDot
+          showAvatar
           className="ct-modal-dropdown"
         />
       ) : (
@@ -370,6 +371,7 @@ function CostModal({
 }
 
 export default function CostTracking() {
+  const [isPhone, setIsPhone] = useState(() => window.innerWidth <= 720)
   const [tab, setTab] = useState<ViewMode>('jobs')
   const [range, setRange] = useState<RangeMode>('Custom Range')
   const [search, setSearch] = useState('')
@@ -395,7 +397,7 @@ export default function CostTracking() {
     '#001': 'Coordinate with suppliers and schedule weekly progress meetings.',
   })
   const [jobCrews, setJobCrews] = useState<Record<string, UnassignedCrew | null>>({
-    '#001': { id: 'hank', name: "Hank's Crew", leadName: 'Hank Williams', rate: 25 },
+    '#001': { id: 'hank', name: "Hank's Crew", leadName: 'Hank Williams', rate: 25, avatar: assignableCrews.find((c) => c.id === 'hank')?.avatar },
   })
 
   const detailsRow =
@@ -423,7 +425,10 @@ export default function CostTracking() {
   }
 
   const jobFilterOptions = useMemo(() => jobs.map((job) => ({ id: job.id, label: job.name })), [jobs])
-  const crewFilterOptions = useMemo(() => crewOptions.map((crew) => ({ id: crew.id, label: crew.label, color: crew.color })), [crewOptions])
+  const crewFilterOptions = useMemo(
+    () => crewOptions.map((crew) => ({ id: crew.id, label: crew.label, color: crew.color, avatar: crew.avatar, avatarName: crew.avatarName })),
+    [crewOptions],
+  )
 
   const filteredJobRows = useMemo(() => {
     return jobRows.filter((row) => {
@@ -445,6 +450,15 @@ export default function CostTracking() {
     const weekStart = getMonday(parseIsoDate(startDate))
     return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index))
   }, [startDate])
+
+  useEffect(() => {
+    function handleResize() {
+      setIsPhone(window.innerWidth <= 720)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   function toggleMeta() {
     setMetaVisible((current) => {
@@ -649,6 +663,8 @@ export default function CostTracking() {
                   placeholder="All Crews"
                   includeAll
                   allLabel="All Crews"
+                  showAvatar
+                  showDot
                 />
               )}
             </div>
@@ -699,17 +715,17 @@ export default function CostTracking() {
           {tab === 'jobs' ? (
             <table className={`ct-table ct-table--grid${metaVisible ? ' ct-table--meta' : ''}`}>
               <colgroup>
-                <col style={{ width: '72px' }} />
-                <col style={{ width: '240px' }} />
-                {metaVisible && <col style={{ width: '120px' }} />}
-                {metaVisible && <col style={{ width: '140px' }} />}
-                {metaVisible && <col style={{ width: '130px' }} />}
-                {metaVisible && <col style={{ width: '120px' }} />}
-                {metaVisible && <col style={{ width: '130px' }} />}
-                {metaVisible && <col style={{ width: '90px' }} />}
-                <col className="ct-grid-divider-col" style={{ width: '10px' }} />
+                <col style={{ width: isPhone ? '56px' : '72px' }} />
+                <col style={{ width: isPhone ? '180px' : '240px' }} />
+                {metaVisible && <col style={{ width: isPhone ? '92px' : '120px' }} />}
+                {metaVisible && <col style={{ width: isPhone ? '104px' : '140px' }} />}
+                {metaVisible && <col style={{ width: isPhone ? '96px' : '130px' }} />}
+                {metaVisible && <col style={{ width: isPhone ? '104px' : '120px' }} />}
+                {metaVisible && <col style={{ width: isPhone ? '104px' : '130px' }} />}
+                {metaVisible && <col style={{ width: isPhone ? '72px' : '90px' }} />}
+                <col className="ct-grid-divider-col" style={{ width: isPhone ? '8px' : '10px' }} />
                 {weekDays.map((day) => (
-                  <col key={day.toISOString()} style={{ width: '140px' }} />
+                  <col key={day.toISOString()} style={{ width: isPhone ? '92px' : '140px' }} />
                 ))}
               </colgroup>
               <thead>
@@ -882,6 +898,7 @@ export default function CostTracking() {
                 name: crew.name,
                 leadName: crew.leadName,
                 rate: crew.rate,
+                avatar: crew.avatar,
               },
             }))
             if (note) {
@@ -937,6 +954,8 @@ export default function CostTracking() {
               id: `c${Date.now()}`,
               label: data.crewName,
               color: selectedColor,
+              avatar: selectedLead?.avatar ?? `https://i.pravatar.cc/64?img=${Math.floor(Math.random() * 70)}`,
+              avatarName: selectedLead?.name ?? data.crewName,
             }
             setCrewOptions((list) => [...list, newCrewOption])
             setCrewRows((list) => [

@@ -26,10 +26,7 @@ interface MenuDropdownProps {
 }
 
 function CrewAvatar({ src, name }: { src?: string; name: string }) {
-  if (src) {
-    return <img className="md-crew-avatar" src={src} alt="" />
-  }
-  return <Avatar name={name} size={22} />
+  return <Avatar name={name} src={src} size={22} />
 }
 
 export default function MenuDropdown({
@@ -39,7 +36,7 @@ export default function MenuDropdown({
   placeholder,
   includeAll = false,
   allLabel = 'All',
-  showDot = true,
+  showDot = false,
   showAvatar = false,
   align = 'left',
   className = '',

@@ -33,7 +33,7 @@ export default function AssignCrewModal({
         selectedLabel={
           selected && (
             <span className="dd__crew-label">
-              <Avatar name={selected.leadName} size={24} />
+              <Avatar name={selected.leadName} src={selected.avatar} size={24} />
               <span className="dd__crew-label__text">
                 {selected.name} (${selected.rate}/h)
               </span>
@@ -45,7 +45,7 @@ export default function AssignCrewModal({
           id: c.id,
           label: (
             <span className="dd__crew-label">
-              <Avatar name={c.leadName} size={24} />
+              <Avatar name={c.leadName} src={c.avatar} size={24} />
               <span className="dd__crew-label__text">{c.name}</span>
               <i className="dot" style={{ background: c.color }} />
             </span>

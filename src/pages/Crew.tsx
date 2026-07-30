@@ -88,6 +88,7 @@ function toCrewLead(crew: CrewRow): UnassignedCrew {
     name: crew.name,
     leadName: match?.leadName ?? crew.name.replace(/'s Crew$/, ''),
     rate: crew.rate,
+    avatar: crew.avatar || match?.avatar,
   }
 }
 
@@ -236,7 +237,7 @@ export default function Crew() {
     <div className="dash">
       <Sidebar active="Crew Management" />
 
-      <main className="dash__main" style={{ zoom }}>
+      <main className="dash__main crew-main" style={{ zoom }}>
         <Topbar
           onAddJob={() => {}}
           onCreateCrew={() => setFlow({ type: 'addNewChooser' })}
@@ -297,6 +298,7 @@ export default function Crew() {
               allLabel="All"
               panelTitle="Crew Menu"
               showAvatar
+              showDot
             />
           )}
 
@@ -715,7 +717,7 @@ export default function Crew() {
       {flow.type === 'assignJob' && (
         // Reused as-is from the Dashboard page.
         <AssignJobModal
-          crew={{ id: flow.crew.id, name: flow.crew.name, leadName: flow.crew.name, rate: flow.crew.rate }}
+          crew={{ id: flow.crew.id, name: flow.crew.name, leadName: flow.crew.name, rate: flow.crew.rate, avatar: flow.crew.avatar }}
           date={new Date().toISOString().slice(0, 10)}
           jobs={masterJobs}
           onCancel={() => setFlow({ type: 'none' })}

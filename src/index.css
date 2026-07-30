@@ -10,7 +10,7 @@
   --field-bg: #f0f0f0;
   --shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.12);
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
 
   color-scheme: light;
   color: var(--text);

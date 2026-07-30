@@ -19,6 +19,7 @@ export interface CrewFormData {
   jobId: string | null
   status: CrewStatus
   color: string
+  note: string
 }
 
 export interface EditableCrew {
@@ -52,6 +53,7 @@ export default function CreateCrewModal({
   const [jobId, setJobId] = useState<string | null>(crew?.jobId ?? null)
   const [status, setStatus] = useState<CrewStatus>(crew?.status ?? 'active')
   const [color, setColor] = useState(crew?.color ?? crewColors[0])
+  const [note, setNote] = useState('')
   const [confirmingRemove, setConfirmingRemove] = useState(false)
 
   const selectedLead = crewLeads.find((c) => c.id === crewLeadId)
@@ -104,7 +106,7 @@ export default function CreateCrewModal({
   function handleSubmit() {
     if (!canSubmit) return
     if (!crewLeadId) return
-    onSubmit({ crewName, crewLeadId: crewLeadId ?? '', laborNames, jobId, status, color })
+    onSubmit({ crewName, crewLeadId: crewLeadId ?? '', laborNames, jobId, status, color, note })
   }
 
   return (
@@ -122,7 +124,7 @@ export default function CreateCrewModal({
         selectedLabel={
           selectedLead && (
             <span className="dd__avatar-label">
-              <Avatar name={selectedLead.name} size={24} />
+              <Avatar name={selectedLead.name} src={selectedLead.avatar} size={24} />
               {selectedLead.name} (${selectedLead.rate}/h)
             </span>
           )
@@ -131,7 +133,7 @@ export default function CreateCrewModal({
           id: c.id,
           label: (
             <span className="dd__avatar-label">
-              <Avatar name={c.name} size={24} />
+              <Avatar name={c.name} src={c.avatar} size={24} />
               {c.name} (${c.rate}/h)
             </span>
           ),
@@ -171,22 +173,10 @@ export default function CreateCrewModal({
         value={jobId}
         placeholder="-"
         onChange={setJobId}
-        selectedLabel={
-          selectedJob && (
-            <span className="dd__dot-label">
-              <i className="dot" style={{ background: selectedJob.color }} />
-              {selectedJob.name}
-            </span>
-          )
-        }
+        selectedLabel={selectedJob?.name}
         options={jobs.map((j) => ({
           id: j.id,
-          label: (
-            <span className="dd__dot-label">
-              <i className="dot" style={{ background: j.color }} />
-              {j.name}
-            </span>
-          ),
+          label: j.name,
         }))}
       />
 
@@ -223,6 +213,14 @@ export default function CreateCrewModal({
           />
         ))}
       </div>
+
+      <label className="field-label">Add a note</label>
+      <textarea
+        className="field-textarea"
+        placeholder="Note about the job..."
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
 
       <div className={`modal-actions ${isEdit ? 'modal-actions--split' : ''}`}>
         {isEdit && (

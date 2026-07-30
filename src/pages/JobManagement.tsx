@@ -65,6 +65,7 @@ function toCrew(row: Row): UnassignedCrew | null {
     name: row.crewName,
     leadName: match?.leadName ?? row.crewName.replace(/'s Crew$/, ''),
     rate: row.crewRate || match?.rate || 0,
+    avatar: match?.avatar,
   }
 }
 
@@ -164,7 +165,7 @@ export default function JobsManagement() {
     <div className="dash">
       <Sidebar active="Jobs Management" />
 
-      <main className="dash__main">
+      <main className="dash__main jm-main">
         <Topbar
           onAddJob={() => setShowCreate(true)}
           onCreateCrew={() => {}}
@@ -189,7 +190,7 @@ export default function JobsManagement() {
           <span className="jm-count">{jobs.length} Total Jobs</span>
 
           <div className="jm-toolbar__right">
-            <div className="jm-dd">
+            <div className="jm-dd jm-dd--status">
               <Dropdown
                 value={statusFilter ?? '__all'}
                 staticLabel="Status"
@@ -197,7 +198,7 @@ export default function JobsManagement() {
                 options={[{ id: '__all', label: 'All' }, ...STATUS_OPTIONS.map((s) => ({ id: s.id, label: s.label }))]}
               />
             </div>
-            <div className="jm-dd">
+            <div className="jm-dd jm-dd--sort">
               <Dropdown
                 value={sortKey}
                 staticLabel="Sort by"
@@ -286,7 +287,11 @@ export default function JobsManagement() {
                     <td className="jm-crew-cell">
                       <span className="jm-crew-bar" style={{ background: job.color }} />
                       <span className="jm-crew">
-                        <Avatar name={job.crewName} size={24} />
+                        <Avatar
+                          name={job.crewName}
+                          src={assignableCrews.find((c) => c.name === job.crewName)?.avatar}
+                          size={24}
+                        />
                         {job.crewName}
                       </span>
                     </td>

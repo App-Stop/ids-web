@@ -119,6 +119,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
             placeholder="Select crew"
             panelTitle="Crew Menu"
             showAvatar
+            showDot
             className="cm-field__dropdown"
           />
         </label>
