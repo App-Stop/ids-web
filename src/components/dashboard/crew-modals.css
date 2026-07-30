@@ -294,6 +294,14 @@
   min-width: 0;
 }
 
+.cm-field__dropdown--status .dd {
+  width: 100%;
+}
+
+.cm-field__dropdown--status .dd__trigger {
+  width: 100%;
+}
+
 .cm-input {
   display: flex;
   align-items: center;

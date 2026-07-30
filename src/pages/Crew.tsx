@@ -32,6 +32,7 @@ import {
   type Status,
 } from '../lib/crewData'
 import './Crew.css'
+import './Dashboard.css'
 
 type Tab = 'crew' | 'roster'
 type SortKey = 'name-asc' | 'name-desc' | 'rate-desc' | 'rate-asc'
@@ -200,7 +201,7 @@ export default function Crew() {
           crewColor: crew?.color ?? '#94a3b8',
           role: data.role,
           rate,
-          status: 'Active',
+          status: data.status,
         },
       ])
     } else if (flow.type === 'editMember') {
@@ -215,6 +216,7 @@ export default function Crew() {
                 crewColor: crew?.color ?? r.crewColor,
                 role: data.role,
                 rate,
+                status: data.status,
               }
             : r,
         ),
@@ -464,15 +466,15 @@ export default function Crew() {
               </tbody>
             </table>
           ) : (
-            <table className="crew-table">
+            <table className="crew-table crew-table--roster">
               <thead>
                 <tr>
                   <th className="crew-col-check">
                     <input type="checkbox" />
                   </th>
                   <th>Roster ID</th>
-                  <th className="crew-center">Name</th>
-                  <th className="crew-center">Crew Assigned</th>
+                  <th className="crew-roster-name-th">Name</th>
+                  <th className="crew-roster-crew-th">Crew Assigned</th>
                   <th className="crew-center">Role</th>
                   <th className="crew-center">Hourly Rate ($)</th>
                   <th className="crew-center">Status</th>
@@ -486,13 +488,13 @@ export default function Crew() {
                       <input type="checkbox" />
                     </td>
                     <td className="crew-id-cell crew-id-cell--roster">#{row.rosterId}</td>
-                    <td className="crew-center">
+                    <td className="crew-roster-name-td">
                       <div className="crew-name-cell">
                         <img className="crew-avatar" src={row.avatar} alt="" />
                         {row.name}
                       </div>
                     </td>
-                    <td className={row.crewName ? 'crew-assigned-td crew-center' : 'crew-center'}>
+                    <td className={row.crewName ? 'crew-assigned-td' : 'crew-assigned-td crew-assigned-td--empty'}>
                       {row.crewName ? (
                         <>
                           <span
@@ -666,6 +668,7 @@ export default function Crew() {
             role: flow.member.role,
             crewId: crewMenuOptions.find((c) => c.label === flow.member.crewName)?.id ?? null,
             rate: String(flow.member.rate),
+            status: flow.member.status,
           }}
           onCancel={() => setFlow({ type: 'none' })}
           onSubmit={submitMember}

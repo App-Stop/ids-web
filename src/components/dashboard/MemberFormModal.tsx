@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Icon } from './icons'
 import MenuDropdown from './MenuDropdown'
-import type { CrewMenuOption } from '../../lib/crewData'
+import Dropdown from './Dropdown'
+import type { CrewMenuOption, Status } from '../../lib/crewData'
 import './crew-modals.css'
 
 export interface MemberFormData {
@@ -11,6 +12,7 @@ export interface MemberFormData {
   role: 'Labor' | 'Crew Lead'
   crewId: string | null
   rate: string
+  status: Status
 }
 
 interface MemberFormModalProps {
@@ -27,11 +29,30 @@ const ROLE_OPTIONS = [
   { id: 'Crew Lead', label: 'Crew Lead' },
 ]
 
+const STATUS_OPTIONS: { id: Status; label: string; color: string }[] = [
+  { id: 'Active', label: 'Active', color: '#22c55e' },
+  { id: 'Inactive', label: 'Inactive', color: '#9ca3af' },
+  { id: 'Unassigned', label: 'Unassigned', color: '#f97316' },
+]
+
+const EMPTY_FORM: MemberFormData = {
+  firstName: '',
+  lastName: '',
+  emailLocalPart: '',
+  role: 'Labor',
+  crewId: null,
+  rate: '',
+  status: 'Active',
+}
+
 export default function MemberFormModal({ mode, crews, initial, onCancel, onSubmit, onRemove }: MemberFormModalProps) {
-  const [form, setForm] = useState<MemberFormData>(
-    initial ?? { firstName: '', lastName: '', emailLocalPart: '', role: 'Labor', crewId: crews[0]?.id ?? null, rate: '' },
-  )
+  const [form, setForm] = useState<MemberFormData>({
+    ...EMPTY_FORM,
+    crewId: crews[0]?.id ?? null,
+    ...initial,
+  })
   const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const selectedStatus = STATUS_OPTIONS.find((s) => s.id === form.status) ?? STATUS_OPTIONS[0]
 
   function update<K extends keyof MemberFormData>(key: K, value: MemberFormData[K]) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -122,6 +143,31 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
             showDot
             className="cm-field__dropdown"
           />
+        </label>
+
+        <label className="cm-field">
+          <span className="cm-field__label">Status</span>
+          <div className="cm-field__dropdown cm-field__dropdown--status">
+            <Dropdown
+              value={form.status}
+              onChange={(id) => update('status', id as Status)}
+              selectedLabel={
+                <span className="dd__dot-label">
+                  <i className="dot" style={{ background: selectedStatus.color }} />
+                  {selectedStatus.label}
+                </span>
+              }
+              options={STATUS_OPTIONS.map((s) => ({
+                id: s.id,
+                label: (
+                  <span className="dd__dot-label">
+                    <i className="dot" style={{ background: s.color }} />
+                    {s.label}
+                  </span>
+                ),
+              }))}
+            />
+          </div>
         </label>
 
         <label className="cm-field">

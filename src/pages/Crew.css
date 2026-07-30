@@ -1,3 +1,8 @@
+.crew-main {
+  overflow-x: hidden;
+  min-width: 0;
+}
+
 .crew-header-row {
   display: flex;
   align-items: flex-start;
@@ -165,7 +170,8 @@
 
 .crew-table-wrap {
   margin-top: 1.25rem;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   max-height: calc(100dvh - 220px);
   border: 1px solid #e5e7eb;
   border-radius: 18px;
@@ -189,7 +195,6 @@
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
-  min-width: 960px;
 }
 
 .crew-table th,
@@ -380,11 +385,43 @@
   text-decoration: underline;
 }
 
-/* Roster: full-height color bar on left of Crew Assigned */
+/* Roster: Name left-aligned with room before the crew color bar */
+.crew-table--roster .crew-roster-name-th,
+.crew-table--roster .crew-roster-name-td {
+  text-align: left !important;
+  width: 22%;
+  min-width: 0;
+  padding-right: 2.75rem !important;
+}
+
+.crew-table--roster .crew-roster-name-td .crew-name-cell {
+  justify-content: flex-start;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crew-table--roster .crew-roster-crew-th {
+  text-align: left !important;
+  padding-left: 1.75rem !important;
+  width: 18%;
+  min-width: 0;
+}
+
+/* Roster: full-height color bar on left of Crew Assigned, with gap on both sides */
 .crew-assigned-td {
   position: relative;
-  padding-left: 1.15rem !important;
-  min-width: 160px;
+  text-align: left !important;
+  padding-left: 1.75rem !important;
+  padding-right: 1.5rem !important;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crew-assigned-td--empty {
+  padding-left: 1.75rem !important;
 }
 
 .crew-assigned-bar-hit {
@@ -392,7 +429,7 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 12px;
+  width: 14px;
   cursor: pointer;
   z-index: 1;
 }
@@ -586,9 +623,5 @@
   .crew-table-wrap {
     margin-top: 1rem;
     border-radius: 16px;
-  }
-
-  .crew-table {
-    min-width: 840px;
   }
 }
