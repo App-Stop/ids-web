@@ -249,7 +249,7 @@ export default function ScheduleBoard() {
   const [jobs, setJobs] = useState(initialScheduleJobs)
   const [weeklyAssignments, setWeeklyAssignments] = useState(weeklyScheduleAssignments)
   const [monthlyAssignments, setMonthlyAssignments] = useState(monthlyScheduleAssignments)
-  const [crews, setCrews] = useState(assignableCrews)
+  const [crews] = useState(assignableCrews)
 
   const [viewMode, setViewMode] = useState<ViewMode>('weekly')
   const [anchor, setAnchor] = useState(() => fromISO(TODAY))
