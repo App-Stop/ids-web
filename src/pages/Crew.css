@@ -209,6 +209,119 @@
   background: #fff;
 }
 
+/* Crew tab only — balanced columns, readable type, comfortable row height */
+.crew-table--leads th,
+.crew-table--leads td {
+  padding: 0.85rem 0.75rem;
+  font-size: 0.88rem;
+}
+
+.crew-table--leads thead th {
+  font-size: 0.8rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.crew-table--leads .crew-col-check {
+  width: auto;
+  padding-left: 0.55rem;
+  padding-right: 0.35rem;
+}
+
+.crew-table--leads .crew-col-check input {
+  width: 16px;
+  height: 16px;
+}
+
+.crew-table--leads .crew-id-cell {
+  width: auto;
+  max-width: none;
+  padding-left: 0.75rem !important;
+  padding-right: 0.55rem !important;
+  white-space: nowrap;
+}
+
+.crew-table--leads th:nth-child(2),
+.crew-table--leads td:nth-child(2) {
+  width: auto;
+  max-width: none;
+  padding-right: 0.55rem !important;
+}
+
+.crew-table--leads th:nth-child(3),
+.crew-table--leads td:nth-child(3) {
+  padding-left: 0.55rem !important;
+  padding-right: 0.75rem !important;
+  text-align: left !important;
+}
+
+.crew-table--leads td:nth-child(3) .crew-name-cell {
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+.crew-table--leads th:nth-child(4),
+.crew-table--leads td:nth-child(4) {
+  padding-left: 0.75rem !important;
+  padding-right: 0.75rem !important;
+}
+
+.crew-table--leads .crew-avatar {
+  width: 28px;
+  height: 28px;
+}
+
+.crew-table--leads .crew-job-cell {
+  font-size: inherit;
+  gap: 0.45rem;
+  justify-content: flex-start;
+}
+
+.crew-table--leads .crew-job-cell__name {
+  flex: 0 1 auto;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.crew-table--leads .crew-job-cell__tail {
+  margin-left: 0;
+}
+
+.crew-table--leads .crew-assign-link {
+  font-size: inherit;
+  margin-left: 0.45rem;
+}
+
+.crew-table--leads .crew-status {
+  min-width: 84px;
+  padding: 0.22rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.crew-table--leads .crew-edit-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.crew-table--leads th:nth-child(5),
+.crew-table--leads td:nth-child(5),
+.crew-table--leads th:nth-child(6),
+.crew-table--leads td:nth-child(6),
+.crew-table--leads th:nth-child(7),
+.crew-table--leads td:nth-child(7) {
+  padding-left: 0.65rem;
+  padding-right: 0.65rem;
+}
+
+.crew-table--leads th:nth-child(8),
+.crew-table--leads td:nth-child(8) {
+  padding-left: 0.35rem;
+  padding-right: 0.65rem;
+  text-align: left !important;
+}
+
 .crew-table td:nth-child(3) {
   font-weight: 600;
 }

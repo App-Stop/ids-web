@@ -349,16 +349,16 @@ export default function Crew() {
 
         <div className="crew-table-wrap" ref={tableWrapRef}>
           {tab === 'crew' ? (
-            <table className="crew-table">
+            <table className="crew-table crew-table--leads">
               <colgroup>
-                <col style={{ width: 40 }} />
-                <col style={{ width: 106 }} />
-                <col style={{ width: 140 }} />
-                <col style={{ width: 340 }} />
-                <col style={{ width: 78 }} />
-                <col style={{ width: 136 }} />
-                <col style={{ width: 136 }} />
-                <col style={{ width: 88 }} />
+                <col style={{ width: '3.5%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '28%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '8.5%' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -366,7 +366,7 @@ export default function Crew() {
                     <input type="checkbox" />
                   </th>
                   <th>Crew ID</th>
-                  <th className="crew-center">Crew Name</th>
+                  <th>Crew Name</th>
                   <th>Job Name</th>
                   <th className="crew-center">Workers</th>
                   <th className="crew-center">Hourly Rate ($)</th>
@@ -403,7 +403,7 @@ export default function Crew() {
                       </span>
                       #{row.crewId}
                     </td>
-                    <td className="crew-center">
+                    <td>
                       <div className="crew-name-cell">
                         <img className="crew-avatar" src={row.avatar} alt="" />
                         {row.name}
