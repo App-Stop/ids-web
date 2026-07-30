@@ -1,15 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
-import { MagnifyingGlass, Bell, Plus } from '@phosphor-icons/react'
+import { MagnifyingGlass, Bell } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Modal from '../components/dashboard/Modal'
 import Dropdown from '../components/dashboard/Dropdown'
 import Avatar from '../components/dashboard/Avatar'
-import CreateJobModal, { type JobFormData } from '../components/dashboard/CreateJobModal'
-import CreateCrewModal, { type CrewFormData } from '../components/dashboard/CreateCrewModal'
 import ZoomControl from '../components/dashboard/ZoomControl'
 import { Icon } from '../components/dashboard/icons'
 import { rosterRows as initialRosterRows, type RosterRow } from '../lib/crewData'
-import { crewLeads, jobs as initialJobs, type Job } from '../lib/dashboardData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import './Dashboard.css'
 import '../components/dashboard/crew-modals.css'
@@ -68,8 +65,6 @@ const INITIAL_TIMES = [
   { clockIn: '08:30', clockOut: '12:30' },
   { clockIn: '09:00', clockOut: '15:00' },
 ]
-
-type ActionChooserMode = 'none' | 'chooser' | 'job' | 'crew'
 
 function buildInitialRows(): AttendanceRow[] {
   return initialRosterRows.map((row, index) => {
@@ -159,34 +154,6 @@ function TimeField({ value, onChange, className = '' }: { value: string; onChang
         <ClockIcon />
       </button>
       <input ref={ref} type="time" value={value} onChange={(e) => onChange(e.target.value)} className="ts-time-field__native" />
-    </div>
-  )
-}
-
-function ActionChooserModal({ onCancel, onAddJob, onCreateCrew }: { onCancel: () => void; onAddJob: () => void; onCreateCrew: () => void }) {
-  return (
-    <div className="cm-overlay" onClick={onCancel}>
-      <div className="cm-card cm-card--narrow" onClick={(e) => e.stopPropagation()}>
-        <div className="cm-card__header">
-          <h2 className="cm-card__title">New Action</h2>
-          <button type="button" className="cm-close" onClick={onCancel} aria-label="Close">
-            <Icon.X width={16} height={16} />
-          </button>
-        </div>
-
-        <p className="cm-subtitle">What would you like to do?</p>
-
-        <div className="cm-choice-list">
-          <button type="button" className="cm-choice" onClick={onAddJob}>
-            <Icon.Wrench width={22} height={22} />
-            <span>Add New Job</span>
-          </button>
-          <button type="button" className="cm-choice" onClick={onCreateCrew}>
-            <Icon.Building width={22} height={22} />
-            <span>Create New Crew</span>
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
@@ -352,8 +319,6 @@ export default function Timesheet() {
   const [rows, setRows] = useState<AttendanceRow[]>(buildInitialRows)
   const [modalMode, setModalMode] = useState<ModalMode>('none')
   const [activeRow, setActiveRow] = useState<AttendanceRow | undefined>()
-  const [actionMode, setActionMode] = useState<ActionChooserMode>('none')
-  const [jobs, setJobs] = useState<Job[]>(initialJobs)
   const [zoom, setZoom] = useState(1)
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
@@ -438,32 +403,6 @@ export default function Timesheet() {
     closeModal()
   }
 
-  function handleAddJob(data: JobFormData) {
-    const selectedLead = crewLeads.find((lead) => lead.id === data.crewLeadId)
-    const nextIndex = jobs.length + 1
-    const nextJob: Job = {
-      id: `j${Date.now()}`,
-      name: data.name,
-      color: data.color,
-      bidNo: String(1000 + nextIndex),
-      jobNo: String(nextIndex).padStart(3, '0'),
-      gc: data.gc,
-      estimator: selectedLead?.name ?? 'TBD',
-      startDate: data.startDate,
-      endDate: data.endDate,
-      contractAmount: data.contractAmount,
-      laborBudgetUsed: 0,
-      laborBudgetTotal: data.laborBudgetTotal,
-    }
-    setJobs((list) => [...list, nextJob])
-    setActionMode('none')
-  }
-
-  function handleAddCrew(data: CrewFormData) {
-    void data
-    setActionMode('none')
-  }
-
   return (
     <div className="dash ts-page">
       <Sidebar active="Timesheet" />
@@ -484,10 +423,6 @@ export default function Timesheet() {
             <button type="button" className="icon-btn icon-btn--bordered" aria-label="Notifications">
               <Bell size={18} weight="regular" />
               <i className="dot-badge" />
-            </button>
-            <button type="button" className="btn btn--primary ts-log-action" onClick={() => setActionMode('chooser')}>
-              <Plus size={16} weight="bold" />
-              New Action
             </button>
           </div>
         </div>
@@ -571,29 +506,6 @@ export default function Timesheet() {
           </table>
         </div>
       </main>
-
-      {actionMode === 'chooser' && (
-        <ActionChooserModal
-          onCancel={() => setActionMode('none')}
-          onAddJob={() => setActionMode('job')}
-          onCreateCrew={() => setActionMode('crew')}
-        />
-      )}
-
-      {actionMode === 'job' && (
-        <CreateJobModal
-          onCancel={() => setActionMode('none')}
-          onSubmit={handleAddJob}
-        />
-      )}
-
-      {actionMode === 'crew' && (
-        <CreateCrewModal
-          jobs={jobs}
-          onCancel={() => setActionMode('none')}
-          onSubmit={handleAddCrew}
-        />
-      )}
 
       {modalMode !== 'none' && (
         <AttendanceModal

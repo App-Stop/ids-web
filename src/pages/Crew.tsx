@@ -243,8 +243,6 @@ export default function Crew() {
 
       <main className="dash__main crew-main" style={{ zoom }}>
         <Topbar
-          onAddJob={() => {}}
-          onCreateCrew={() => setFlow({ type: 'addNewChooser' })}
           extra={
             <ZoomControl
               zoom={zoom}

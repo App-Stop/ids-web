@@ -4,9 +4,6 @@ import Sidebar from '../components/dashboard/Sidebar'
 import Modal from '../components/dashboard/Modal'
 import Dropdown from '../components/dashboard/Dropdown'
 import MenuDropdown from '../components/dashboard/MenuDropdown'
-import NewActionMenu from '../components/dashboard/NewActionMenu'
-import CreateJobModal, { type JobFormData } from '../components/dashboard/CreateJobModal'
-import CreateCrewModal, { type CrewFormData } from '../components/dashboard/CreateCrewModal'
 import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import ZoomControl from '../components/dashboard/ZoomControl'
@@ -15,7 +12,6 @@ import { crewRows as initialCrewRows, crewMenuOptions } from '../lib/crewData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import {
   assignableCrews,
-  crewLeads,
   formatMoney,
   type Job,
   type UnassignedCrew,
@@ -436,10 +432,6 @@ export default function CostTracking() {
   const [endDate, setEndDate] = useState('2026-01-21')
   const [metaVisible, setMetaVisible] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [actionMenuOpen, setActionMenuOpen] = useState(false)
-  const [actionMenuPlacement, setActionMenuPlacement] = useState<'up' | 'down'>('up')
-  const [showCreateJob, setShowCreateJob] = useState(false)
-  const [showCreateCrew, setShowCreateCrew] = useState(false)
   const [zoom, setZoom] = useState(1)
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
@@ -459,20 +451,6 @@ export default function CostTracking() {
 
   function openJobDetails(row: JobCostRow) {
     setJobFlow({ type: 'details', jobId: row.jobId })
-  }
-
-  function toggleActionMenu(button: HTMLButtonElement) {
-    if (actionMenuOpen) {
-      setActionMenuOpen(false)
-      return
-    }
-
-    const rect = button.getBoundingClientRect()
-    const estimatedMenuHeight = 190
-    const spaceAbove = rect.top
-    const spaceBelow = window.innerHeight - rect.bottom
-    setActionMenuPlacement(spaceAbove >= estimatedMenuHeight || spaceAbove > spaceBelow ? 'up' : 'down')
-    setActionMenuOpen(true)
   }
 
   const jobFilterOptions = useMemo(
@@ -630,31 +608,6 @@ export default function CostTracking() {
               <Icon.Bell />
               <i className="dot-badge" />
             </button>
-            <div className="ct-new-action">
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={(e) => toggleActionMenu(e.currentTarget)}
-              >
-                <Plus size={16} weight="bold" />
-                New Action
-              </button>
-              {actionMenuOpen && (
-                <div className={`ct-new-action__menu ct-new-action__menu--${actionMenuPlacement}`}>
-                  <NewActionMenu
-                    onClose={() => setActionMenuOpen(false)}
-                    onAddJob={() => {
-                      setActionMenuOpen(false)
-                      setShowCreateJob(true)
-                    }}
-                    onCreateCrew={() => {
-                      setActionMenuOpen(false)
-                      setShowCreateCrew(true)
-                    }}
-                  />
-                </div>
-              )}
-            </div>
           </div>
         </div>
 
@@ -972,102 +925,6 @@ export default function CostTracking() {
         />
       )}
 
-      {showCreateJob && (
-        <CreateJobModal
-          presetJobs={jobs}
-          onCancel={() => setShowCreateJob(false)}
-          onSubmit={(data: JobFormData) => {
-            const selectedLead = crewLeads.find((lead) => lead.id === data.crewLeadId)
-            const nextIndex = jobs.length + 1
-            const nextId = `#${String(
-              Math.max(0, ...jobRows.map((row) => Number(row.id.replace(/\D/g, '')) || 0)) + 1,
-            ).padStart(3, '0')}`
-            const nextJob: Job = {
-              id: nextId,
-              name: data.name,
-              color: data.color,
-              bidNo: String(1000 + Number(nextId.replace(/\D/g, '') || nextIndex)),
-              jobNo: nextId.replace(/^#/, ''),
-              gc: data.gc,
-              estimator: selectedLead?.name ?? 'TBD',
-              startDate: data.startDate,
-              endDate: data.endDate,
-              contractAmount: data.contractAmount,
-              laborBudgetUsed: 0,
-              laborBudgetTotal: data.laborBudgetTotal,
-            }
-            const laborCost = 0
-            const dumpstersCount = 1
-            const dumpsterUnitCost = 500
-            setJobs((list) => [...list, nextJob])
-            setJobRows((list) => [
-              {
-                id: nextId,
-                jobId: nextId,
-                jobName: nextJob.name,
-                color: nextJob.color,
-                date: nextJob.startDate,
-                contract: nextJob.contractAmount,
-                laborBudgetTotal: nextJob.laborBudgetTotal,
-                laborBudgetUsed: laborCost,
-                balanceLeft: nextJob.laborBudgetTotal,
-                percentSpent: 0,
-                cumulativeLaborCosts: laborCost,
-                laborCost,
-                dumpstersCount,
-                dumpsterUnitCost,
-                totalCost: dumpstersCount * dumpsterUnitCost,
-                weeklyCosts: makeWeeklyCosts(laborCost),
-              },
-              ...list,
-            ])
-            setShowCreateJob(false)
-          }}
-        />
-      )}
-
-      {showCreateCrew && (
-        <CreateCrewModal
-          jobs={jobs}
-          onCancel={() => setShowCreateCrew(false)}
-          onSubmit={(data: CrewFormData) => {
-            const selectedLead = crewLeads.find((lead) => lead.id === data.crewLeadId)
-            const selectedColor = data.color
-            const totalHours = Math.max(1, data.laborNames.length) * 11
-            const hourlyRate = selectedLead?.rate ?? 0
-            const laborCost = totalHours * hourlyRate
-            const dumpstersCount = Math.max(1, (data.laborNames.length % 3) + 1)
-            const dumpsterUnitCost = 450
-            const newCrewOption = {
-              id: `c${Date.now()}`,
-              label: data.crewName,
-              color: selectedColor,
-              avatar: selectedLead?.avatar ?? `https://i.pravatar.cc/64?img=${Math.floor(Math.random() * 70)}`,
-              avatarName: selectedLead?.name ?? data.crewName,
-            }
-            setCrewOptions((list) => [...list, newCrewOption])
-            setCrewRows((list) => [
-              ...list,
-              {
-                id: `c-${Date.now()}`,
-                crewId: String(Math.floor(1000 + Math.random() * 9000)),
-                crewName: data.crewName,
-                avatar: `https://i.pravatar.cc/64?img=${Math.floor(Math.random() * 70)}`,
-                color: selectedColor,
-                date: formatToolbarDate(new Date()),
-                hourlyRate,
-                totalHours,
-                cost: laborCost,
-                laborCost,
-                dumpstersCount,
-                dumpsterUnitCost,
-                totalCost: laborCost + dumpstersCount * dumpsterUnitCost,
-              },
-            ])
-            setShowCreateCrew(false)
-          }}
-        />
-      )}
     </div>
   )
 }

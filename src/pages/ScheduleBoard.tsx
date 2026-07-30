@@ -27,9 +27,8 @@ import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import CrewDetailsModal from '../components/dashboard/CrewDetailsModal'
 import NoteModal from '../components/dashboard/NoteModal'
 import CreateJobModal from '../components/dashboard/CreateJobModal'
-import CreateCrewModal from '../components/dashboard/CreateCrewModal'
 import { Icon } from '../components/dashboard/icons'
-import { assignableCrews, crewLeads, type Job } from '../lib/dashboardData'
+import { assignableCrews, type Job } from '../lib/dashboardData'
 import {
   scheduleJobs as initialScheduleJobs,
   weeklyScheduleAssignments,
@@ -57,8 +56,6 @@ type Flow =
   | { type: 'crewDetails'; jobId: string; date: string; assignmentId: string }
   | { type: 'assignmentNote'; jobId: string; date: string; assignmentId: string }
   | { type: 'editJob'; jobId: string }
-  | { type: 'newJob' }
-  | { type: 'newCrew' }
 
 const scheduleCollision: CollisionDetection = (args) => {
   const hits = pointerWithin(args)
@@ -396,8 +393,6 @@ export default function ScheduleBoard() {
 
       <main className="dash__main sb-main">
         <Topbar
-          onAddJob={() => setFlow({ type: 'newJob' })}
-          onCreateCrew={() => setFlow({ type: 'newCrew' })}
           extra={
             <ZoomControl
               zoom={zoom}
@@ -845,51 +840,6 @@ export default function ScheduleBoard() {
         />
       )}
 
-      {flow.type === 'newJob' && (
-        <CreateJobModal
-          presetJobs={jobs.map((job) => toJob(job, TODAY))}
-          onCancel={() => setFlow({ type: 'none' })}
-          onSubmit={(data) => {
-            const jobNo = String(4800 + jobs.length + 1)
-            setJobs((list) => [
-              ...list,
-              {
-                id: `s${jobNo}`,
-                jobNo,
-                name: data.name,
-                color: data.color,
-                idsSuper: 'TBD',
-                gcSuper: 'TBD',
-                gc: data.gc,
-                contract: data.contractAmount,
-              },
-            ])
-            setFlow({ type: 'none' })
-          }}
-        />
-      )}
-
-      {flow.type === 'newCrew' && (
-        <CreateCrewModal
-          jobs={jobs.map((job) => toJob(job, TODAY))}
-          onCancel={() => setFlow({ type: 'none' })}
-          onSubmit={(data) => {
-            const lead = crewLeads.find((c) => c.id === data.crewLeadId)
-            setCrews((list) => [
-              ...list,
-              {
-                id: `crew-${Date.now()}`,
-                name: data.crewName,
-                leadName: lead?.name ?? 'TBD',
-                rate: lead?.rate ?? 25,
-                color: data.color,
-                avatar: lead?.avatar ?? `https://i.pravatar.cc/64?img=${Math.floor(Math.random() * 70)}`,
-              },
-            ])
-            setFlow({ type: 'none' })
-          }}
-        />
-      )}
     </div>
   )
 }

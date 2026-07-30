@@ -171,8 +171,6 @@ export default function JobsManagement() {
 
       <main className="dash__main jm-main">
         <Topbar
-          onAddJob={() => setShowCreate(true)}
-          onCreateCrew={() => {}}
           extra={
             <ZoomControl
               zoom={zoom}

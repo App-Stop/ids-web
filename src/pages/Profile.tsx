@@ -224,7 +224,7 @@ export default function Profile() {
       <Sidebar active="Profile" />
 
       <main className="dash__main profile-page__main">
-        <Topbar onAddJob={() => {}} onCreateCrew={() => {}} />
+        <Topbar />
 
         <div className="profile-page__header">
           <div>

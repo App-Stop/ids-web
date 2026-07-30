@@ -9,11 +9,9 @@ import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import CrewDetailsModal from '../components/dashboard/CrewDetailsModal'
 import CreateJobModal from '../components/dashboard/CreateJobModal'
-import CreateCrewModal from '../components/dashboard/CreateCrewModal'
 import { CaretRight, Hammer, Users, Money, WarningCircle } from '@phosphor-icons/react'
 import {
   assignableCrews,
-  crewLeads,
   initialUnassignedCrews,
   jobs as initialJobs,
   type CrewLead,
@@ -37,7 +35,6 @@ type Flow =
   | { step: 'assignCrew'; crew: UnassignedCrew; job: Job; note: string }
   | { step: 'crewDetails'; job: Job; crewLead: CrewLead; note: string }
   | { step: 'jobForm'; job?: Job }
-  | { step: 'crewForm' }
 
 let nextJobSeq = 1054
 
@@ -51,10 +48,7 @@ export default function Dashboard() {
       <Sidebar active="Dashboard" />
 
       <main className="dash__main">
-        <Topbar
-          onAddJob={() => setFlow({ step: 'jobForm' })}
-          onCreateCrew={() => setFlow({ step: 'crewForm' })}
-        />
+        <Topbar />
 
         <h1 className="dash__title">Dashboard</h1>
         <p className="dash__subtitle">Overview of your operations</p>
@@ -202,23 +196,6 @@ export default function Dashboard() {
                 laborBudgetTotal: data.laborBudgetTotal,
               }
               setJobs((list) => [...list, newJob])
-            }
-            setFlow({ step: 'none' })
-          }}
-        />
-      )}
-
-      {flow.step === 'crewForm' && (
-        <CreateCrewModal
-          jobs={jobs}
-          onCancel={() => setFlow({ step: 'none' })}
-          onSubmit={(data) => {
-            const lead = crewLeads.find((c) => c.id === data.crewLeadId)
-            if (lead) {
-              setUnassigned((list) => [
-                ...list,
-                { id: `u-${Date.now()}`, name: data.crewName, leadName: lead.name, rate: lead.rate, avatar: lead.avatar },
-              ])
             }
             setFlow({ step: 'none' })
           }}
