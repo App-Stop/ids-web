@@ -201,14 +201,14 @@
   background: #f5f5f7;
 }
 
-/* Sticky frozen columns: Job ID | color bar | Job Name */
+/* Sticky frozen columns: Job ID | Job Name (scroll container must not use CSS zoom) */
 .jm-sticky {
   position: sticky;
   z-index: 2;
   background: var(--card-bg);
 }
 
-thead .jm-sticky {
+.jm-table thead .jm-sticky {
   z-index: 5;
   background: #f5f5f7;
 }
@@ -221,13 +221,13 @@ thead .jm-sticky {
   padding-left: 0.65rem !important;
   padding-right: 0.75rem !important;
   z-index: 3;
-  position: sticky;
   box-sizing: border-box;
   overflow: visible;
 }
 
-thead .jm-sticky--id {
+.jm-table thead .jm-sticky--id {
   z-index: 6;
+  top: 0;
   background: #f5f5f7;
 }
 
@@ -237,15 +237,14 @@ thead .jm-sticky--id {
   min-width: var(--jm-name-w);
   max-width: var(--jm-name-w);
   z-index: 2;
-  position: sticky;
   box-sizing: border-box;
-  overflow: hidden;
   border-right: 1px solid var(--border);
   box-shadow: 4px 0 8px -4px rgba(0, 0, 0, 0.08);
 }
 
-thead .jm-sticky--name {
+.jm-table thead .jm-sticky--name {
   z-index: 5;
+  top: 0;
   background: #f5f5f7;
 }
 
@@ -301,7 +300,6 @@ thead .jm-sticky--name {
   color: var(--ink);
   white-space: nowrap;
   line-height: 1.35;
-  overflow: hidden;
 }
 
 /* Color bar on the right edge of Job ID = between Job ID and Job Name */
@@ -537,7 +535,7 @@ thead .jm-sticky--name {
   }
 
   .jm-sticky,
-  thead .jm-sticky {
+  .jm-table thead .jm-sticky {
     position: static;
     left: auto;
     z-index: auto;

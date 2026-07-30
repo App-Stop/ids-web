@@ -591,7 +591,7 @@ export default function CostTracking() {
         onCollapsedChange={setSidebarCollapsed}
       />
 
-      <main className="dash__main ct-main" style={{ zoom }}>
+      <main className="dash__main ct-main" style={zoom !== 1 ? { zoom } : undefined}>
         <div className="ct-topbar">
           <label className="topbar__search ct-search">
             <MagnifyingGlass size={18} weight="regular" />
@@ -727,8 +727,8 @@ export default function CostTracking() {
           {tab === 'jobs' ? (
             <table className={`ct-table ct-table--grid${metaVisible ? ' ct-table--meta' : ''}`}>
               <colgroup>
-                <col style={{ width: isPhone ? '56px' : '72px' }} />
-                <col style={{ width: isPhone ? '180px' : '240px' }} />
+                <col className="ct-col-id-w" />
+                <col className="ct-col-job-w" />
                 {metaVisible && <col style={{ width: isPhone ? '92px' : '120px' }} />}
                 {metaVisible && <col style={{ width: isPhone ? '104px' : '140px' }} />}
                 {metaVisible && <col style={{ width: isPhone ? '96px' : '130px' }} />}
@@ -742,8 +742,8 @@ export default function CostTracking() {
               </colgroup>
               <thead>
                 <tr>
-                  <th>Job #</th>
-                  <th>Job</th>
+                  <th className="ct-sticky ct-sticky--id">Job #</th>
+                  <th className="ct-sticky ct-sticky--job">Job</th>
                   {metaVisible && <th>Total Contract</th>}
                   {metaVisible && <th>Labor Budget per Proposal</th>}
                   {metaVisible && <th>Balance Left To Spend</th>}
@@ -764,10 +764,10 @@ export default function CostTracking() {
               <tbody>
                 {filteredJobRows.map((row, rowIndex) => (
                   <tr key={row.id}>
-                    <td className="ct-id-cell">
+                    <td className="ct-id-cell ct-sticky ct-sticky--id">
                       {row.id.replace(/^#/, '')}
                     </td>
-                    <td className="ct-job-cell">
+                    <td className="ct-job-cell ct-sticky ct-sticky--job">
                       <span className="ct-job-bar" style={{ background: row.color }} />
                       <button type="button" className="ct-name-cell" onClick={() => openJobDetails(row)}>
                         <span className="ct-job-title" title={row.jobName}>

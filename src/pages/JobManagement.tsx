@@ -169,7 +169,7 @@ export default function JobsManagement() {
     <div className="dash">
       <Sidebar active="Jobs Management" />
 
-      <main className="dash__main jm-main">
+      <main className="dash__main jm-main" style={zoom !== 1 ? { zoom } : undefined}>
         <Topbar
           extra={
             <ZoomControl
@@ -227,11 +227,7 @@ export default function JobsManagement() {
           </div>
         </div>
 
-        <div
-          className="jm-table-wrap"
-          style={{ zoom, width: `${100 / zoom}%` }}
-          ref={tableWrapRef}
-        >
+        <div className="jm-table-wrap" ref={tableWrapRef}>
           <table className="jm-table">
             <colgroup>
               <col className="jm-col-id-w" />

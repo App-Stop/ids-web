@@ -607,8 +607,18 @@
 }
 
 .ct-table--grid {
+  --ct-id-w: 72px;
+  --ct-job-w: 240px;
   width: max-content;
   min-width: 100%;
+}
+
+.ct-col-id-w {
+  width: var(--ct-id-w);
+}
+
+.ct-col-job-w {
+  width: var(--ct-job-w);
 }
 
 .ct-table--grid th,
@@ -617,6 +627,7 @@
   border-bottom: 1px solid var(--border);
   border-right: 1px solid var(--border);
   vertical-align: middle;
+  background: var(--card-bg);
 }
 
 .ct-table--grid thead th {
@@ -626,6 +637,50 @@
   vertical-align: bottom;
   color: #7b7b85;
   background: #f5f5f7;
+}
+
+/* Sticky frozen columns: Job # | Job */
+.ct-table--grid .ct-sticky {
+  position: sticky;
+  z-index: 2;
+  background: var(--card-bg);
+}
+
+.ct-table--grid thead .ct-sticky {
+  z-index: 5;
+  top: 0;
+  background: #f5f5f7;
+}
+
+.ct-table--grid .ct-sticky--id {
+  left: 0;
+  width: var(--ct-id-w);
+  min-width: var(--ct-id-w);
+  max-width: var(--ct-id-w);
+  z-index: 3;
+  box-sizing: border-box;
+}
+
+.ct-table--grid thead .ct-sticky--id {
+  z-index: 6;
+}
+
+.ct-table--grid .ct-sticky--job {
+  left: var(--ct-id-w);
+  width: var(--ct-job-w);
+  min-width: var(--ct-job-w);
+  max-width: var(--ct-job-w);
+  z-index: 2;
+  box-sizing: border-box;
+  box-shadow: 4px 0 8px -4px rgba(0, 0, 0, 0.08);
+}
+
+.ct-table--grid thead .ct-sticky--job {
+  z-index: 5;
+}
+
+.ct-table--grid tbody tr:hover .ct-sticky {
+  background: #fafafa;
 }
 
 .ct-table--grid td:not(.ct-grid-divider) {
@@ -846,6 +901,8 @@
   }
 
   .ct-table--grid {
+    --ct-id-w: 56px;
+    --ct-job-w: 180px;
     min-width: 1120px;
   }
 

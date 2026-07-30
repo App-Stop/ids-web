@@ -471,12 +471,12 @@ export default function Crew() {
                     <input type="checkbox" />
                   </th>
                   <th>Roster ID</th>
-                  <th>Name</th>
-                  <th>Crew Assigned</th>
-                  <th>Role</th>
-                  <th>Hourly Rate ($)</th>
-                  <th>Status</th>
-                  <th>Action</th>
+                  <th className="crew-center">Name</th>
+                  <th className="crew-center">Crew Assigned</th>
+                  <th className="crew-center">Role</th>
+                  <th className="crew-center">Hourly Rate ($)</th>
+                  <th className="crew-center">Status</th>
+                  <th className="crew-center">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -486,13 +486,13 @@ export default function Crew() {
                       <input type="checkbox" />
                     </td>
                     <td className="crew-id-cell crew-id-cell--roster">#{row.rosterId}</td>
-                    <td>
+                    <td className="crew-center">
                       <div className="crew-name-cell">
                         <img className="crew-avatar" src={row.avatar} alt="" />
                         {row.name}
                       </div>
                     </td>
-                    <td className={row.crewName ? 'crew-assigned-td' : undefined}>
+                    <td className={row.crewName ? 'crew-assigned-td crew-center' : 'crew-center'}>
                       {row.crewName ? (
                         <>
                           <span
@@ -517,12 +517,12 @@ export default function Crew() {
                         <span className="crew-job-cell__unassigned">Unassigned</span>
                       )}
                     </td>
-                    <td>{row.role}</td>
-                    <td>{row.rate}</td>
-                    <td>
+                    <td className="crew-center">{row.role}</td>
+                    <td className="crew-center">{row.rate}</td>
+                    <td className="crew-center">
                       <StatusPill status={row.status} />
                     </td>
-                    <td>
+                    <td className="crew-center">
                       <button type="button" className="crew-edit-btn" onClick={() => setFlow({ type: 'editMember', member: row })}>
                         <Icon.Edit width={15} height={15} />
                       </button>
