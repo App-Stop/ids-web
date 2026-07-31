@@ -371,10 +371,10 @@ export default function ScheduleBoard() {
     // Resize only on the same job row.
     if (source.jobId !== target.jobId) return
 
-    // Keep assignment within Mon–Sat of its week.
+    // Keep assignment within Mon–Sun of its week.
     const weekMon = toISO(getMonday(fromISO(source.startDate)))
-    const weekSat = toISO(addDays(fromISO(weekMon), 5))
-    const clampedTarget = target.date < weekMon ? weekMon : target.date > weekSat ? weekSat : target.date
+    const weekSun = toISO(addDays(fromISO(weekMon), 6))
+    const clampedTarget = target.date < weekMon ? weekMon : target.date > weekSun ? weekSun : target.date
 
     if (edge === 'start') {
       // Left handle: drop day becomes the new start (extend left or shrink from left).
@@ -787,7 +787,7 @@ export default function ScheduleBoard() {
             if (!crew) return
             const weekStart = getMonday(fromISO(flow.date))
             const startDate = toISO(weekStart)
-            const endDate = toISO(addDays(weekStart, 5)) // Monday–Saturday
+            const endDate = toISO(addDays(weekStart, 6)) // Monday–Sunday
             setAssignments((list) => {
               const existingCrew = list.find((a) => a.jobId === flow.jobId)?.crewName
               // One crew per job: replacing with a different crew clears other weeks.

@@ -12,9 +12,7 @@ import CreateCrewModal from '../components/dashboard/CreateCrewModal'
 import AssignJobModal from '../components/dashboard/AssignJobModal'
 import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
-import ZoomControl from '../components/dashboard/ZoomControl'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
-import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import {
   assignableCrews,
   crewLeads,
@@ -130,7 +128,6 @@ export default function Crew() {
   const [jobNotes, setJobNotes] = useState<Record<string, string>>({
     'c8742:1042:001': 'Coordinate with suppliers and schedule weekly progress meetings.',
   })
-  const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
 
@@ -245,15 +242,7 @@ export default function Crew() {
       <Sidebar active="Crew Management" />
 
       <main className="dash__main crew-main">
-        <Topbar
-          extra={
-            <ZoomControl
-              zoom={zoom}
-              onZoomIn={() => setZoom((z) => stepSheetZoom(z, 1))}
-              onZoomOut={() => setZoom((z) => stepSheetZoom(z, -1))}
-            />
-          }
-        />
+        <Topbar />
 
         <div className="crew-header-row">
           <div>
@@ -349,7 +338,6 @@ export default function Crew() {
         </div>
 
         <div className="crew-table-wrap" ref={tableWrapRef}>
-          <div className="crew-table-zoom" style={sheetZoomStyle(zoom)}>
           {tab === 'crew' ? (
             <table className="crew-table crew-table--leads">
               <colgroup>
@@ -469,14 +457,24 @@ export default function Crew() {
             </table>
           ) : (
             <table className="crew-table crew-table--roster">
+              <colgroup>
+                <col style={{ width: '3.5%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '17%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '13.5%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th className="crew-col-check">
                     <input type="checkbox" />
                   </th>
                   <th>Roster ID</th>
-                  <th className="crew-roster-name-th">Name</th>
-                  <th className="crew-roster-crew-th">Crew Assigned</th>
+                  <th>Name</th>
+                  <th>Crew Assigned</th>
                   <th className="crew-center">Role</th>
                   <th className="crew-center">Hourly Rate ($)</th>
                   <th className="crew-center">Status</th>
@@ -490,7 +488,7 @@ export default function Crew() {
                       <input type="checkbox" />
                     </td>
                     <td className="crew-id-cell crew-id-cell--roster">#{row.rosterId}</td>
-                    <td className="crew-roster-name-td">
+                    <td>
                       <div className="crew-name-cell">
                         <img className="crew-avatar" src={row.avatar} alt="" />
                         {row.name}
@@ -536,7 +534,6 @@ export default function Crew() {
               </tbody>
             </table>
           )}
-          </div>
         </div>
       </main>
 

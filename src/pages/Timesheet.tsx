@@ -4,11 +4,9 @@ import Sidebar from '../components/dashboard/Sidebar'
 import Modal from '../components/dashboard/Modal'
 import Dropdown from '../components/dashboard/Dropdown'
 import Avatar from '../components/dashboard/Avatar'
-import ZoomControl from '../components/dashboard/ZoomControl'
 import { Icon } from '../components/dashboard/icons'
 import { rosterRows as initialRosterRows, type RosterRow } from '../lib/crewData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
-import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import './Dashboard.css'
 import '../components/dashboard/crew-modals.css'
 import './Timesheet.css'
@@ -320,7 +318,6 @@ export default function Timesheet() {
   const [rows, setRows] = useState<AttendanceRow[]>(buildInitialRows)
   const [modalMode, setModalMode] = useState<ModalMode>('none')
   const [activeRow, setActiveRow] = useState<AttendanceRow | undefined>()
-  const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
 
@@ -416,11 +413,6 @@ export default function Timesheet() {
           </label>
 
           <div className="topbar__actions ts-topbar__actions">
-            <ZoomControl
-              zoom={zoom}
-              onZoomIn={() => setZoom((z) => stepSheetZoom(z, 1))}
-              onZoomOut={() => setZoom((z) => stepSheetZoom(z, -1))}
-            />
             <button type="button" className="icon-btn icon-btn--bordered" aria-label="Notifications">
               <Bell size={18} weight="regular" />
               <i className="dot-badge" />
@@ -462,7 +454,6 @@ export default function Timesheet() {
         </div>
 
         <div className="ts-table-wrap" ref={tableWrapRef}>
-          <div className="ts-table-zoom" style={sheetZoomStyle(zoom)}>
           <table className="ts-table">
             <thead>
               <tr>
@@ -506,7 +497,6 @@ export default function Timesheet() {
               ))}
             </tbody>
           </table>
-          </div>
         </div>
       </main>
 
