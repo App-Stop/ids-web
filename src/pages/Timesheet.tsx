@@ -320,7 +320,7 @@ export default function Timesheet() {
   const [rows, setRows] = useState<AttendanceRow[]>(buildInitialRows)
   const [modalMode, setModalMode] = useState<ModalMode>('none')
   const [activeRow, setActiveRow] = useState<AttendanceRow | undefined>()
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
 

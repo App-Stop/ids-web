@@ -130,7 +130,7 @@ export default function Crew() {
   const [jobNotes, setJobNotes] = useState<Record<string, string>>({
     'c8742:1042:001': 'Coordinate with suppliers and schedule weekly progress meetings.',
   })
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
 
