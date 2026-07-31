@@ -763,7 +763,7 @@ export default function CostTracking() {
                   {weekDays.map((day, index) => (
                     <th key={day.toISOString()} className={index === 2 ? 'is-today' : ''}>
                       <div className="ct-grid-day-head">
-                        {index === 2 ? <span className="ct-grid-day-head__today">Today, {WEEKDAY_SHORT[day.getDay()]}</span> : WEEKDAY_SHORT[day.getDay()]}
+                        {WEEKDAY_SHORT[day.getDay()]}
                         <span>{formatGridDate(day)}</span>
                       </div>
                     </th>
