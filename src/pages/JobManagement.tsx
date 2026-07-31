@@ -46,7 +46,7 @@ function toJob(row: Row): Job {
   return {
     id: row.id,
     name: row.name,
-    color: row.color,
+    color: crewBarColor(row.crewName, row.color),
     bidNo: String(1000 + Number(num)),
     jobNo: num,
     gc: row.gc,
@@ -71,10 +71,17 @@ function toCrew(row: Row): UnassignedCrew | null {
   }
 }
 
+/** Color bar + legend must use the assigned crew's color, not a stale job color. */
+function crewBarColor(crewName: string | undefined, fallback: string) {
+  if (!crewName || crewName === 'Unassigned') return fallback
+  return assignableCrews.find((c) => c.name === crewName)?.color ?? fallback
+}
+
 export default function JobsManagement() {
   const [jobs, setJobs] = useState<Row[]>(
     initialManagedJobs.map((j, i) => ({
       ...j,
+      color: crewBarColor(j.crewName, j.color),
       seq: i + 1,
       note: i === 0 ? 'Coordinate with suppliers and schedule weekly progress meetings.' : undefined,
     })),
@@ -276,6 +283,7 @@ export default function JobsManagement() {
                 const pct = Math.min(100, Math.round((job.laborBudgetUsed / Math.max(1, job.laborBudgetTotal)) * 100))
                 const barColor = overBudget ? '#ef4444' : job.status === 'awarded' ? '#f97316' : '#22c55e'
                 const barPct = overBudget ? 100 : Math.max(8, pct)
+                const stripeColor = crewBarColor(job.crewName, job.color)
                 return (
                   <tr key={job.id} className="jm-row">
                     <td className="jm-sticky jm-sticky--id">
@@ -296,13 +304,13 @@ export default function JobsManagement() {
                           setCrewHover({
                             x: rect.right + 8,
                             y: rect.top + rect.height / 2,
-                            color: job.color,
+                            color: stripeColor,
                             names: [job.crewName],
                           })
                         }}
                         onMouseLeave={() => setCrewHover(null)}
                       >
-                        <span className="jm-color-bar" style={{ background: job.color }} />
+                        <span className="jm-color-bar" style={{ background: stripeColor }} />
                       </span>
                     </td>
                     <td className="jm-name-cell jm-sticky jm-sticky--name">
