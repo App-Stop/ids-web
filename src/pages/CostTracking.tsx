@@ -436,6 +436,7 @@ export default function CostTracking() {
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
   const [jobFlow, setJobFlow] = useState<JobFlow>({ type: 'none' })
+  const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
   const [jobNotes, setJobNotes] = useState<Record<string, string>>({
     '#001': 'Coordinate with suppliers and schedule weekly progress meetings.',
   })
@@ -616,6 +617,14 @@ export default function CostTracking() {
             <h1 className="dash__title">Cost Tracking</h1>
             <p className="dash__subtitle">Labor and dumpster cost analysis</p>
           </div>
+          <div className="sb-legend">
+            {assignableCrews.map((crew) => (
+              <span key={crew.id} className="sb-legend__item">
+                <i style={{ background: crew.color }} />
+                {crew.name}
+              </span>
+            ))}
+          </div>
           <button type="button" className="btn btn--outline ct-export-btn">
             Export
           </button>
@@ -768,7 +777,25 @@ export default function CostTracking() {
                       {row.id.replace(/^#/, '')}
                     </td>
                     <td className="ct-job-cell ct-sticky ct-sticky--job">
-                      <span className="ct-job-bar" style={{ background: row.color }} />
+                      <span
+                        className="ct-job-bar-hit"
+                        onMouseEnter={(e) => {
+                          const assigned = jobCrews[row.jobId] ?? jobCrews[row.id]
+                          const matched = assignableCrews.find((c) => c.color === row.color)
+                          const name = assigned?.name ?? matched?.name
+                          if (!name) return
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setCrewHover({
+                            x: rect.right + 8,
+                            y: rect.top + rect.height / 2,
+                            color: row.color,
+                            names: [name],
+                          })
+                        }}
+                        onMouseLeave={() => setCrewHover(null)}
+                      >
+                        <span className="ct-job-bar" style={{ background: row.color }} />
+                      </span>
                       <button type="button" className="ct-name-cell" onClick={() => openJobDetails(row)}>
                         <span className="ct-job-title" title={row.jobName}>
                           {row.jobName}
@@ -847,7 +874,22 @@ export default function CostTracking() {
                     </td>
                     <td className="ct-id-cell">#{row.crewId}</td>
                     <td className="ct-crew-name-cell">
-                      <span className="ct-crew-name-bar" style={{ background: row.color }} />
+                      <span
+                        className="ct-crew-name-bar-hit"
+                        onMouseEnter={(e) => {
+                          if (!row.crewName) return
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setCrewHover({
+                            x: rect.right + 8,
+                            y: rect.top + rect.height / 2,
+                            color: row.color,
+                            names: [row.crewName],
+                          })
+                        }}
+                        onMouseLeave={() => setCrewHover(null)}
+                      >
+                        <span className="ct-crew-name-bar" style={{ background: row.color }} />
+                      </span>
                       <div className="ct-crew-cell">
                         <img src={row.avatar} alt="" className="ct-crew-cell__avatar" />
                         <span>{row.crewName}</span>
@@ -869,6 +911,19 @@ export default function CostTracking() {
           )}
         </div>
       </main>
+
+      {crewHover && (
+        <div
+          className="sb-jobno-tooltip sb-jobno-tooltip--fixed"
+          style={{ left: crewHover.x, top: crewHover.y }}
+        >
+          {crewHover.names.map((name) => (
+            <span key={name} className="sb-jobno-tooltip__pill" style={{ background: crewHover.color }}>
+              {name}
+            </span>
+          ))}
+        </div>
+      )}
 
       {modalMode !== 'none' && (
         <CostModal

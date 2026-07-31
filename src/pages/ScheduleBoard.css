@@ -528,6 +528,15 @@ td.sb-col-divider {
   width: 150px;
   min-width: 150px;
   font-size: 0.875rem;
+  box-sizing: border-box;
+}
+
+/* Weekly: equal flexible day columns — no fixed min-width fighting the grid */
+.sb-board:not(.sb-board--monthly) .sb-day-head,
+.sb-board:not(.sb-board--monthly) .sb-table--days td.sb-cell {
+  width: auto;
+  min-width: 0;
+  max-width: none;
 }
 
 .sb-day-head__weekday {
@@ -619,16 +628,7 @@ td.sb-col-divider {
   padding: 0 !important;
   z-index: 0;
   overflow: visible;
-}
-
-/* Hide vertical day grid lines through crew assignment bars */
-.sb-table--days td.sb-cell--occupied {
-  border-right-color: transparent;
-}
-
-/* Restore the divider when the next day is empty */
-.sb-table--days td.sb-cell--occupied + td.sb-cell:not(.sb-cell--occupied) {
-  box-shadow: inset 1px 0 0 var(--border);
+  box-sizing: border-box;
 }
 
 /* Cell that owns a bar stacks above later days so the RIGHT handle is reachable */
@@ -688,6 +688,17 @@ td.sb-col-divider {
   pointer-events: auto;
 }
 
+/* Opaque backing so day grid lines don't show through translucent weekly bars */
+.sb-pill-wrap::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  border-radius: 8px;
+  z-index: 0;
+  pointer-events: none;
+}
+
 /* Keep spanning bars above neighboring cells so the RIGHT handle is hoverable */
 .sb-pill-wrap:hover,
 .sb-pill-wrap:has(.sb-pill__drag-handle:hover),
@@ -723,6 +734,7 @@ td.sb-col-divider {
   transition: box-shadow 0.15s ease, filter 0.15s ease;
   overflow: visible;
   position: relative;
+  z-index: 1;
 }
 
 .sb-pill-wrap:has(.sb-pill__drag-handle.is-dragging) .sb-pill {

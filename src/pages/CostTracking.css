@@ -22,9 +22,10 @@
 
 .ct-head-row {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 1.5rem;
+  flex-wrap: wrap;
   margin-top: 0.7rem;
 }
 
@@ -32,8 +33,42 @@
   margin-top: 40px;
 }
 
+.ct-head-row .sb-legend {
+  margin-top: 1.75rem;
+  margin-left: auto;
+}
+
+.sb-legend {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  column-gap: 2.75rem;
+  row-gap: 0.85rem;
+  padding-top: 0.15rem;
+  justify-content: start;
+}
+
+.sb-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.sb-legend__item i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .ct-export-btn {
   flex-shrink: 0;
+  margin-top: 1.75rem;
 }
 
 .ct-toolbar {
@@ -345,12 +380,45 @@
   padding-left: 0.9rem !important;
 }
 
+.ct-job-bar-hit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: pointer;
+  z-index: 2;
+}
+
 .ct-job-bar {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
   width: 4px;
+}
+
+.sb-jobno-tooltip--fixed {
+  position: fixed;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  pointer-events: none;
+  z-index: 200;
+}
+
+.sb-jobno-tooltip__pill {
+  display: inline-block;
+  padding: 0.4rem 0.9rem;
+  border: none;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .ct-name-cell {
@@ -439,6 +507,16 @@
   position: relative;
   padding-left: 1.15rem !important;
   min-width: 180px;
+}
+
+.ct-crew-name-bar-hit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: pointer;
+  z-index: 2;
 }
 
 .ct-crew-name-bar {
@@ -801,6 +879,22 @@
   .ct-head-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .ct-head-row .sb-legend {
+    margin-left: 0;
+    margin-top: 0.5rem;
+  }
+
+  .ct-export-btn {
+    margin-top: 0;
+    margin-left: 0;
+  }
+
+  .sb-legend {
+    grid-template-columns: repeat(2, auto);
+    column-gap: 1.25rem;
+    row-gap: 0.55rem;
   }
 
   .ct-add-btn {
