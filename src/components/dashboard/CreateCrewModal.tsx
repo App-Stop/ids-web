@@ -55,17 +55,19 @@ export default function CreateCrewModal({
   const [color, setColor] = useState(crew?.color ?? crewColors[0])
   const [note, setNote] = useState('')
   const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const [laborError, setLaborError] = useState('')
 
   const selectedLead = crewLeads.find((c) => c.id === crewLeadId)
   const selectedJob = jobs.find((j) => j.id === jobId)
   const selectedStatus = STATUS_OPTIONS.find((s) => s.id === status)!
-  const canSubmit = Boolean(crewName.trim() && crewLeadId && laborNames.length > 0)
+  const canSubmit = Boolean(crewName.trim() && crewLeadId)
 
   function addLaborName(rawName: string) {
     const value = rawName.trim()
     if (!value) return
     setLaborNames((list) => (list.some((name) => name.toLowerCase() === value.toLowerCase()) ? list : [...list, value]))
     setLaborInput('')
+    setLaborError('')
   }
 
   function removeLaborName(nameToRemove: string) {
@@ -106,6 +108,11 @@ export default function CreateCrewModal({
   function handleSubmit() {
     if (!canSubmit) return
     if (!crewLeadId) return
+    if (laborNames.length === 0) {
+      setLaborError('At least one labor is required')
+      return
+    }
+    setLaborError('')
     onSubmit({ crewName, crewLeadId: crewLeadId ?? '', laborNames, jobId, status, color, note })
   }
 
@@ -141,7 +148,7 @@ export default function CreateCrewModal({
       />
 
       <label className="field-label">Labors*</label>
-      <div className="crew-chip-input">
+      <div className={`crew-chip-input${laborError ? ' is-invalid' : ''}`}>
         {laborNames.map((name) => (
           <span key={name} className="crew-chip-input__chip">
             {name}
@@ -153,7 +160,10 @@ export default function CreateCrewModal({
         <input
           className="crew-chip-input__field"
           value={laborInput}
-          onChange={(e) => setLaborInput(e.target.value)}
+          onChange={(e) => {
+            setLaborInput(e.target.value)
+            if (laborError) setLaborError('')
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ',') {
               e.preventDefault()
@@ -165,8 +175,10 @@ export default function CreateCrewModal({
           }}
           onBlur={() => addLaborName(laborInput)}
           placeholder={laborNames.length === 0 ? 'Type a name and press Enter' : ''}
+          aria-invalid={Boolean(laborError)}
         />
       </div>
+      {laborError && <p className="field-error">{laborError}</p>}
 
       <label className="field-label">{isEdit ? 'Job Assigned' : 'Assign Job'}</label>
       <Dropdown

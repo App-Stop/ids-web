@@ -43,51 +43,48 @@ export const scheduleJobs: ScheduleJob[] = [
 /** Jobs shown in Schedule / Cost pickers — full sheet roster. */
 export const sheetPickerJobs = scheduleJobs
 
-/** Weekly view assignments (week of TODAY 2026-07-20 … 2026-07-26). */
-export const weeklyScheduleAssignments: ScheduleAssignment[] = [
-  { id: 'wa1', jobId: 's4827', startDate: '2026-07-20', endDate: '2026-07-22', crewName: "Hank's Crew", rate: 25, workers: 4, note: 'Coordinate with suppliers and schedule weekly progress meetings.' },
-  { id: 'wa1b', jobId: 's4827', startDate: '2026-07-24', endDate: '2026-07-26', crewName: "Chris's Crew", rate: 28, workers: 3 },
-  { id: 'wa2', jobId: 's5914', startDate: '2026-07-20', endDate: '2026-07-24', crewName: "John's Crew", rate: 32, workers: 5, note: 'Confirm crane delivery Tuesday morning.' },
-  { id: 'wa3', jobId: 's4706', startDate: '2026-07-21', endDate: '2026-07-23', crewName: "Dan's Crew", rate: 29, workers: 3, note: 'Dust control required near classrooms.' },
-  { id: 'wa3b', jobId: 's4706', startDate: '2026-07-25', endDate: '2026-07-26', crewName: "Eli's Crew", rate: 33, workers: 4 },
-  { id: 'wa4', jobId: 's3460', startDate: '2026-07-20', endDate: '2026-07-23', crewName: "Bob's Crew", rate: 28, workers: 3, note: 'Watch for permit delays on the west wing.' },
-  { id: 'wa5', jobId: 's2049', startDate: '2026-07-20', endDate: '2026-07-26', crewName: "Noah's Crew", rate: 30, workers: 6, note: 'Full-week interior soft demo.' },
-  { id: 'wa6', jobId: 's8602', startDate: '2026-07-21', endDate: '2026-07-25', crewName: "Lucas's Crew", rate: 27, workers: 4, note: 'Second shift covers cleanup.' },
-  { id: 'wa7', jobId: 's7214', startDate: '2026-07-20', endDate: '2026-07-22', crewName: "Liam's Crew", rate: 33, workers: 5, note: 'Confirm dumpster pickup Friday.' },
-  { id: 'wa7b', jobId: 's7214', startDate: '2026-07-23', endDate: '2026-07-26', crewName: "Owen's Crew", rate: 34, workers: 4 },
-  { id: 'wa8', jobId: 's3391', startDate: '2026-07-20', endDate: '2026-07-24', crewName: "Aiden's Crew", rate: 30, workers: 5 },
-  { id: 'wa9', jobId: 's5108', startDate: '2026-07-22', endDate: '2026-07-26', crewName: "Mason's Crew", rate: 29, workers: 4, note: 'Coordinate fire-watch overnight.' },
-  { id: 'wa10', jobId: 's6620', startDate: '2026-07-20', endDate: '2026-07-23', crewName: "Luca's Crew", rate: 26, workers: 3 },
-  { id: 'wa10b', jobId: 's6620', startDate: '2026-07-24', endDate: '2026-07-26', crewName: "Hank's Crew", rate: 25, workers: 4 },
+/** Weekly view assignments (week of TODAY 2026-07-20 … 2026-07-26) — one crew per job, Mon–Sat. */
+const WEEKLY_CREW_BY_JOB: Array<Omit<ScheduleAssignment, 'id' | 'startDate' | 'endDate'>> = [
+  { jobId: 's4827', crewName: "Hank's Crew", rate: 25, workers: 4, note: 'Coordinate with suppliers and schedule weekly progress meetings.' },
+  { jobId: 's5914', crewName: "John's Crew", rate: 32, workers: 5, note: 'Confirm crane delivery Tuesday morning.' },
+  { jobId: 's4706', crewName: "Dan's Crew", rate: 29, workers: 3, note: 'Dust control required near classrooms.' },
+  { jobId: 's3460', crewName: "Bob's Crew", rate: 28, workers: 3, note: 'Watch for permit delays on the west wing.' },
+  { jobId: 's2049', crewName: "Noah's Crew", rate: 30, workers: 6, note: 'Full-week interior soft demo.' },
+  { jobId: 's8602', crewName: "Lucas's Crew", rate: 27, workers: 4, note: 'Second shift covers cleanup.' },
+  { jobId: 's7214', crewName: "Liam's Crew", rate: 33, workers: 5, note: 'Confirm dumpster pickup Friday.' },
+  { jobId: 's3391', crewName: "Aiden's Crew", rate: 30, workers: 5 },
+  { jobId: 's5108', crewName: "Mason's Crew", rate: 29, workers: 4, note: 'Coordinate fire-watch overnight.' },
+  { jobId: 's6620', crewName: "Luca's Crew", rate: 26, workers: 3 },
 ]
 
-/** Monthly Gantt ranges for July 2026 — dense coverage across the sheet. */
-export const monthlyScheduleAssignments: ScheduleAssignment[] = [
-  { id: 'ma1', jobId: 's4827', startDate: '2026-07-01', endDate: '2026-07-07', crewName: "Hank's Crew", rate: 25, workers: 4, note: 'Coordinate with suppliers and schedule weekly progress meetings.' },
-  { id: 'ma1b', jobId: 's4827', startDate: '2026-07-14', endDate: '2026-07-22', crewName: "Chris's Crew", rate: 28, workers: 3 },
-  { id: 'ma1c', jobId: 's4827', startDate: '2026-07-27', endDate: '2026-07-31', crewName: "Hank's Crew", rate: 25, workers: 4 },
-  { id: 'ma2', jobId: 's5914', startDate: '2026-07-02', endDate: '2026-07-11', crewName: "John's Crew", rate: 32, workers: 5, note: 'Confirm crane delivery Tuesday morning.' },
-  { id: 'ma2b', jobId: 's5914', startDate: '2026-07-16', endDate: '2026-07-28', crewName: "John's Crew", rate: 32, workers: 5 },
-  { id: 'ma7', jobId: 's4706', startDate: '2026-07-03', endDate: '2026-07-12', crewName: "Dan's Crew", rate: 29, workers: 3, note: 'Dust control required near classrooms.' },
-  { id: 'ma7b', jobId: 's4706', startDate: '2026-07-18', endDate: '2026-07-26', crewName: "Eli's Crew", rate: 33, workers: 4 },
-  { id: 'ma3', jobId: 's3460', startDate: '2026-07-01', endDate: '2026-07-09', crewName: "Bob's Crew", rate: 28, workers: 3, note: 'Watch for permit delays on the west wing.' },
-  { id: 'ma3b', jobId: 's3460', startDate: '2026-07-15', endDate: '2026-07-24', crewName: "Bob's Crew", rate: 28, workers: 3 },
-  { id: 'ma3c', jobId: 's3460', startDate: '2026-07-28', endDate: '2026-08-02', crewName: "Owen's Crew", rate: 34, workers: 4 },
-  { id: 'ma4', jobId: 's2049', startDate: '2026-07-04', endDate: '2026-07-18', crewName: "Noah's Crew", rate: 30, workers: 6, note: 'Full-week interior soft demo.' },
-  { id: 'ma4b', jobId: 's2049', startDate: '2026-07-22', endDate: '2026-07-31', crewName: "Noah's Crew", rate: 30, workers: 6 },
-  { id: 'ma5', jobId: 's8602', startDate: '2026-07-06', endDate: '2026-07-15', crewName: "Lucas's Crew", rate: 27, workers: 4, note: 'Second shift covers cleanup.' },
-  { id: 'ma5b', jobId: 's8602', startDate: '2026-07-20', endDate: '2026-07-30', crewName: "Lucas's Crew", rate: 27, workers: 4 },
-  { id: 'ma6', jobId: 's7214', startDate: '2026-07-01', endDate: '2026-07-08', crewName: "Liam's Crew", rate: 33, workers: 5, note: 'Confirm dumpster pickup Friday.' },
-  { id: 'ma6b', jobId: 's7214', startDate: '2026-07-12', endDate: '2026-07-21', crewName: "Owen's Crew", rate: 34, workers: 4 },
-  { id: 'ma6c', jobId: 's7214', startDate: '2026-07-25', endDate: '2026-08-02', crewName: "Liam's Crew", rate: 33, workers: 5 },
-  { id: 'ma8', jobId: 's3391', startDate: '2026-07-05', endDate: '2026-07-14', crewName: "Aiden's Crew", rate: 30, workers: 5 },
-  { id: 'ma8b', jobId: 's3391', startDate: '2026-07-19', endDate: '2026-07-29', crewName: "Aiden's Crew", rate: 30, workers: 5 },
-  { id: 'ma9', jobId: 's5108', startDate: '2026-07-08', endDate: '2026-07-17', crewName: "Mason's Crew", rate: 29, workers: 4, note: 'Coordinate fire-watch overnight.' },
-  { id: 'ma9b', jobId: 's5108', startDate: '2026-07-21', endDate: '2026-07-31', crewName: "Mason's Crew", rate: 29, workers: 4 },
-  { id: 'ma10', jobId: 's6620', startDate: '2026-07-02', endDate: '2026-07-10', crewName: "Luca's Crew", rate: 26, workers: 3 },
-  { id: 'ma10b', jobId: 's6620', startDate: '2026-07-13', endDate: '2026-07-23', crewName: "Hank's Crew", rate: 25, workers: 4 },
-  { id: 'ma10c', jobId: 's6620', startDate: '2026-07-26', endDate: '2026-08-02', crewName: "Luca's Crew", rate: 26, workers: 3 },
+export const weeklyScheduleAssignments: ScheduleAssignment[] = WEEKLY_CREW_BY_JOB.map((crew, index) => ({
+  ...crew,
+  id: `wa${index + 1}`,
+  startDate: '2026-07-20',
+  endDate: '2026-07-25',
+}))
+
+/**
+ * Monthly Gantt — one crew per job.
+ * Each week is Mon–Sat; Sundays (Jul 5, 12, 19, 26, Aug 2) stay empty.
+ * July 2026 starts on Wednesday, so the first block is Wed–Sat (1–4).
+ */
+const MONTHLY_MON_SAT_RANGES: Array<{ startDate: string; endDate: string }> = [
+  { startDate: '2026-07-01', endDate: '2026-07-04' }, // Wed–Sat
+  { startDate: '2026-07-06', endDate: '2026-07-11' }, // Mon–Sat
+  { startDate: '2026-07-13', endDate: '2026-07-18' }, // Mon–Sat
+  { startDate: '2026-07-20', endDate: '2026-07-25' }, // Mon–Sat
+  { startDate: '2026-07-27', endDate: '2026-08-01' }, // Mon–Sat (into next-month overflow cols)
 ]
+
+export const monthlyScheduleAssignments: ScheduleAssignment[] = WEEKLY_CREW_BY_JOB.flatMap((crew, jobIndex) =>
+  MONTHLY_MON_SAT_RANGES.map((range, weekIndex) => ({
+    ...crew,
+    id: `ma${jobIndex + 1}w${weekIndex + 1}`,
+    startDate: range.startDate,
+    endDate: range.endDate,
+  })),
+)
 
 /** @deprecated use weeklyScheduleAssignments / monthlyScheduleAssignments */
 export const initialScheduleAssignments = weeklyScheduleAssignments

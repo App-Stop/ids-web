@@ -8,6 +8,7 @@ import ZoomControl from '../components/dashboard/ZoomControl'
 import { Icon } from '../components/dashboard/icons'
 import { rosterRows as initialRosterRows, type RosterRow } from '../lib/crewData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
+import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import './Dashboard.css'
 import '../components/dashboard/crew-modals.css'
 import './Timesheet.css'
@@ -407,7 +408,7 @@ export default function Timesheet() {
     <div className="dash ts-page">
       <Sidebar active="Timesheet" />
 
-      <main className="dash__main ts-main" style={{ zoom }}>
+      <main className="dash__main ts-main">
         <div className="topbar ts-topbar">
           <label className="topbar__search ts-search">
             <MagnifyingGlass size={18} weight="regular" />
@@ -417,8 +418,8 @@ export default function Timesheet() {
           <div className="topbar__actions ts-topbar__actions">
             <ZoomControl
               zoom={zoom}
-              onZoomIn={() => setZoom((z) => Math.min(1.5, +(z + 0.05).toFixed(2)))}
-              onZoomOut={() => setZoom((z) => Math.max(0.75, +(z - 0.05).toFixed(2)))}
+              onZoomIn={() => setZoom((z) => stepSheetZoom(z, 1))}
+              onZoomOut={() => setZoom((z) => stepSheetZoom(z, -1))}
             />
             <button type="button" className="icon-btn icon-btn--bordered" aria-label="Notifications">
               <Bell size={18} weight="regular" />
@@ -461,6 +462,7 @@ export default function Timesheet() {
         </div>
 
         <div className="ts-table-wrap" ref={tableWrapRef}>
+          <div className="ts-table-zoom" style={sheetZoomStyle(zoom)}>
           <table className="ts-table">
             <thead>
               <tr>
@@ -504,6 +506,7 @@ export default function Timesheet() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </main>
 

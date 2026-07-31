@@ -46,6 +46,8 @@ import {
   type ScheduleJob,
   type ScheduleAssignment,
 } from '../lib/scheduleData'
+import { useSidebarCollapsed } from '../hooks/useSidebarCollapsed'
+import { SHEET_ZOOM_DEFAULT, stepSheetZoom } from '../lib/sheetZoom'
 import './ScheduleBoard.css'
 
 type ViewMode = 'weekly' | 'monthly'
@@ -64,6 +66,7 @@ const scheduleCollision: CollisionDetection = (args) => {
 
 const JOBNO_W = 72
 const JOB_W = 230
+const JOB_W_WEEKLY = 180
 const DIVIDER_W = 10
 const META_WIDTHS = [130, 130, 130, 100] as const
 /** Fallback day width when monthly + separator open if we couldn't measure. */
@@ -229,7 +232,7 @@ function DayCell({
   iso: string
   compact: boolean
   occupied?: boolean
-  children: React.ReactNode
+  children?: React.ReactNode
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${jobId}__${iso}`,
@@ -259,8 +262,8 @@ export default function ScheduleBoard() {
   const [jobFilter, setJobFilter] = useState<string | null>(null)
   const [jumpOpen, setJumpOpen] = useState(false)
   const [metaVisible, setMetaVisible] = useState(false)
-  const [zoom, setZoom] = useState(1)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
+  const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
   const [lockedMonthDayW, setLockedMonthDayW] = useState<number | null>(null)
   const daysTableRef = useRef<HTMLTableElement>(null)
   const boardScrollRef = useRef<HTMLDivElement>(null)
@@ -279,16 +282,21 @@ export default function ScheduleBoard() {
   const monthDays = monthGridDays(anchor)
   const visibleDays = viewMode === 'weekly' ? weekDays : monthDays
   const compact = viewMode === 'monthly'
+  const jobColW = viewMode === 'weekly' ? JOB_W_WEEKLY : JOB_W
   const dayW =
     viewMode === 'weekly'
       ? isPhone
-        ? 96
+        ? 72
         : undefined
-      : isPhone
-        ? 42
-        : lockedMonthDayW ?? undefined
-  const weeklyColPct =
-    viewMode === 'weekly' && !isPhone ? `${100 / Math.max(visibleDays.length, 1)}%` : undefined
+      : metaVisible
+        ? isPhone
+          ? 42
+          : lockedMonthDayW ?? MONTH_DAY_META_W
+        : undefined
+  const equalDayColPct =
+    !isPhone && ((viewMode === 'weekly') || (viewMode === 'monthly' && !metaVisible))
+      ? `${100 / Math.max(visibleDays.length, 1)}%`
+      : undefined
 
   useEffect(() => {
     function handleResize() {
@@ -363,9 +371,14 @@ export default function ScheduleBoard() {
     // Resize only on the same job row.
     if (source.jobId !== target.jobId) return
 
+    // Keep assignment within Mon–Sat of its week.
+    const weekMon = toISO(getMonday(fromISO(source.startDate)))
+    const weekSat = toISO(addDays(fromISO(weekMon), 5))
+    const clampedTarget = target.date < weekMon ? weekMon : target.date > weekSat ? weekSat : target.date
+
     if (edge === 'start') {
       // Left handle: drop day becomes the new start (extend left or shrink from left).
-      const newStart = target.date > source.endDate ? source.endDate : target.date
+      const newStart = clampedTarget > source.endDate ? source.endDate : clampedTarget
       if (newStart === source.startDate) return
       setAssignments((list) =>
         list.map((a) => (a.id === source.id ? { ...a, startDate: newStart } : a)),
@@ -374,7 +387,7 @@ export default function ScheduleBoard() {
     }
 
     // Right handle: drop day becomes the new end (extend right or shrink from right).
-    const newEnd = target.date < source.startDate ? source.startDate : target.date
+    const newEnd = clampedTarget < source.startDate ? source.startDate : clampedTarget
     if (newEnd === source.endDate) return
     setAssignments((list) =>
       list.map((a) => (a.id === source.id ? { ...a, endDate: newEnd } : a)),
@@ -398,8 +411,8 @@ export default function ScheduleBoard() {
           extra={
             <ZoomControl
               zoom={zoom}
-              onZoomIn={() => setZoom((z) => Math.min(1.5, +(z + 0.05).toFixed(2)))}
-              onZoomOut={() => setZoom((z) => Math.max(0.75, +(z - 0.05).toFixed(2)))}
+              onZoomIn={() => setZoom((z) => stepSheetZoom(z, 1))}
+              onZoomOut={() => setZoom((z) => stepSheetZoom(z, -1))}
             />
           }
         />
@@ -498,15 +511,16 @@ export default function ScheduleBoard() {
               draggingAssignment ? ' is-dragging' : ''
             }`}
           >
-            <div
-              className="sb-board__frame"
-              style={{ zoom, width: `${100 / zoom}%` }}
-            >
+            <div className="sb-board__frame">
+              <div
+                className="sb-board__zoom"
+                style={{ zoom, width: '100%' }}
+              >
               <div className="sb-board__frozen">
                 <table className="sb-table sb-table--frozen">
                   <colgroup>
                     <col style={{ width: JOBNO_W }} />
-                    <col style={{ width: JOB_W }} />
+                    <col style={{ width: jobColW }} />
                     {metaVisible && META_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}
                     <col style={{ width: DIVIDER_W }} />
                   </colgroup>
@@ -609,8 +623,8 @@ export default function ScheduleBoard() {
                       <col
                         key={toISO(d)}
                         style={
-                          weeklyColPct
-                            ? { width: weeklyColPct }
+                          equalDayColPct
+                            ? { width: equalDayColPct }
                             : dayW
                               ? { width: dayW, minWidth: dayW }
                               : undefined
@@ -657,6 +671,10 @@ export default function ScheduleBoard() {
                             )
 
                             if (!assignment) {
+                              // One crew per job — only offer Add when the job has no assignment yet.
+                              if (rowAssignments.length > 0) {
+                                return <DayCell key={iso} jobId={row.id} iso={iso} compact={compact} />
+                              }
                               return (
                                 <DayCell key={iso} jobId={row.id} iso={iso} compact={compact}>
                                   {compact ? (
@@ -730,6 +748,7 @@ export default function ScheduleBoard() {
                   </tbody>
                 </table>
               </div>
+              </div>
             </div>
           </div>
 
@@ -766,19 +785,35 @@ export default function ScheduleBoard() {
           onAssign={(crewId, note) => {
             const crew = crews.find((c) => c.id === crewId)
             if (!crew) return
-            setAssignments((list) => [
-              ...list,
-              {
-                id: `sa-${Date.now()}`,
-                jobId: flow.jobId,
-                startDate: flow.date,
-                endDate: flow.date,
-                crewName: crew.name,
-                rate: crew.rate,
-                workers: 1,
-                note: note || undefined,
-              },
-            ])
+            const weekStart = getMonday(fromISO(flow.date))
+            const startDate = toISO(weekStart)
+            const endDate = toISO(addDays(weekStart, 5)) // Monday–Saturday
+            setAssignments((list) => {
+              const existingCrew = list.find((a) => a.jobId === flow.jobId)?.crewName
+              // One crew per job: replacing with a different crew clears other weeks.
+              const keep =
+                existingCrew && existingCrew !== crew.name
+                  ? list.filter((a) => a.jobId !== flow.jobId)
+                  : list.filter(
+                      (a) =>
+                        a.jobId !== flow.jobId ||
+                        a.endDate < startDate ||
+                        a.startDate > endDate,
+                    )
+              return [
+                ...keep,
+                {
+                  id: `sa-${Date.now()}`,
+                  jobId: flow.jobId,
+                  startDate,
+                  endDate,
+                  crewName: crew.name,
+                  rate: crew.rate,
+                  workers: 1,
+                  note: note || undefined,
+                },
+              ]
+            })
             setFlow({ type: 'none' })
           }}
         />

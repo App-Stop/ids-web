@@ -316,6 +316,11 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.ct-table-zoom {
+  box-sizing: border-box;
+  min-width: 100%;
+}
+
 .ct-table-wrap.is-panning {
   cursor: grabbing;
   user-select: none;

@@ -14,6 +14,7 @@ import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import ZoomControl from '../components/dashboard/ZoomControl'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
+import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import {
   assignableCrews,
   crewLeads,
@@ -243,13 +244,13 @@ export default function Crew() {
     <div className="dash">
       <Sidebar active="Crew Management" />
 
-      <main className="dash__main crew-main" style={{ zoom }}>
+      <main className="dash__main crew-main">
         <Topbar
           extra={
             <ZoomControl
               zoom={zoom}
-              onZoomIn={() => setZoom((z) => Math.min(1.5, +(z + 0.05).toFixed(2)))}
-              onZoomOut={() => setZoom((z) => Math.max(0.75, +(z - 0.05).toFixed(2)))}
+              onZoomIn={() => setZoom((z) => stepSheetZoom(z, 1))}
+              onZoomOut={() => setZoom((z) => stepSheetZoom(z, -1))}
             />
           }
         />
@@ -348,6 +349,7 @@ export default function Crew() {
         </div>
 
         <div className="crew-table-wrap" ref={tableWrapRef}>
+          <div className="crew-table-zoom" style={sheetZoomStyle(zoom)}>
           {tab === 'crew' ? (
             <table className="crew-table crew-table--leads">
               <colgroup>
@@ -534,6 +536,7 @@ export default function Crew() {
               </tbody>
             </table>
           )}
+          </div>
         </div>
       </main>
 
@@ -558,7 +561,6 @@ export default function Crew() {
           onSubmit={(data) => {
             const selectedLead = crewLeads.find((item) => item.id === data.crewLeadId)
             setCrewRows((list) => [
-              ...list,
               {
                 id: `c-${Date.now()}`,
                 crewId: String(Math.floor(1000 + Math.random() * 9000)),
@@ -580,7 +582,10 @@ export default function Crew() {
                 rate: selectedLead?.rate ?? 25,
                 status: data.status === 'active' ? 'Active' : data.status === 'inactive' ? 'Inactive' : 'Unassigned',
               },
+              ...list,
             ])
+            setSort(null)
+            setTab('crew')
             setFlow({ type: 'none' })
           }}
         />

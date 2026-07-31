@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   SquaresFour,
@@ -12,6 +11,7 @@ import {
   User,
 } from '@phosphor-icons/react'
 import logo from '../../assets/logo.png'
+import { useSidebarCollapsed } from '../../hooks/useSidebarCollapsed'
 
 const OPERATIONS = [
   { label: 'Dashboard', icon: SquaresFour, path: '/dashboard' },
@@ -40,7 +40,7 @@ export default function Sidebar({
   collapsed?: boolean
   onCollapsedChange?: (collapsed: boolean) => void
 }) {
-  const [internalCollapsed, setInternalCollapsed] = useState(false)
+  const [internalCollapsed, setInternalCollapsed] = useSidebarCollapsed()
   const collapsed = collapsedProp ?? internalCollapsed
   const setCollapsed = (next: boolean) => {
     if (collapsedProp === undefined) setInternalCollapsed(next)

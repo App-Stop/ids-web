@@ -10,6 +10,8 @@ import ZoomControl from '../components/dashboard/ZoomControl'
 import { Icon } from '../components/dashboard/icons'
 import { crewRows as initialCrewRows, crewMenuOptions } from '../lib/crewData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
+import { useSidebarCollapsed } from '../hooks/useSidebarCollapsed'
+import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import {
   assignableCrews,
   formatMoney,
@@ -431,8 +433,8 @@ export default function CostTracking() {
   const [startDate, setStartDate] = useState('2026-01-20')
   const [endDate, setEndDate] = useState('2026-01-21')
   const [metaVisible, setMetaVisible] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [zoom, setZoom] = useState(1)
+  const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
+  const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
   const [jobFlow, setJobFlow] = useState<JobFlow>({ type: 'none' })
@@ -592,7 +594,7 @@ export default function CostTracking() {
         onCollapsedChange={setSidebarCollapsed}
       />
 
-      <main className="dash__main ct-main" style={zoom !== 1 ? { zoom } : undefined}>
+      <main className="dash__main ct-main">
         <div className="ct-topbar">
           <label className="topbar__search ct-search">
             <MagnifyingGlass size={18} weight="regular" />
@@ -602,8 +604,8 @@ export default function CostTracking() {
           <div className="ct-topbar__actions">
             <ZoomControl
               zoom={zoom}
-              onZoomIn={() => setZoom((z) => Math.min(1.5, +(z + 0.05).toFixed(2)))}
-              onZoomOut={() => setZoom((z) => Math.max(0.75, +(z - 0.05).toFixed(2)))}
+              onZoomIn={() => setZoom((z) => stepSheetZoom(z, 1))}
+              onZoomOut={() => setZoom((z) => stepSheetZoom(z, -1))}
             />
             <button type="button" className="icon-btn icon-btn--bordered" aria-label="Notifications">
               <Icon.Bell />
@@ -733,6 +735,7 @@ export default function CostTracking() {
         </div>
 
         <div className="ct-table-wrap" ref={tableWrapRef}>
+          <div className="ct-table-zoom" style={sheetZoomStyle(zoom)}>
           {tab === 'jobs' ? (
             <table className={`ct-table ct-table--grid${metaVisible ? ' ct-table--meta' : ''}`}>
               <colgroup>
@@ -909,6 +912,7 @@ export default function CostTracking() {
               </tbody>
             </table>
           )}
+          </div>
         </div>
       </main>
 

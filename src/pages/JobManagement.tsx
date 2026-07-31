@@ -12,6 +12,7 @@ import { Icon } from '../components/dashboard/icons'
 import { assignableCrews, formatMoney, type Job, type UnassignedCrew } from '../lib/dashboardData'
 import { initialManagedJobs, STATUS_COLORS, STATUS_LABELS, type JobStatus, type ManagedJob } from '../lib/jobsManagementData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
+import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import './JobsManagement.css'
 
 type SortKey = 'newest' | 'oldest' | 'rateLowHigh' | 'rateHighLow' | 'workers' | 'ascending' | 'descending'
@@ -82,7 +83,7 @@ export default function JobsManagement() {
   const [statusFilter, setStatusFilter] = useState<JobStatus | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('newest')
   const [selected, setSelected] = useState<string[]>([])
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
@@ -99,9 +100,9 @@ export default function JobsManagement() {
   list = [...list].sort((a, b) => {
     switch (sortKey) {
       case 'newest':
-        return a.seq - b.seq
-      case 'oldest':
         return b.seq - a.seq
+      case 'oldest':
+        return a.seq - b.seq
       case 'rateLowHigh':
         return a.crewRate - b.crewRate
       case 'rateHighLow':
@@ -149,8 +150,9 @@ export default function JobsManagement() {
       crewRate: lead?.rate ?? 0,
       workers: 1,
     }
-    setJobs((prev) => [...prev, { ...newJob, seq }])
+    setJobs((prev) => [{ ...newJob, seq }, ...prev])
     setShowCreate(false)
+    setSortKey('newest')
   }
 
   function handleUpdate(data: JobFormData) {
@@ -169,13 +171,13 @@ export default function JobsManagement() {
     <div className="dash">
       <Sidebar active="Jobs Management" />
 
-      <main className="dash__main jm-main" style={zoom !== 1 ? { zoom } : undefined}>
+      <main className="dash__main jm-main">
         <Topbar
           extra={
             <ZoomControl
               zoom={zoom}
-              onZoomIn={() => setZoom((z) => Math.min(1.5, +(z + 0.05).toFixed(2)))}
-              onZoomOut={() => setZoom((z) => Math.max(0.75, +(z - 0.05).toFixed(2)))}
+              onZoomIn={() => setZoom((z) => stepSheetZoom(z, 1))}
+              onZoomOut={() => setZoom((z) => stepSheetZoom(z, -1))}
             />
           }
         />
@@ -228,6 +230,7 @@ export default function JobsManagement() {
         </div>
 
         <div className="jm-table-wrap" ref={tableWrapRef}>
+          <div className="jm-table-zoom" style={sheetZoomStyle(zoom)}>
           <table className="jm-table">
             <colgroup>
               <col className="jm-col-id-w" />
@@ -371,6 +374,7 @@ export default function JobsManagement() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       </main>
 
