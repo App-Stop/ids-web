@@ -32,7 +32,10 @@ type JobCostRow = {
   jobId: string
   jobName: string
   color: string
+  /** ISO start date of the job. */
   date: string
+  /** ISO end date of the job — a row shows whenever it overlaps the range. */
+  endDate: string
   contract: number
   laborBudgetTotal: number
   laborBudgetUsed: number
@@ -44,6 +47,7 @@ type JobCostRow = {
   dumpsterUnitCost: number
   totalCost: number
   weeklyCosts: Array<number | null>
+  dailyCosts?: Record<string, number | null>
 }
 
 type CrewCostRow = {
@@ -52,7 +56,10 @@ type CrewCostRow = {
   crewName: string
   avatar: string
   color: string
+  /** ISO date shown in the Date column. */
   date: string
+  /** ISO dates of every job the crew worked — used to match the range. */
+  jobDates: string[]
   hourlyRate: number
   totalHours: number
   cost: number
@@ -78,11 +85,41 @@ const RANGE_OPTIONS: { id: RangeMode; label: RangeMode }[] = [
   { id: 'All Time', label: 'All Time' },
 ]
 
+const MONTH_OPTIONS = [
+  { id: '1', label: 'January' },
+  { id: '2', label: 'February' },
+  { id: '3', label: 'March' },
+  { id: '4', label: 'April' },
+  { id: '5', label: 'May' },
+  { id: '6', label: 'June' },
+  { id: '7', label: 'July' },
+  { id: '8', label: 'August' },
+  { id: '9', label: 'September' },
+  { id: '10', label: 'October' },
+  { id: '11', label: 'November' },
+  { id: '12', label: 'December' },
+]
+
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+/** Parses `YYYY-MM-DD` (the format every date input and every row date uses). */
 function parseIsoDate(value: string) {
   const [year, month, day] = value.split('-').map(Number)
   return new Date(year, month - 1, day)
+}
+
+/** Job data stores dates day-first (`30-07-2026`). */
+function dmyToIso(value: string) {
+  const [day, month, year] = value.split('-')
+  if (!day || !month || !year) return value
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+}
+
+/** Crew data stores dates month-first (`07-14-2026`). */
+function mdyToIso(value: string) {
+  const [month, day, year] = value.split('-')
+  if (!month || !day || !year) return value
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
 }
 
 function addDays(date: Date, amount: number) {
@@ -113,9 +150,10 @@ function formatGridDate(date: Date) {
   return `${month}-${day}-${year}`
 }
 
+/** ISO row date -> `MM-DD-YYYY` for display in the crew table. */
 function formatCrewDate(value: string) {
-  const [month, day, year] = value.split('-')
-  if (!month || !day || !year) return value
+  const [year, month, day] = value.split('-')
+  if (!year || !month || !day) return value
   return `${month}-${day}-${year}`
 }
 
@@ -180,6 +218,55 @@ function makeCostJobs(): Job[] {
   return initialManagedJobs.map(managedToJob)
 }
 
+function toISO(date: Date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function getDeterministicDailyCost(laborCost: number, dateString: string, jobId: string) {
+  const d = parseIsoDate(dateString)
+  const dayOfWeek = d.getDay()
+  if (dayOfWeek === 0) return null // Sunday no work
+  const idNum = Number(jobId.replace(/\D/g, '')) || 1
+  if (dayOfWeek === 6 && (idNum % 2 === 0)) return null // Saturday off for some
+  const dayNum = d.getDate()
+  const factor = 0.03 + ((dayNum * 7 + idNum * 13) % 8) * 0.015
+  return Math.round(laborCost * factor)
+}
+
+/** Inclusive ISO bounds of the selected range; `null` = no date filtering. */
+function getRangeBounds(range: RangeMode, startDate: string, endDate: string): [string, string] | null {
+  if (range === 'All Time') return null
+
+  const start = parseIsoDate(startDate)
+  if (range === 'Weekly') {
+    const weekStart = getMonday(start)
+    return [toISO(weekStart), toISO(addDays(weekStart, 6))]
+  }
+  if (range === 'Monthly') {
+    const year = start.getFullYear()
+    const month = start.getMonth()
+    return [toISO(new Date(year, month, 1)), toISO(new Date(year, month + 1, 0))]
+  }
+
+  const end = parseIsoDate(endDate)
+  return start <= end ? [toISO(start), toISO(end)] : [toISO(end), toISO(start)]
+}
+
+const EARLIEST_JOB_ISO =
+  initialManagedJobs.map((job) => dmyToIso(job.startDate)).sort()[0] ?? toISO(new Date())
+
+/** Open on the month the earliest job starts in, so the grid never lands on an empty window. */
+const DEFAULT_RANGE = (() => {
+  const anchor = parseIsoDate(EARLIEST_JOB_ISO)
+  return {
+    start: toISO(new Date(anchor.getFullYear(), anchor.getMonth(), 1)),
+    end: toISO(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0)),
+  }
+})()
+
 function makeJobRows(): JobCostRow[] {
   return initialManagedJobs.map((job, index) => {
     const dumpstersCount = 1 + (index % 3)
@@ -187,12 +274,24 @@ function makeJobRows(): JobCostRow[] {
     const laborCost = job.laborBudgetUsed
     const balanceLeft = Math.max(0, job.laborBudgetTotal - job.laborBudgetUsed)
     const percentSpent = job.laborBudgetTotal > 0 ? job.laborBudgetUsed / job.laborBudgetTotal : 0
+    const startIso = dmyToIso(job.startDate)
+    const endIso = dmyToIso(job.endDate)
+
+    const dailyCosts: Record<string, number | null> = {}
+    const baseDate = parseIsoDate(startIso)
+    for (let i = 0; i < 90; i++) {
+      const currentDay = addDays(baseDate, i)
+      const dayStr = toISO(currentDay)
+      dailyCosts[dayStr] = getDeterministicDailyCost(laborCost, dayStr, job.id)
+    }
+
     return {
       id: job.id,
       jobId: job.id,
       jobName: job.name,
       color: job.color,
-      date: job.startDate,
+      date: startIso,
+      endDate: endIso,
       contract: job.contract,
       laborBudgetTotal: job.laborBudgetTotal,
       laborBudgetUsed: job.laborBudgetUsed,
@@ -204,6 +303,7 @@ function makeJobRows(): JobCostRow[] {
       dumpsterUnitCost,
       totalCost: laborCost + dumpstersCount * dumpsterUnitCost,
       weeklyCosts: makeWeeklyCosts(laborCost),
+      dailyCosts,
     }
   })
 }
@@ -214,13 +314,15 @@ function makeCrewRows(): CrewCostRow[] {
     const laborCost = totalHours * crew.rate
     const dumpstersCount = Math.max(1, (crew.laborNames.length % 3) + 1)
     const dumpsterUnitCost = 450 + index * 30
+    const jobDates = crew.jobs.map((job) => mdyToIso(job.date)).sort()
     return {
       id: crew.id,
       crewId: crew.crewId,
       crewName: crew.name,
       avatar: crew.avatar,
       color: crew.color,
-      date: crew.jobs[0]?.date ?? '01-01-2026',
+      date: jobDates[0] ?? toISO(new Date()),
+      jobDates,
       hourlyRate: crew.rate,
       totalHours,
       cost: laborCost,
@@ -258,6 +360,7 @@ function CostModal({
   jobRows,
   crews,
   record,
+  selectedDate,
   onCancel,
   onSubmit,
 }: {
@@ -267,6 +370,7 @@ function CostModal({
   jobRows: JobCostRow[]
   crews: typeof crewMenuOptions
   record?: JobCostRow | CrewCostRow
+  selectedDate?: string | null
   onCancel: () => void
   onSubmit: (form: CostRecordForm) => void
 }) {
@@ -277,11 +381,21 @@ function CostModal({
     const jobId = !isCrewScope ? initialJobId ?? jobs[0]?.id ?? null : jobs[0]?.id ?? null
     const existing = jobId ? jobRows.find((row) => row.jobId === jobId || row.id === jobId) : undefined
     const job = jobId ? jobs.find((item) => item.id === jobId) : undefined
+
+    let initialLaborCost = String(record?.laborCost ?? existing?.laborCost ?? job?.laborBudgetUsed ?? 0)
+    if (selectedDate && record && 'dailyCosts' in record) {
+      const dailyCosts = (record as JobCostRow).dailyCosts
+      const dayVal = dailyCosts && dailyCosts[selectedDate] !== undefined
+        ? dailyCosts[selectedDate]
+        : getDeterministicDailyCost((record as JobCostRow).laborCost, selectedDate, record.jobId)
+      initialLaborCost = String(dayVal ?? 0)
+    }
+
     return {
       jobId,
       crewId: isCrewScope ? initialCrewId ?? crews[0]?.id ?? null : crews[0]?.id ?? null,
-      date: record?.date ?? new Date().toISOString().slice(0, 10),
-      laborCost: String(record?.laborCost ?? existing?.laborCost ?? job?.laborBudgetUsed ?? 0),
+      date: selectedDate ?? record?.date ?? new Date().toISOString().slice(0, 10),
+      laborCost: initialLaborCost,
       dumpstersCount: String(record?.dumpstersCount ?? existing?.dumpstersCount ?? 1),
       dumpsterUnitCost: String(record?.dumpsterUnitCost ?? existing?.dumpsterUnitCost ?? 500),
     }
@@ -426,12 +540,25 @@ export default function CostTracking() {
   const [crewFilter, setCrewFilter] = useState<string | null>(null)
   const [modalMode, setModalMode] = useState<ModalMode>('none')
   const [activeRecord, setActiveRecord] = useState<JobCostRow | CrewCostRow | undefined>()
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [extraDays, setExtraDays] = useState(0)
   const [jobs] = useState<Job[]>(makeCostJobs)
   const [jobRows, setJobRows] = useState<JobCostRow[]>(makeJobRows)
   const [crewRows, setCrewRows] = useState<CrewCostRow[]>(makeCrewRows)
   const [crewOptions] = useState(crewMenuOptions)
-  const [startDate, setStartDate] = useState('2026-01-20')
-  const [endDate, setEndDate] = useState('2026-01-21')
+  const [startDate, setStartDate] = useState(DEFAULT_RANGE.start)
+  const [endDate, setEndDate] = useState(DEFAULT_RANGE.end)
+
+  const [prevRange, setPrevRange] = useState(range)
+  const [prevStart, setPrevStart] = useState(startDate)
+  const [prevEnd, setPrevEnd] = useState(endDate)
+
+  if (range !== prevRange || startDate !== prevStart || endDate !== prevEnd) {
+    setPrevRange(range)
+    setPrevStart(startDate)
+    setPrevEnd(endDate)
+    setExtraDays(0)
+  }
   const [metaVisible, setMetaVisible] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
   const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
@@ -466,25 +593,95 @@ export default function CostTracking() {
   )
 
   const filteredJobRows = useMemo(() => {
+    const bounds = getRangeBounds(range, startDate, endDate)
     return jobRows.filter((row) => {
       const matchesSearch = !search || row.jobName.toLowerCase().includes(search.toLowerCase()) || row.id.includes(search)
       const matchesFilter = !jobFilter || row.jobId === jobFilter
-      return matchesSearch && matchesFilter
+      // A job belongs in the grid whenever it runs during any day of the range.
+      const matchesDate = !bounds || (row.date <= bounds[1] && (row.endDate || row.date) >= bounds[0])
+
+      return matchesSearch && matchesFilter && matchesDate
     })
-  }, [jobRows, search, jobFilter])
+  }, [jobRows, search, jobFilter, range, startDate, endDate])
 
   const filteredCrewRows = useMemo(() => {
-    return crewRows.filter((row) => {
+    const bounds = getRangeBounds(range, startDate, endDate)
+    return crewRows.reduce<CrewCostRow[]>((rows, row) => {
       const matchesSearch = !search || row.crewName.toLowerCase().includes(search.toLowerCase()) || row.crewId.includes(search)
       const matchesFilter = !crewFilter || row.crewId === crewFilter
-      return matchesSearch && matchesFilter
-    })
-  }, [crewRows, search, crewFilter])
+      if (!matchesSearch || !matchesFilter) return rows
+
+      if (!bounds || row.jobDates.length === 0) {
+        rows.push(row)
+        return rows
+      }
+
+      // Show the crew against the first job it worked inside the range.
+      const dateInRange = row.jobDates.find((date) => date >= bounds[0] && date <= bounds[1])
+      if (dateInRange) rows.push({ ...row, date: dateInRange })
+      return rows
+    }, [])
+  }, [crewRows, search, crewFilter, range, startDate, endDate])
+
+  useEffect(() => {
+    const el = tableWrapRef.current
+    if (!el) return
+
+    function handleScroll() {
+      if (!el) return
+      if (el.scrollWidth - el.scrollLeft - el.clientWidth < 100) {
+        if (range === 'All Time') {
+          setExtraDays((prev) => prev + 7)
+        }
+      }
+    }
+
+    el.addEventListener('scroll', handleScroll)
+    return () => {
+      if (el) {
+        el.removeEventListener('scroll', handleScroll)
+      }
+    }
+  }, [range])
 
   const weekDays = useMemo(() => {
-    const weekStart = getMonday(parseIsoDate(startDate))
-    return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index))
-  }, [startDate])
+    const start = parseIsoDate(startDate)
+    let baseDays: Date[]
+
+    if (range === 'Weekly') {
+      const weekStart = getMonday(start)
+      baseDays = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index))
+    } else if (range === 'Monthly') {
+      const year = start.getFullYear()
+      const month = start.getMonth()
+      const numDays = new Date(year, month + 1, 0).getDate()
+      baseDays = Array.from({ length: numDays }, (_, index) => new Date(year, month, index + 1))
+    } else if (range === 'All Time') {
+      const startAll = parseIsoDate(EARLIEST_JOB_ISO)
+      baseDays = Array.from({ length: 60 }, (_, index) => addDays(startAll, index))
+    } else {
+      const end = parseIsoDate(endDate)
+      const diffTime = end.getTime() - start.getTime()
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+      const count = Math.min(Math.max(1, diffDays), 90)
+      baseDays = Array.from({ length: count }, (_, index) => addDays(start, index))
+    }
+
+    if (extraDays > 0) {
+      const lastDay = baseDays[baseDays.length - 1]
+      const extra = Array.from({ length: extraDays }, (_, index) => addDays(lastDay, index + 1))
+      return [...baseDays, ...extra]
+    }
+
+    return baseDays
+  }, [range, startDate, endDate, extraDays])
+
+  const dayColWidth = useMemo(() => {
+    if (range === 'Monthly' || range === 'All Time' || (range === 'Custom Range' && weekDays.length > 7)) {
+      return isPhone ? 64 : 96
+    }
+    return isPhone ? 92 : 140
+  }, [range, isPhone, weekDays.length])
 
   useEffect(() => {
     function handleResize() {
@@ -503,19 +700,38 @@ export default function CostTracking() {
     })
   }
 
+  const isTableEmpty = (tab === 'jobs' ? filteredJobRows : filteredCrewRows).length === 0
+  const hasActiveFilters = Boolean(search.trim()) || Boolean(tab === 'jobs' ? jobFilter : crewFilter)
+  const rangeBounds = getRangeBounds(range, startDate, endDate)
+  const rangeLabel = rangeBounds
+    ? `${formatToolbarDate(parseIsoDate(rangeBounds[0]))} and ${formatToolbarDate(parseIsoDate(rangeBounds[1]))}`
+    : null
+
+  function clearFilters() {
+    setSearch('')
+    if (tab === 'jobs') {
+      setJobFilter(null)
+    } else {
+      setCrewFilter(null)
+    }
+  }
+
   function openAddModal() {
     setActiveRecord(undefined)
+    setSelectedDate(null)
     setModalMode('add')
   }
 
-  function openEditModal(record: JobCostRow | CrewCostRow) {
+  function openEditModal(record: JobCostRow | CrewCostRow, date?: string) {
     setActiveRecord(record)
+    setSelectedDate(date ?? null)
     setModalMode('edit')
   }
 
   function closeModal() {
     setModalMode('none')
     setActiveRecord(undefined)
+    setSelectedDate(null)
   }
 
   function handleSubmit(form: CostRecordForm) {
@@ -526,6 +742,16 @@ export default function CostTracking() {
       const dumpsterUnitCost = Number(form.dumpsterUnitCost) || 0
       const baseRow = activeRecord && 'jobId' in activeRecord ? activeRecord : undefined
       const budgetTotal = baseRow?.laborBudgetTotal ?? job?.laborBudgetTotal ?? laborCost
+
+      const updatedDailyCosts = { ...(baseRow?.dailyCosts ?? {}) }
+      if (selectedDate) {
+        updatedDailyCosts[selectedDate] = laborCost
+      } else {
+        updatedDailyCosts[form.date] = laborCost
+      }
+
+      const totalLaborCost = Object.values(updatedDailyCosts).reduce((sum: number, val) => sum + (val ?? 0), 0)
+
       const nextRow: JobCostRow = {
         id: baseRow
           ? baseRow.id
@@ -535,18 +761,20 @@ export default function CostTracking() {
         jobId: job?.id ?? form.jobId ?? jobs[0]?.id ?? '',
         jobName: job?.name ?? 'New Job',
         color: job?.color ?? '#94a3b8',
-        date: form.date,
+        date: baseRow?.date ?? form.date,
+        endDate: baseRow?.endDate ?? form.date,
         contract: baseRow?.contract ?? job?.contractAmount ?? 0,
         laborBudgetTotal: budgetTotal,
-        laborBudgetUsed: laborCost,
-        balanceLeft: Math.max(0, budgetTotal - laborCost),
-        percentSpent: budgetTotal > 0 ? laborCost / budgetTotal : 0,
-        cumulativeLaborCosts: laborCost,
-        laborCost,
+        laborBudgetUsed: totalLaborCost,
+        balanceLeft: Math.max(0, budgetTotal - totalLaborCost),
+        percentSpent: budgetTotal > 0 ? totalLaborCost / budgetTotal : 0,
+        cumulativeLaborCosts: totalLaborCost,
+        laborCost: totalLaborCost,
         dumpstersCount,
         dumpsterUnitCost,
-        totalCost: laborCost + dumpstersCount * dumpsterUnitCost,
-        weeklyCosts: baseRow ? baseRow.weeklyCosts : makeWeeklyCosts(laborCost),
+        totalCost: totalLaborCost + dumpstersCount * dumpsterUnitCost,
+        weeklyCosts: baseRow ? baseRow.weeklyCosts : makeWeeklyCosts(totalLaborCost),
+        dailyCosts: updatedDailyCosts,
       }
       setJobRows((list) => {
         if (modalMode === 'edit' && activeRecord && 'jobId' in activeRecord) {
@@ -561,13 +789,16 @@ export default function CostTracking() {
       const dumpsterUnitCost = Number(form.dumpsterUnitCost) || 0
       const totalHours = crew?.workers ?? 1
       const hourlyRate = crew?.rate ?? 0
+      const baseCrewRow = activeRecord && 'crewId' in activeRecord ? activeRecord : undefined
+      const jobDates = Array.from(new Set([...(baseCrewRow?.jobDates ?? []), form.date])).sort()
       const nextRow: CrewCostRow = {
-        id: activeRecord && 'crewId' in activeRecord ? activeRecord.id : `crew-cost-${Date.now()}`,
+        id: baseCrewRow ? baseCrewRow.id : `crew-cost-${Date.now()}`,
         crewId: crew?.crewId ?? form.crewId ?? '',
         crewName: crew?.name ?? 'New Crew',
         avatar: crew?.avatar ?? '',
         color: crew?.color ?? '#94a3b8',
         date: form.date,
+        jobDates,
         hourlyRate,
         totalHours,
         cost: laborCost,
@@ -643,11 +874,33 @@ export default function CostTracking() {
             />
           </div>
 
-          {tab === 'jobs' && (
+          {range !== 'All Time' && (
             <>
-              <DateField value={startDate} onChange={setStartDate} className="ct-range-date" />
-              <span className="ct-range-sep">TO</span>
-              <DateField value={endDate} onChange={setEndDate} className="ct-range-date" />
+              <span className="ct-range-label" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted)', alignSelf: 'center', marginLeft: '0.5rem' }}>
+                {range === 'Weekly' ? 'Week of:' : range === 'Monthly' ? 'Month:' : 'From:'}
+              </span>
+              {range === 'Monthly' ? (
+                <div className="ct-dd ct-dd--month" style={{ width: '140px', marginLeft: '0.5rem', display: 'inline-block' }}>
+                  <Dropdown
+                    value={String(parseIsoDate(startDate).getMonth() + 1)}
+                    options={MONTH_OPTIONS}
+                    selectedLabel={MONTH_OPTIONS.find(m => m.id === String(parseIsoDate(startDate).getMonth() + 1))?.label ?? 'January'}
+                    onChange={(mId) => {
+                      const newMonth = String(mId).padStart(2, '0')
+                      setStartDate(`2026-${newMonth}-01`)
+                    }}
+                    placeholder="Select Month"
+                  />
+                </div>
+              ) : (
+                <DateField value={startDate} onChange={setStartDate} className="ct-range-date" />
+              )}
+              {range === 'Custom Range' && (
+                <>
+                  <span className="ct-range-sep">TO</span>
+                  <DateField value={endDate} onChange={setEndDate} className="ct-range-date" />
+                </>
+              )}
             </>
           )}
 
@@ -734,22 +987,59 @@ export default function CostTracking() {
           </div>
         </div>
 
-        <div className="ct-table-wrap" ref={tableWrapRef}>
+        <div className={`ct-table-wrap${isTableEmpty ? ' ct-table-wrap--empty' : ''}`} ref={tableWrapRef}>
           <div className="ct-table-zoom" style={sheetZoomStyle(zoom)}>
-          {tab === 'jobs' ? (
+          {isTableEmpty ? (
+            <div className="ct-empty">
+              <span className="ct-empty__icon" aria-hidden>
+                {hasActiveFilters ? (
+                  <MagnifyingGlass size={26} weight="regular" />
+                ) : (
+                  <CalendarBlank size={26} weight="regular" />
+                )}
+              </span>
+              <h3 className="ct-empty__title">
+                No {tab === 'jobs' ? 'jobs' : 'crews'} to show
+              </h3>
+              <p className="ct-empty__text">
+                {hasActiveFilters
+                  ? 'Nothing matches your current search and filters. Clear them to see every entry in this date range.'
+                  : rangeLabel
+                    ? `There are no cost entries between ${rangeLabel}. Pick a different date range to see more.`
+                    : 'There are no cost entries yet. Add one to start tracking costs.'}
+              </p>
+              <div className="ct-empty__actions">
+                {hasActiveFilters ? (
+                  <button type="button" className="btn btn--outline" onClick={clearFilters}>
+                    Clear filters
+                  </button>
+                ) : (
+                  range !== 'All Time' && (
+                    <button type="button" className="btn btn--outline" onClick={() => setRange('All Time')}>
+                      View all time
+                    </button>
+                  )
+                )}
+                <button type="button" className="btn btn--primary" onClick={openAddModal}>
+                  <Plus size={16} weight="bold" />
+                  Add Entry
+                </button>
+              </div>
+            </div>
+          ) : tab === 'jobs' ? (
             <table className={`ct-table ct-table--grid${metaVisible ? ' ct-table--meta' : ''}`}>
               <colgroup>
                 <col className="ct-col-id-w" />
                 <col className="ct-col-job-w" />
-                {metaVisible && <col style={{ width: isPhone ? '92px' : '120px' }} />}
-                {metaVisible && <col style={{ width: isPhone ? '104px' : '140px' }} />}
-                {metaVisible && <col style={{ width: isPhone ? '96px' : '130px' }} />}
-                {metaVisible && <col style={{ width: isPhone ? '104px' : '120px' }} />}
-                {metaVisible && <col style={{ width: isPhone ? '104px' : '130px' }} />}
-                {metaVisible && <col style={{ width: isPhone ? '72px' : '90px' }} />}
-                <col className="ct-grid-divider-col" style={{ width: isPhone ? '8px' : '10px' }} />
+                {metaVisible && <col style={{ width: (isPhone ? 92 : 120) * zoom }} />}
+                {metaVisible && <col style={{ width: (isPhone ? 104 : 140) * zoom }} />}
+                {metaVisible && <col style={{ width: (isPhone ? 96 : 130) * zoom }} />}
+                {metaVisible && <col style={{ width: (isPhone ? 104 : 120) * zoom }} />}
+                {metaVisible && <col style={{ width: (isPhone ? 104 : 130) * zoom }} />}
+                {metaVisible && <col style={{ width: (isPhone ? 72 : 90) * zoom }} />}
+                <col className="ct-grid-divider-col" style={{ width: (isPhone ? 8 : 10) * zoom }} />
                 {weekDays.map((day) => (
-                  <col key={day.toISOString()} style={{ width: isPhone ? '92px' : '140px' }} />
+                  <col key={day.toISOString()} style={{ width: dayColWidth * zoom }} />
                 ))}
               </colgroup>
               <thead>
@@ -837,12 +1127,15 @@ export default function CostTracking() {
                         </button>
                       </div>
                     </td>
-                    {weekDays.map((day, index) => {
-                      const value = row.weeklyCosts[index]
+                    {weekDays.map((day) => {
+                      const dayStr = toISO(day)
+                      const value = row.dailyCosts && row.dailyCosts[dayStr] !== undefined
+                        ? row.dailyCosts[dayStr]
+                        : getDeterministicDailyCost(row.laborCost, dayStr, row.jobId)
                       return (
                         <td key={day.toISOString()} className="ct-grid-cell">
                           {value != null ? (
-                            <button type="button" className="ct-grid-cell__value" onClick={() => openEditModal(row)}>
+                            <button type="button" className="ct-grid-cell__value" onClick={() => openEditModal(row, dayStr)}>
                               {formatMoney(value)}
                             </button>
                           ) : null}
@@ -937,6 +1230,7 @@ export default function CostTracking() {
           jobRows={jobRows}
           crews={crewOptions}
           record={activeRecord}
+          selectedDate={selectedDate}
           onCancel={closeModal}
           onSubmit={handleSubmit}
         />

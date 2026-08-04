@@ -91,7 +91,7 @@ export default function Dashboard() {
                     <CaretRight size={14} weight="bold" className="unassigned-item__chevron" />
                     <button
                       type="button"
-                      className="btn btn--outline btn--sm"
+                      className="btn btn--primary btn--sm"
                       onClick={() => {
                         const job = jobs.find((j) => j.name === name) ?? jobs[0]
                         if (!job) return

@@ -47,7 +47,7 @@ import {
   type ScheduleAssignment,
 } from '../lib/scheduleData'
 import { useSidebarCollapsed } from '../hooks/useSidebarCollapsed'
-import { SHEET_ZOOM_DEFAULT, stepSheetZoom } from '../lib/sheetZoom'
+import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import './ScheduleBoard.css'
 
 type ViewMode = 'weekly' | 'monthly'
@@ -514,15 +514,15 @@ export default function ScheduleBoard() {
             <div className="sb-board__frame">
               <div
                 className="sb-board__zoom"
-                style={{ zoom, width: '100%' }}
+                style={sheetZoomStyle(zoom)}
               >
               <div className="sb-board__frozen">
                 <table className="sb-table sb-table--frozen">
                   <colgroup>
-                    <col style={{ width: JOBNO_W }} />
-                    <col style={{ width: jobColW }} />
-                    {metaVisible && META_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}
-                    <col style={{ width: DIVIDER_W }} />
+                    <col style={{ width: JOBNO_W * zoom }} />
+                    <col style={{ width: jobColW * zoom }} />
+                    {metaVisible && META_WIDTHS.map((w, i) => <col key={i} style={{ width: w * zoom }} />)}
+                    <col style={{ width: DIVIDER_W * zoom }} />
                   </colgroup>
                   <thead>
                     <tr>
@@ -613,7 +613,7 @@ export default function ScheduleBoard() {
                     compact
                       ? ({
                           ['--sb-day-count' as string]: visibleDays.length,
-                          ...(dayW ? { ['--sb-day-w' as string]: `${dayW}px` } : {}),
+                          ...(dayW ? { ['--sb-day-w' as string]: `${dayW * zoom}px` } : {}),
                         } as CSSProperties)
                       : undefined
                   }
@@ -626,7 +626,7 @@ export default function ScheduleBoard() {
                           equalDayColPct
                             ? { width: equalDayColPct }
                             : dayW
-                              ? { width: dayW, minWidth: dayW }
+                              ? { width: dayW * zoom, minWidth: dayW * zoom }
                               : undefined
                         }
                       />
