@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import Sidebar from '../components/dashboard/Sidebar'
-import Topbar from '../components/dashboard/Topbar'
 import StatCard from '../components/dashboard/StatCard'
 import ActivityList from '../components/dashboard/ActivityList'
 import UnassignedCrewList from '../components/dashboard/UnassignedCrewList'
@@ -48,7 +47,6 @@ export default function Dashboard() {
       <Sidebar active="Dashboard" />
 
       <main className="dash__main">
-        <Topbar />
 
         <h1 className="dash__title">Dashboard</h1>
         <p className="dash__subtitle">Overview of your operations</p>

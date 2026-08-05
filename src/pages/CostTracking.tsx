@@ -827,21 +827,12 @@ export default function CostTracking() {
 
       <main className="dash__main ct-main">
         <div className="ct-topbar">
-          <label className="topbar__search ct-search">
-            <MagnifyingGlass size={18} weight="regular" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search anything..." />
-          </label>
-
           <div className="ct-topbar__actions">
             <ZoomControl
               zoom={zoom}
               onZoomIn={() => setZoom((z) => stepSheetZoom(z, 1))}
               onZoomOut={() => setZoom((z) => stepSheetZoom(z, -1))}
             />
-            <button type="button" className="icon-btn icon-btn--bordered" aria-label="Notifications">
-              <Icon.Bell />
-              <i className="dot-badge" />
-            </button>
           </div>
         </div>
 

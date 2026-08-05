@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { ArrowDown, PenIcon } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
-import Topbar from '../components/dashboard/Topbar'
 import { Icon } from '../components/dashboard/icons'
 import MenuDropdown from '../components/dashboard/MenuDropdown'
 import AddNewModal from '../components/dashboard/AddNewModal'
@@ -242,8 +241,6 @@ export default function Crew() {
       <Sidebar active="Crew Management" />
 
       <main className="dash__main crew-main">
-        <Topbar />
-
         <div className="crew-header-row">
           <div>
             <h1 className="dash__title">Crew</h1>
