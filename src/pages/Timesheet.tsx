@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { MagnifyingGlass, Bell } from '@phosphor-icons/react'
+import { MagnifyingGlass, Bell, Pen, PenIcon } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Modal from '../components/dashboard/Modal'
 import Dropdown from '../components/dashboard/Dropdown'
@@ -489,8 +489,9 @@ export default function Timesheet() {
                   <td>{row.clockOut}</td>
                   <td>{row.hoursWorked}</td>
                   <td>
-                    <button type="button" className="ts-action-btn" onClick={() => openEditModal(row)} aria-label={`Edit attendance for ${row.name}`}>
-                      <Icon.Edit width={15} height={15} />
+                    <button type="button" className="btn--primary btn" onClick={() => openEditModal(row)} aria-label={`Edit attendance for ${row.name}`}>
+                      <PenIcon size={20}/>
+                      <p>Edit</p>
                     </button>
                   </td>
                 </tr>

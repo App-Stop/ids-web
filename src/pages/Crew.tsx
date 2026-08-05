@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { ArrowDown } from '@phosphor-icons/react'
+import { ArrowDown, PenIcon } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Topbar from '../components/dashboard/Topbar'
 import { Icon } from '../components/dashboard/icons'
@@ -446,8 +446,9 @@ export default function Crew() {
                       <StatusPill status={row.status} />
                     </td>
                     <td>
-                      <button type="button" className="crew-edit-btn" onClick={() => setFlow({ type: 'editCrew', crew: row })}>
-                        <Icon.Edit width={15} height={15} />
+                      <button type="button" className="btn btn--primary" onClick={() => setFlow({ type: 'editCrew', crew: row })}>
+                        <PenIcon size={20}/>
+                      <p>Edit</p>
                         {row.status === 'Unassigned' && <span className="crew-edit-btn__dot" />}
                       </button>
                     </td>
@@ -525,8 +526,9 @@ export default function Crew() {
                       <StatusPill status={row.status} />
                     </td>
                     <td className="crew-center">
-                      <button type="button" className="crew-edit-btn" onClick={() => setFlow({ type: 'editMember', member: row })}>
-                        <Icon.Edit width={15} height={15} />
+                      <button type="button" className="btn btn--primary" onClick={() => setFlow({ type: 'editMember', member: row })}>
+                        <PenIcon size={20}/>
+                      <p>Edit</p>
                       </button>
                     </td>
                   </tr>
