@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react'
 
 export const SHEET_ZOOM_MIN = 0.85
 export const SHEET_ZOOM_MAX = 1
-export const SHEET_ZOOM_DEFAULT = 0.85
+export const SHEET_ZOOM_DEFAULT = 1
 export const SHEET_ZOOM_STEP = 0.05
 
 export function clampSheetZoom(zoom: number) {
@@ -13,10 +13,9 @@ export function stepSheetZoom(zoom: number, direction: 1 | -1) {
   return clampSheetZoom(zoom + direction * SHEET_ZOOM_STEP)
 }
 
-/** Zoom the sheet content; keep scroll on an un-zoomed parent. */
+/** Zoom the sheet content using standard CSS variable scaling. */
 export function sheetZoomStyle(zoom: number): CSSProperties {
   return {
-    zoom,
-    width: `${100 / zoom}%`,
-  }
+    '--table-zoom': zoom,
+  } as CSSProperties
 }

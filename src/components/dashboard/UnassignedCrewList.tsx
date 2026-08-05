@@ -22,7 +22,8 @@ export default function UnassignedCrewList({
             <li key={crew.id} className="unassigned-item">
               <Avatar name={crew.leadName} src={crew.avatar} />
               <span className="unassigned-item__name">{crew.name}</span>
-              <button type="button" className="btn btn--outline btn--sm" onClick={() => onAssignJob(crew)}>
+              <button type="button" className="btn btn--primary
+               btn--sm" onClick={() => onAssignJob(crew)}>
                 Assign Job
               </button>
             </li>

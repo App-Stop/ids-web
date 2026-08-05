@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import Sidebar from '../components/dashboard/Sidebar'
-import Topbar from '../components/dashboard/Topbar'
 import StatCard from '../components/dashboard/StatCard'
 import ActivityList from '../components/dashboard/ActivityList'
 import UnassignedCrewList from '../components/dashboard/UnassignedCrewList'
@@ -48,7 +47,6 @@ export default function Dashboard() {
       <Sidebar active="Dashboard" />
 
       <main className="dash__main">
-        <Topbar />
 
         <h1 className="dash__title">Dashboard</h1>
         <p className="dash__subtitle">Overview of your operations</p>
@@ -91,7 +89,7 @@ export default function Dashboard() {
                     <CaretRight size={14} weight="bold" className="unassigned-item__chevron" />
                     <button
                       type="button"
-                      className="btn btn--outline btn--sm"
+                      className="btn btn--primary btn--sm"
                       onClick={() => {
                         const job = jobs.find((j) => j.name === name) ?? jobs[0]
                         if (!job) return

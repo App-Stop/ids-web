@@ -13,7 +13,7 @@ export default function ZoomControl({
 
   return (
     <div className="zoom-control" role="group" aria-label="Zoom">
-      {pct !== 100 && <span className="zoom-control__pct">{pct}%</span>}
+      {<span className="zoom-control__pct">{pct}%</span>}
       <div className="zoom-control__group">
         <button type="button" className="zoom-control__btn" onClick={onZoomIn} aria-label="Zoom in">
           <MagnifyingGlassPlus size={18} weight="regular" />

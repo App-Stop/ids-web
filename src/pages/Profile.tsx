@@ -4,7 +4,6 @@ import { CaretDown, Plus, SignOut, Trash, User } from '@phosphor-icons/react'
 import Avatar from '../components/dashboard/Avatar'
 import Modal from '../components/dashboard/Modal'
 import Sidebar from '../components/dashboard/Sidebar'
-import Topbar from '../components/dashboard/Topbar'
 import { Icon } from '../components/dashboard/icons'
 import './Dashboard.css'
 import './Profile.css'
@@ -224,8 +223,6 @@ export default function Profile() {
       <Sidebar active="Profile" />
 
       <main className="dash__main profile-page__main">
-        <Topbar />
-
         <div className="profile-page__header">
           <div>
             <h1 className="dash__title profile-page__title">Profile</h1>
