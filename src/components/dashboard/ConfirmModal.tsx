@@ -1,5 +1,4 @@
 import Modal from './Modal'
-import { Icon } from './icons'
 import warning from '../../assets/Warning.png'
 
 export default function ConfirmModal({

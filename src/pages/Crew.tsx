@@ -121,7 +121,8 @@ export default function Crew() {
   const [status, setStatus] = useState<string | null>(null)
   const [sort, setSort] = useState<SortKey | null>(null)
   const [jobFilter, setJobFilter] = useState<string | null>(null) // Crew tab
-  const [crewFilter, setCrewFilter] = useState<string | null>(null) // Roster tab
+  // Roster tab — no crew filter control is rendered yet, so this stays null.
+  const [crewFilter] = useState<string | null>(null)
   const [jobHover, setJobHover] = useState<{ x: number; y: number; names: string[] } | null>(null)
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
   const [jobNotes, setJobNotes] = useState<Record<string, string>>({
