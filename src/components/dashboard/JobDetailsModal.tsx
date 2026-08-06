@@ -12,6 +12,7 @@ export default function JobDetailsModal({
   onDone,
   onChangeCrew,
   onRemoveCrew,
+  onSaveNote,
 }: {
   job: Job
   crew: UnassignedCrew | null
@@ -19,8 +20,12 @@ export default function JobDetailsModal({
   onDone: () => void
   onChangeCrew: () => void
   onRemoveCrew: () => void
+  /** When provided, the note section becomes editable inside the modal. */
+  onSaveNote?: (text: string) => void
 }) {
   const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const [editingNote, setEditingNote] = useState(false)
+  const [noteDraft, setNoteDraft] = useState(note)
 
   if (confirmingRemove) {
     return (
@@ -92,10 +97,54 @@ export default function JobDetailsModal({
         <p className="crew-row__empty">No crew assigned</p>
       )}
 
-      {note && (
+      {(note || onSaveNote) && (
         <>
-          <span className="field-label">Note</span>
-          <div className="note-box">{note}</div>
+          <div className="note-section__head">
+            <span className="detail-label" style={{marginTop:20}}>Note</span>
+            {onSaveNote && !editingNote && (
+              <button
+                type="button"
+                className="note-section__action"
+                onClick={() => {
+                  setNoteDraft(note)
+                  setEditingNote(true)
+                }}
+              >
+                {note ? 'Edit' : 'Add Note'}
+              </button>
+            )}
+          </div>
+
+          {editingNote ? (
+            <>
+              <textarea
+                className="field-textarea"
+                placeholder="Note about the job..."
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+                autoFocus
+              />
+              <div className="modal-actions note-section__actions">
+                <button type="button" className="btn btn--outline" onClick={() => setEditingNote(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => {
+                    onSaveNote?.(noteDraft.trim())
+                    setEditingNote(false)
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </>
+          ) : note ? (
+            <div className="note-box">{note}</div>
+          ) : (
+            <p className="crew-row__empty">No note added</p>
+          )}
         </>
       )}
 

@@ -123,6 +123,16 @@
   min-width: 250px;
 }
 
+/* Trigger is narrower than the option labels — let the menu size to its content
+   so "In Progress" and its checkmark both fit inside the option. */
+.jm-dd--status .dd__menu {
+  left: auto;
+  right: 0;
+  width: max-content;
+  min-width: 100%;
+  max-width: 220px;
+}
+
 .jm-create-btn {
   height: var(--jm-ctrl-h);
   box-sizing: border-box;

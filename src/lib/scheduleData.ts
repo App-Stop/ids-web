@@ -28,16 +28,16 @@ export interface ScheduleNote {
 }
 
 export const scheduleJobs: ScheduleJob[] = [
-  { id: 's4827', jobNo: '4827', name: 'Johnson State Prison Kitchen', color: '#ea3da9', idsSuper: 'John D.', gcSuper: 'Hank Williams', gc: 'Turner Const.', contract: 50000 },
+  { id: 's4827', jobNo: '4827', name: 'Johnson State Prison Kitchen', color: '#FF1FAD', idsSuper: 'John D.', gcSuper: 'Hank Williams', gc: 'Turner Const.', contract: 50000 },
   { id: 's5914', jobNo: '5914', name: 'Smith County Courthouse Renovation', color: '#56bd6d', idsSuper: 'Alice S.', gcSuper: 'David Richards', gc: 'Skanska', contract: 90000 },
-  { id: 's4706', jobNo: '4706', name: 'Riverside Community Center Demo', color: '#E2B900', idsSuper: 'Michael T.', gcSuper: 'John Smith', gc: 'Laura H.', contract: 80000 },
-  { id: 's3460', jobNo: '3460', name: 'Cedar Valley Library Expansion', color: '#df3021', idsSuper: 'David L.', gcSuper: 'Michael Johnson', gc: 'Sarah D.', contract: 70000 },
-  { id: 's2049', jobNo: '2049', name: 'Smith County Courthouse Renovation', color: '#e8752e', idsSuper: 'Sophia K.', gcSuper: 'Sarah Wilson', gc: 'Kevin M.', contract: 60000 },
+  { id: 's4706', jobNo: '4706', name: 'Riverside Community Center Demo', color: '#D6C700', idsSuper: 'Michael T.', gcSuper: 'John Smith', gc: 'Laura H.', contract: 80000 },
+  { id: 's3460', jobNo: '3460', name: 'Cedar Valley Library Expansion', color: '#F6162D', idsSuper: 'David L.', gcSuper: 'Michael Johnson', gc: 'Sarah D.', contract: 70000 },
+  { id: 's2049', jobNo: '2049', name: 'Smith County Courthouse Renovation', color: '#F96C00', idsSuper: 'Sophia K.', gcSuper: 'Sarah Wilson', gc: 'Kevin M.', contract: 60000 },
   { id: 's8602', jobNo: '8602', name: 'Johnson State Prison Kitchen', color: '#4193f7', idsSuper: 'Olivia B.', gcSuper: 'Linda Martinez', gc: 'James L.', contract: 65000 },
   { id: 's7214', jobNo: '7214', name: 'Cedar Valley Library Expansion', color: '#8640f6', idsSuper: 'Isabella N.', gcSuper: 'Patricia Taylor', gc: 'Daniel W.', contract: 95000 },
-  { id: 's3391', jobNo: '3391', name: 'Harbor Point Parking Garage Repair', color: '#14b8a6', idsSuper: 'Ethan R.', gcSuper: 'Jude R.', gc: 'Harbor Works', contract: 54000 },
-  { id: 's5108', jobNo: '5108', name: 'Westbrook Fire Station Remodel', color: '#0ea5e9', idsSuper: 'Maya K.', gcSuper: 'Leo S.', gc: 'Reyes Builders', contract: 95000 },
-  { id: 's6620', jobNo: '6620', name: 'Copper Hill Waste Transfer Station', color: '#a855f7', idsSuper: 'Noah W.', gcSuper: 'Iris T.', gc: 'Sterling Group', contract: 141000 },
+  { id: 's3391', jobNo: '3391', name: 'Harbor Point Parking Garage Repair', color: '#00C064', idsSuper: 'Ethan R.', gcSuper: 'Jude R.', gc: 'Harbor Works', contract: 54000 },
+  { id: 's5108', jobNo: '5108', name: 'Westbrook Fire Station Remodel', color: '#00B8C9', idsSuper: 'Maya K.', gcSuper: 'Leo S.', gc: 'Reyes Builders', contract: 95000 },
+  { id: 's6620', jobNo: '6620', name: 'Copper Hill Waste Transfer Station', color: '#803BFF', idsSuper: 'Noah W.', gcSuper: 'Iris T.', gc: 'Sterling Group', contract: 141000 },
 ]
 
 /** Jobs shown in Schedule / Cost pickers — full sheet roster. */

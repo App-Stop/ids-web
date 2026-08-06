@@ -1,5 +1,9 @@
+/* `clip` (not `hidden`) so this stays a non-scrolling box: `overflow-x: hidden`
+   forces overflow-y to `auto`, which clipped the open filter dropdowns whenever
+   the filtered table was short. */
 .crew-main {
-  overflow-x: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
   min-width: 0;
 }
 
@@ -155,11 +159,17 @@
   min-width: 92px;
 }
 
+/* Tall enough for the whole job list; falls back to scrolling on short viewports. */
+.crew-dd--jobs .md-panel {
+  max-height: min(380px, 60vh);
+}
+
+/* No margin-left:auto here — .crew-count already claims the free space, so the
+   tabs, filters and this button stay flush right as one group. */
 .crew-add-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  margin-left: auto;
   height: 36px;
   padding: 0 1rem;
   border-radius: 12px;

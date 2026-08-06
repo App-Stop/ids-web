@@ -49,6 +49,7 @@
   gap: 0.5rem;
   min-height: 36px;
   padding: 0 0.25rem;
+  margin-top: 5px;
 }
 
 .sidebar__brand img {
@@ -131,6 +132,18 @@
   color: var(--ink);
   cursor: pointer;
   flex-shrink: 0;
+}
+
+.sidebar_logo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.sidebar_text {
+  font-size: 16px;
+  color: black;
 }
 
 .sidebar__icon-btn:hover {
@@ -476,12 +489,12 @@
 .btn--danger {
   background: none;
   border: none;
-  color: #dc2626;
+  color: #ea0101;
   padding: 0.6rem 0;
 }
 
 .btn--danger-solid {
-  background: #dc2626;
+  background: #ea0101;
   color: #fff;
 }
 
@@ -623,10 +636,22 @@
   flex-shrink: 0;
 }
 
-.activity-icon--info { background: #ccfbf1; color: #0d9488; }
-.activity-icon--accent { background: #ede9fe; color: #7c3aed; }
-.activity-icon--success { background: #dcfce7; color: #16a34a; }
-.activity-icon--danger { background: #fee2e2; color: #dc2626; }
+.activity-icon--info {
+  background: #ccfbf1;
+  color: #0d9488;
+}
+.activity-icon--accent {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+.activity-icon--success {
+  background: #dcfce7;
+  color: #16a34a;
+}
+.activity-icon--danger {
+  background: #fee2e2;
+  color: #dc2626;
+}
 
 .activity-item__body {
   flex: 1;
@@ -823,17 +848,23 @@
 .field-label {
   display: block;
   margin-top: 1.1rem;
-  margin-bottom: 0.4rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--ink);
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px; /* 142.857% */
+  color: var(--800, #1e1e1e);
 }
 
 .field-input {
   width: 100%;
   padding: 0.7rem 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--300, #dcdcdc);
+  background: var(--50, #fcfcfc);
+
+  /* Shadows/shadow-xs */
+  box-shadow: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
   font: inherit;
   outline: none;
 }
@@ -931,7 +962,7 @@
 
 .field-textarea {
   width: 100%;
-  min-height: 90px;
+  min-height: 60px;
   padding: 0.7rem 0.85rem;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1034,7 +1065,9 @@
 }
 
 .color-swatch.is-selected {
-  box-shadow: 0 0 0 2px var(--card-bg), 0 0 0 4px currentColor;
+  box-shadow:
+    0 0 0 2px var(--card-bg),
+    0 0 0 4px currentColor;
   outline: 2px solid var(--ink);
   outline-offset: 3px;
 }
@@ -1157,11 +1190,35 @@
 .note-box {
   margin-top: 0.4rem;
   padding: 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
   background: var(--field-bg);
-  font-size: 0.85rem;
-  color: var(--text);
+  font-size: 1rem;
+  color: #1e1e1e;
+}
+
+.note-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.note-section__action {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--yellow-dark);
+  cursor: pointer;
+}
+
+.note-section__action:hover {
+  text-decoration: underline;
+}
+
+.note-section__actions {
+  margin-top: 0.6rem;
 }
 
 .note-view-text {
@@ -1274,6 +1331,14 @@
 .dd__option:hover,
 .dd__option.is-selected {
   background: var(--field-bg);
+}
+
+/* Label takes the leftover room so the checkmark always stays inside the option. */
+.dd__option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dd__check {

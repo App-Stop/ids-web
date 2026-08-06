@@ -191,9 +191,11 @@
 }
 
 .cm-field__label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--muted);
+  color: var(--800, #1E1E1E);
+font-size: 14px;
+font-style: normal;
+font-weight: 500;
+line-height: 20px; /* 142.857% */
 }
 
 .cm-input {
@@ -273,7 +275,7 @@
   height: 52px;
   border-radius: 50%;
   background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
+  color: #EA0101;
   display: flex;
   align-items: center;
   justify-content: center;

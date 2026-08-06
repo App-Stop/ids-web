@@ -279,7 +279,7 @@ export default function Crew() {
             </button>
           </div>
 
-          {tab === 'crew' ? (
+          {tab === 'crew' && (
             <MenuDropdown
               className="crew-dd crew-dd--jobs"
               options={jobMenuOptions}
@@ -290,19 +290,6 @@ export default function Crew() {
               allLabel="All Jobs"
               showDot={false}
             />
-          ) : (
-            <MenuDropdown
-              className="crew-dd crew-dd--jobs"
-              options={crewMenuOptions}
-              value={crewFilter}
-              onChange={setCrewFilter}
-              placeholder="All Crews"
-              includeAll
-              allLabel="All"
-              panelTitle="Crew Menu"
-              showAvatar
-              showDot
-            />
           )}
 
           <MenuDropdown
@@ -312,7 +299,7 @@ export default function Crew() {
             onChange={setStatus}
             placeholder="Status"
             includeAll
-            allLabel="All Status"
+            allLabel="Status"
             showDot={false}
           />
 
