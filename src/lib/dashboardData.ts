@@ -33,14 +33,6 @@ export function crewAvatarUrl(seed: number) {
   return `https://i.pravatar.cc/64?img=${seed}`
 }
 
-export interface ActivityItem {
-  id: string
-  kind: 'labor' | 'assigned' | 'completed' | 'overdue'
-  title: string
-  email: string
-  date: string
-}
-
 export const jobs: Job[] = [
   { id: 'j1', name: 'Jordan Park Renovation', color: '#e0399f', bidNo: '1038', jobNo: '004', gc: 'Reyes Builders', estimator: 'Mara L.', startDate: '02-07-2026', endDate: '20-08-2026', contractAmount: 98000, laborBudgetUsed: 4210, laborBudgetTotal: 28000 },
   { id: 'j2', name: 'Johnson State Prison Kitchen', color: '#22c55e', bidNo: '1042', jobNo: '001', gc: 'Turner Const.', estimator: 'John D.', startDate: '12-07-2026', endDate: '13-07-2026', contractAmount: 150000, laborBudgetUsed: 10421, laborBudgetTotal: 45000 },
@@ -98,16 +90,6 @@ export function findCrewAvatar(nameOrId?: string | null) {
   )
   return fromUnassigned?.avatar
 }
-
-export const activity: ActivityItem[] = [
-  { id: 'a1', kind: 'labor', title: 'Labor Logged: Rafael on CapX Warehouse', email: 'rafael@ids.com', date: 'Jul 9, 5:30 PM' },
-  { id: 'a2', kind: 'labor', title: 'Labor Logged: Rafael on CapX Warehouse', email: 'rafael@ids.com', date: 'Jul 9, 5:30 PM' },
-  { id: 'a3', kind: 'assigned', title: 'Job Assigned: Alan on Hays State Prison Kitchen', email: 'rafael@ids.com', date: 'Jul 9, 5:30 PM' },
-  { id: 'a4', kind: 'assigned', title: 'Job Assigned: Alan on Hays State Prison Kitchen', email: 'rafael@ids.com', date: 'Jul 9, 5:30 PM' },
-  { id: 'a5', kind: 'completed', title: 'Job Completed: Alan on Hays State Prison Kitchen', email: 'rafael@ids.com', date: 'Jul 9, 5:30 PM' },
-  { id: 'a6', kind: 'completed', title: 'Job Completed: Alan on Hays State Prison Kitchen', email: 'rafael@ids.com', date: 'Jul 9, 5:30 PM' },
-  { id: 'a7', kind: 'overdue', title: 'Budget Overdue ($425): Alan on Hays State Prison Kitchen', email: 'rafael@ids.com', date: 'Jul 9, 5:30 PM' },
-]
 
 export function formatMoney(n: number) {
   return `$${n.toLocaleString('en-US')}`

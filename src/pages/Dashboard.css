@@ -329,18 +329,13 @@
   font-size: 0.9rem;
 }
 
+/* Unassigned Crew on the left, Unassigned Jobs on the right — equal weight. */
 .dash__columns {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
   margin-top: 1.25rem;
   align-items: start;
-}
-
-.dash__side-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
 }
 
 /* Topbar */
@@ -605,76 +600,6 @@
   margin-top: 1rem;
   font-size: 0.85rem;
   color: var(--muted);
-}
-
-/* Activity */
-.activity-list {
-  list-style: none;
-  margin: 0.75rem 0 0;
-  padding: 0;
-}
-
-.activity-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.65rem;
-  padding: 0.65rem 0;
-  border-top: 1px solid var(--border);
-}
-
-.activity-item:first-child {
-  border-top: none;
-}
-
-.activity-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  flex-shrink: 0;
-}
-
-.activity-icon--info {
-  background: #ccfbf1;
-  color: #0d9488;
-}
-.activity-icon--accent {
-  background: #ede9fe;
-  color: #7c3aed;
-}
-.activity-icon--success {
-  background: #dcfce7;
-  color: #16a34a;
-}
-.activity-icon--danger {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.activity-item__body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.activity-item__title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.activity-item__email {
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-
-.activity-item__date {
-  font-size: 0.78rem;
-  color: var(--muted);
-  white-space: nowrap;
 }
 
 /* Unassigned crew */
@@ -1466,7 +1391,6 @@
   }
 
   .panel__head,
-  .activity-item,
   .unassigned-item,
   .modal-head-row,
   .job-head,
@@ -1477,7 +1401,6 @@
     flex-direction: column;
   }
 
-  .activity-item__date,
   .crew-row__date {
     white-space: normal;
   }

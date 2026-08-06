@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import Sidebar from '../components/dashboard/Sidebar'
 import StatCard from '../components/dashboard/StatCard'
-import ActivityList from '../components/dashboard/ActivityList'
 import UnassignedCrewList from '../components/dashboard/UnassignedCrewList'
 import AssignJobModal from '../components/dashboard/AssignJobModal'
 import JobDetailsModal from '../components/dashboard/JobDetailsModal'
@@ -72,41 +71,38 @@ export default function Dashboard() {
         </div>
 
         <div className="dash__columns">
-          <ActivityList />
-          <div className="dash__side-stack">
-            <UnassignedCrewList
-              crews={unassigned}
-              onAssignJob={(crew) => setFlow({ step: 'assignJob', crew })}
-            />
-            <div className="panel">
-              <div className="panel__head">
-                <h2>Unassigned Jobs</h2>
-              </div>
-              <ul className="unassigned-list">
-                {UNASSIGNED_JOBS.map((name) => (
-                  <li key={name} className="unassigned-item">
-                    <span className="unassigned-item__name">{name}</span>
-                    <CaretRight size={14} weight="bold" className="unassigned-item__chevron" />
-                    <button
-                      type="button"
-                      className="btn btn--primary btn--sm"
-                      onClick={() => {
-                        const job = jobs.find((j) => j.name === name) ?? jobs[0]
-                        if (!job) return
-                        setFlow({
-                          step: 'assignCrew',
-                          crew: unassigned[0] ?? { id: 'tmp', name: 'Unassigned', leadName: 'TBD', rate: 0 },
-                          job,
-                          note: '',
-                        })
-                      }}
-                    >
-                      Assign Crew
-                    </button>
-                  </li>
-                ))}
-              </ul>
+          <UnassignedCrewList
+            crews={unassigned}
+            onAssignJob={(crew) => setFlow({ step: 'assignJob', crew })}
+          />
+          <div className="panel">
+            <div className="panel__head">
+              <h2>Unassigned Jobs</h2>
             </div>
+            <ul className="unassigned-list">
+              {UNASSIGNED_JOBS.map((name) => (
+                <li key={name} className="unassigned-item">
+                  <span className="unassigned-item__name">{name}</span>
+                  <CaretRight size={14} weight="bold" className="unassigned-item__chevron" />
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={() => {
+                      const job = jobs.find((j) => j.name === name) ?? jobs[0]
+                      if (!job) return
+                      setFlow({
+                        step: 'assignCrew',
+                        crew: unassigned[0] ?? { id: 'tmp', name: 'Unassigned', leadName: 'TBD', rate: 0 },
+                        job,
+                        note: '',
+                      })
+                    }}
+                  >
+                    Assign Crew
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </main>
