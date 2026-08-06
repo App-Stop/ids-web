@@ -9,6 +9,7 @@ import {
   SidebarSimple,
   GearSix,
   User,
+  Question,
 } from "@phosphor-icons/react";
 import logo from "../../assets/sidebar logo.png";
 import { useSidebarCollapsed } from "../../hooks/useSidebarCollapsed";
@@ -29,9 +30,14 @@ const MANAGEMENT = [
   { label: "Timesheet", icon: ListChecks, path: "/timesheet" },
 ];
 
+const SUPPORT = [
+  { label: "Help Center", icon: Question, path: "/help-center" },
+];
+
 const MOBILE_NAV = [
   ...OPERATIONS,
   ...MANAGEMENT,
+  ...SUPPORT,
   { label: "Profile", icon: User, path: "/profile" },
 ];
 
@@ -100,6 +106,23 @@ export default function Sidebar({
                   />
                 </button>
               ))}
+
+              <div className="sidebar__rail-sep" />
+
+              {SUPPORT.map(({ label, icon: IconCmp, path }) => (
+                <button
+                  key={label}
+                  type="button"
+                  className={`sidebar__icon-btn ${active === label ? "is-active" : ""}`}
+                  title={label}
+                  onClick={() => path && navigate(path)}
+                >
+                  <IconCmp
+                    size={20}
+                    weight={active === label ? "fill" : "regular"}
+                  />
+                </button>
+              ))}
             </div>
 
             <button
@@ -150,6 +173,22 @@ export default function Sidebar({
 
                 <p className="sidebar__group">Management</p>
                 {MANAGEMENT.map(({ label, icon: IconCmp, path }) => (
+                  <button
+                    key={label}
+                    className={`sidebar__item ${active === label ? "is-active" : ""}`}
+                    type="button"
+                    onClick={() => path && navigate(path)}
+                  >
+                    <IconCmp
+                      size={20}
+                      weight={active === label ? "fill" : "regular"}
+                    />
+                    {label}
+                  </button>
+                ))}
+
+                <p className="sidebar__group">Support</p>
+                {SUPPORT.map(({ label, icon: IconCmp, path }) => (
                   <button
                     key={label}
                     className={`sidebar__item ${active === label ? "is-active" : ""}`}
