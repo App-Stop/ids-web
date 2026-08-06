@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Icon } from './icons'
 import MenuDropdown from './MenuDropdown'
-import Dropdown from './Dropdown'
 import type { CrewMenuOption, Status } from '../../lib/crewData'
 import './crew-modals.css'
 
@@ -52,7 +51,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
     ...initial,
   })
   const [confirmingRemove, setConfirmingRemove] = useState(false)
-  const selectedStatus = STATUS_OPTIONS.find((s) => s.id === form.status) ?? STATUS_OPTIONS[0]
+  STATUS_OPTIONS[0]
 
   function update<K extends keyof MemberFormData>(key: K, value: MemberFormData[K]) {
     setForm((f) => ({ ...f, [key]: value }))
