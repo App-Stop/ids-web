@@ -9,6 +9,7 @@ import Crew from './pages/Crew'
 import CostTracking from './pages/CostTracking'
 import Timesheet from './pages/Timesheet'
 import Profile from './pages/Profile'
+import HelpCenter from './pages/HelpCenter'
 
 function App() {
   return (
@@ -23,6 +24,8 @@ function App() {
       <Route path="/Crew" element={<Crew />} />
       <Route path="/timesheet" element={<Timesheet />} />
       <Route path="/profile" element={<Profile />} />
+      <Route path="/help-center" element={<HelpCenter />} />
+      <Route path="/help-center/:articleId" element={<HelpCenter />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
