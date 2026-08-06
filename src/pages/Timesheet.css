@@ -95,6 +95,14 @@
   color: #31343a;
 }
 
+/* Trigger stays the narrow "Sort by" label, so let the menu size to its options. */
+.ts-dd--sort .dd__menu {
+  left: auto;
+  right: 0;
+  width: max-content;
+  min-width: 100%;
+}
+
 .ts-log-action,
 .ts-log-btn {
   display: inline-flex;

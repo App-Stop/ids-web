@@ -409,6 +409,9 @@ export default function JobsManagement() {
           note={activeRow.note ?? ''}
           onDone={() => setFlow({ type: 'none' })}
           onChangeCrew={() => setFlow({ type: 'assignCrew', jobId: activeRow.id })}
+          onSaveNote={(text) =>
+            setJobs((prev) => prev.map((j) => (j.id === activeRow.id ? { ...j, note: text || undefined } : j)))
+          }
           onRemoveCrew={() => {
             setJobs((prev) =>
               prev.map((j) =>

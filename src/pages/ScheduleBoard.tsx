@@ -261,7 +261,7 @@ export default function ScheduleBoard() {
   const [search, setSearch] = useState('')
   const [jobFilter, setJobFilter] = useState<string | null>(null)
   const [jumpOpen, setJumpOpen] = useState(false)
-  const [metaVisible, setMetaVisible] = useState(false)
+  const [metaVisible, setMetaVisible] = useState(true)
   const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
   const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
   const [lockedMonthDayW, setLockedMonthDayW] = useState<number | null>(null)
@@ -317,6 +317,14 @@ export default function ScheduleBoard() {
     setViewMode('monthly')
     setSidebarCollapsed(true)
     setLockedMonthDayW(metaVisible ? MONTH_DAY_META_W : null)
+  }
+
+  /** Weekly has room for the full left-hand table, so open it with the meta columns showing. */
+  function openWeekly() {
+    setViewMode('weekly')
+    setMetaVisible(true)
+    setSidebarCollapsed(true)
+    setLockedMonthDayW(null)
   }
 
   function toggleMeta() {
@@ -478,7 +486,7 @@ export default function ScheduleBoard() {
             <button
               type="button"
               className={viewMode === 'weekly' ? 'is-active' : ''}
-              onClick={() => setViewMode('weekly')}
+              onClick={openWeekly}
             >
               Weekly
             </button>

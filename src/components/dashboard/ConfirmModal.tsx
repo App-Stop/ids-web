@@ -1,5 +1,6 @@
 import Modal from './Modal'
 import { Icon } from './icons'
+import warning from '../../assets/Warning.png'
 
 export default function ConfirmModal({
   title,
@@ -15,11 +16,9 @@ export default function ConfirmModal({
   onConfirm: () => void
 }) {
   return (
-    <Modal onClose={onCancel} width={380}>
+    <Modal onClose={onCancel} width={320}>
       <div className="confirm-modal">
-        <span className="confirm-modal__icon">
-          <Icon.AlertTriangle width={22} height={22} />
-        </span>
+        <img src={warning}/>
         <h2 className="confirm-modal__title">{title}</h2>
         <p className="confirm-modal__message">{message}</p>
       </div>

@@ -143,7 +143,7 @@ export default function Dashboard() {
       {flow.step === 'assignCrew' && (
         <AssignCrewModal
           job={flow.job}
-          onCancel={() => setFlow({ step: 'jobDetails', crew: flow.crew, job: flow.job, note: flow.note })}
+          onCancel={() => setFlow({ step: 'none' })}
           onAssign={(crewId, note) => {
             const crew = assignableCrews.find((c) => c.id === crewId)
             if (!crew) return

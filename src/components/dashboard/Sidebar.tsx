@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from "react-router-dom";
 import {
   SquaresFour,
   CalendarBlank,
@@ -9,48 +9,52 @@ import {
   SidebarSimple,
   GearSix,
   User,
-} from '@phosphor-icons/react'
-import logo from '../../assets/logo.png'
-import { useSidebarCollapsed } from '../../hooks/useSidebarCollapsed'
+} from "@phosphor-icons/react";
+import logo from "../../assets/sidebar logo.png";
+import { useSidebarCollapsed } from "../../hooks/useSidebarCollapsed";
 
 const OPERATIONS = [
-  { label: 'Dashboard', icon: SquaresFour, path: '/dashboard' },
-  { label: 'Schedule Board', icon: CalendarBlank, path: '/schedule-board' },
-  { label: 'Jobs Management', icon: Hammer, path: '/jobs-management' },
-  { label: 'Cost Tracking', icon: CurrencyCircleDollar, path: '/cost-tracking' },
-]
+  { label: "Dashboard", icon: SquaresFour, path: "/dashboard" },
+  { label: "Schedule Board", icon: CalendarBlank, path: "/schedule-board" },
+  { label: "Jobs Management", icon: Hammer, path: "/jobs-management" },
+  {
+    label: "Cost Tracking",
+    icon: CurrencyCircleDollar,
+    path: "/cost-tracking",
+  },
+];
 
 const MANAGEMENT = [
-  { label: 'Crew Management', icon: Users, path: '/Crew' },
-  { label: 'Timesheet', icon: ListChecks, path: '/timesheet' },
-]
+  { label: "Crew Management", icon: Users, path: "/Crew" },
+  { label: "Timesheet", icon: ListChecks, path: "/timesheet" },
+];
 
 const MOBILE_NAV = [
   ...OPERATIONS,
   ...MANAGEMENT,
-  { label: 'Profile', icon: User, path: '/profile' },
-]
+  { label: "Profile", icon: User, path: "/profile" },
+];
 
 export default function Sidebar({
   active,
   collapsed: collapsedProp,
   onCollapsedChange,
 }: {
-  active: string
-  collapsed?: boolean
-  onCollapsedChange?: (collapsed: boolean) => void
+  active: string;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }) {
-  const [internalCollapsed, setInternalCollapsed] = useSidebarCollapsed()
-  const collapsed = collapsedProp ?? internalCollapsed
+  const [internalCollapsed, setInternalCollapsed] = useSidebarCollapsed();
+  const collapsed = collapsedProp ?? internalCollapsed;
   const setCollapsed = (next: boolean) => {
-    if (collapsedProp === undefined) setInternalCollapsed(next)
-    onCollapsedChange?.(next)
-  }
-  const navigate = useNavigate()
+    if (collapsedProp === undefined) setInternalCollapsed(next);
+    onCollapsedChange?.(next);
+  };
+  const navigate = useNavigate();
 
   return (
     <>
-      <aside className={`sidebar ${collapsed ? 'is-collapsed' : ''}`}>
+      <aside className={`sidebar ${collapsed ? "is-collapsed" : ""}`}>
         {collapsed ? (
           <>
             <div className="sidebar__rail">
@@ -69,11 +73,14 @@ export default function Sidebar({
                 <button
                   key={label}
                   type="button"
-                  className={`sidebar__icon-btn ${active === label ? 'is-active' : ''}`}
+                  className={`sidebar__icon-btn ${active === label ? "is-active" : ""}`}
                   title={label}
                   onClick={() => path && navigate(path)}
                 >
-                  <IconCmp size={20} weight={active === label ? 'fill' : 'regular'} />
+                  <IconCmp
+                    size={20}
+                    weight={active === label ? "fill" : "regular"}
+                  />
                 </button>
               ))}
 
@@ -83,11 +90,14 @@ export default function Sidebar({
                 <button
                   key={label}
                   type="button"
-                  className={`sidebar__icon-btn ${active === label ? 'is-active' : ''}`}
+                  className={`sidebar__icon-btn ${active === label ? "is-active" : ""}`}
                   title={label}
                   onClick={() => path && navigate(path)}
                 >
-                  <IconCmp size={20} weight={active === label ? 'fill' : 'regular'} />
+                  <IconCmp
+                    size={20}
+                    weight={active === label ? "fill" : "regular"}
+                  />
                 </button>
               ))}
             </div>
@@ -95,7 +105,7 @@ export default function Sidebar({
             <button
               type="button"
               className="sidebar__profile-pill"
-              onClick={() => navigate('/profile')}
+              onClick={() => navigate("/profile")}
               aria-label="Open profile"
             >
               <span className="sidebar__profile-avatar">
@@ -107,7 +117,10 @@ export default function Sidebar({
           <>
             <div className="sidebar__panel">
               <div className="sidebar__brand">
-                <img src={logo} alt="IDS Demolition" />
+                <div className="sidebar_logo">
+                  <img src={logo} alt="IDS Demolition" />
+                  <h2 className="sidebar_text">IDS Demolition</h2>
+                </div>
                 <button
                   type="button"
                   className="sidebar__icon-btn sidebar__collapse-btn"
@@ -123,11 +136,14 @@ export default function Sidebar({
                 {OPERATIONS.map(({ label, icon: IconCmp, path }) => (
                   <button
                     key={label}
-                    className={`sidebar__item ${active === label ? 'is-active' : ''}`}
+                    className={`sidebar__item ${active === label ? "is-active" : ""}`}
                     type="button"
                     onClick={() => path && navigate(path)}
                   >
-                    <IconCmp size={20} weight={active === label ? 'fill' : 'regular'} />
+                    <IconCmp
+                      size={20}
+                      weight={active === label ? "fill" : "regular"}
+                    />
                     {label}
                   </button>
                 ))}
@@ -136,18 +152,25 @@ export default function Sidebar({
                 {MANAGEMENT.map(({ label, icon: IconCmp, path }) => (
                   <button
                     key={label}
-                    className={`sidebar__item ${active === label ? 'is-active' : ''}`}
+                    className={`sidebar__item ${active === label ? "is-active" : ""}`}
                     type="button"
                     onClick={() => path && navigate(path)}
                   >
-                    <IconCmp size={20} weight={active === label ? 'fill' : 'regular'} />
+                    <IconCmp
+                      size={20}
+                      weight={active === label ? "fill" : "regular"}
+                    />
                     {label}
                   </button>
                 ))}
               </nav>
             </div>
 
-            <button type="button" className="sidebar__user sidebar__user--button" onClick={() => navigate('/profile')}>
+            <button
+              type="button"
+              className="sidebar__user sidebar__user--button"
+              onClick={() => navigate("/profile")}
+            >
               <span className="sidebar__profile-avatar sidebar__profile-avatar--lg">
                 <User size={18} weight="regular" />
               </span>
@@ -166,15 +189,15 @@ export default function Sidebar({
           <button
             key={label}
             type="button"
-            className={`sidebar-mobile-nav__item ${active === label ? 'is-active' : ''}`}
+            className={`sidebar-mobile-nav__item ${active === label ? "is-active" : ""}`}
             onClick={() => path && navigate(path)}
-            aria-current={active === label ? 'page' : undefined}
+            aria-current={active === label ? "page" : undefined}
           >
-            <IconCmp size={18} weight={active === label ? 'fill' : 'regular'} />
+            <IconCmp size={18} weight={active === label ? "fill" : "regular"} />
             <span>{label}</span>
           </button>
         ))}
       </nav>
     </>
-  )
+  );
 }

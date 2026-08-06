@@ -1016,13 +1016,14 @@ export default function Timesheet() {
           </div>
 
           <div className="ts-toolbar__right">
-            <Dropdown
-              value={sortKey}
-              options={SORT_OPTIONS.map((option) => ({ id: option.id, label: option.label }))}
-              onChange={(id) => setSortKey(id as SortKey)}
-              placeholder="Sort by"
-              selectedLabel={SORT_OPTIONS.find((option) => option.id === sortKey)?.label}
-            />
+            <div className="ts-dd--sort">
+              <Dropdown
+                value={sortKey}
+                options={SORT_OPTIONS.map((option) => ({ id: option.id, label: option.label }))}
+                onChange={(id) => setSortKey(id as SortKey)}
+                staticLabel="Sort by"
+              />
+            </div>
             <button type="button" className="btn btn--primary ts-log-btn" onClick={openAddModal}>
               <Icon.Plus width={16} height={16} />
               Log Attendance

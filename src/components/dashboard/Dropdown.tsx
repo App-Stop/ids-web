@@ -50,7 +50,7 @@ export default function Dropdown({
                 setOpen(false)
               }}
             >
-              {opt.label}
+              <span className="dd__option-label">{opt.label}</span>
               {opt.id === value && <Icon.Check className="dd__check" />}
             </li>
           ))}

@@ -145,30 +145,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
           />
         </label>
 
-        <label className="cm-field">
-          <span className="cm-field__label">Status</span>
-          <div className="cm-field__dropdown cm-field__dropdown--status">
-            <Dropdown
-              value={form.status}
-              onChange={(id) => update('status', id as Status)}
-              selectedLabel={
-                <span className="dd__dot-label">
-                  <i className="dot" style={{ background: selectedStatus.color }} />
-                  {selectedStatus.label}
-                </span>
-              }
-              options={STATUS_OPTIONS.map((s) => ({
-                id: s.id,
-                label: (
-                  <span className="dd__dot-label">
-                    <i className="dot" style={{ background: s.color }} />
-                    {s.label}
-                  </span>
-                ),
-              }))}
-            />
-          </div>
-        </label>
+        
 
         <label className="cm-field">
           <span className="cm-field__label">Hourly Rate</span>
