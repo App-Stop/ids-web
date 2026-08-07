@@ -52,6 +52,9 @@ type JobCostRow = {
 
 type CrewCostRow = {
   id: string
+  /** Crew identity as used by crewMenuOptions (`c8742`) — what the filter matches on. */
+  crewKey: string
+  /** Display-only crew number (`8742`), shown as #8742 in the ID column. */
   crewId: string
   crewName: string
   avatar: string
@@ -317,6 +320,7 @@ function makeCrewRows(): CrewCostRow[] {
     const jobDates = crew.jobs.map((job) => mdyToIso(job.date)).sort()
     return {
       id: crew.id,
+      crewKey: crew.id,
       crewId: crew.crewId,
       crewName: crew.name,
       avatar: crew.avatar,
@@ -376,7 +380,9 @@ function CostModal({
 }) {
   const isCrewScope = scope === 'crew'
   const initialJobId = record && 'jobId' in record ? record.jobId : null
-  const initialCrewId = record && 'crewId' in record ? record.crewId : null
+  // The dropdown is keyed on crewMenuOptions ids, so seed it from crewKey — not
+  // the display number in crewId.
+  const initialCrewId = record && 'crewKey' in record ? record.crewKey : null
   const [form, setForm] = useState<CostRecordForm>(() => {
     const jobId = !isCrewScope ? initialJobId ?? jobs[0]?.id ?? null : jobs[0]?.id ?? null
     const existing = jobId ? jobRows.find((row) => row.jobId === jobId || row.id === jobId) : undefined
@@ -608,7 +614,7 @@ export default function CostTracking() {
     const bounds = getRangeBounds(range, startDate, endDate)
     return crewRows.reduce<CrewCostRow[]>((rows, row) => {
       const matchesSearch = !search || row.crewName.toLowerCase().includes(search.toLowerCase()) || row.crewId.includes(search)
-      const matchesFilter = !crewFilter || row.crewId === crewFilter
+      const matchesFilter = !crewFilter || row.crewKey === crewFilter
       if (!matchesSearch || !matchesFilter) return rows
 
       if (!bounds || row.jobDates.length === 0) {
@@ -793,7 +799,8 @@ export default function CostTracking() {
       const jobDates = Array.from(new Set([...(baseCrewRow?.jobDates ?? []), form.date])).sort()
       const nextRow: CrewCostRow = {
         id: baseCrewRow ? baseCrewRow.id : `crew-cost-${Date.now()}`,
-        crewId: crew?.crewId ?? form.crewId ?? '',
+        crewKey: crew?.id ?? form.crewId ?? '',
+        crewId: crew?.crewId ?? '',
         crewName: crew?.name ?? 'New Crew',
         avatar: crew?.avatar ?? '',
         color: crew?.color ?? '#94a3b8',
