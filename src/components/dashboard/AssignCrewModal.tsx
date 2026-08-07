@@ -11,10 +11,13 @@ export default function AssignCrewModal({
 }: {
   job: Job
   onCancel: () => void
-  onAssign: (crewLeadId: string, note: string) => void
+  onAssign: (crewLeadId: string, startDate: string, endDate: string, note: string) => void
 }) {
   const [crewId, setCrewId] = useState<string | null>(null)
+  const [startDate, setStartDate] = useState(job.startDate || '')
+  const [endDate, setEndDate] = useState(job.endDate || '')
   const [note, setNote] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const selected = assignableCrews.find((c) => c.id === crewId)
 
   return (
@@ -53,13 +56,40 @@ export default function AssignCrewModal({
         }))}
       />
 
-      <label className="field-label">Add a note</label>
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+        <div style={{ flex: 1 }}>
+          <label className="field-label">Start Date (DD-MM-YYYY)</label>
+          <input
+            className="field-input"
+            placeholder="DD-MM-YYYY"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label className="field-label">End Date (DD-MM-YYYY)</label>
+          <input
+            className="field-input"
+            placeholder="DD-MM-YYYY"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <label className="field-label" style={{ marginTop: '1rem' }}>Add a note</label>
       <textarea
         className="field-textarea"
         placeholder="Note about the job..."
         value={note}
         onChange={(e) => setNote(e.target.value)}
       />
+
+      {error && (
+        <div style={{ color: '#ef4444', marginTop: '1rem', fontSize: '0.875rem' }}>
+          {error}
+        </div>
+      )}
 
       <div className="modal-actions">
         <button type="button" className="btn btn--outline" onClick={onCancel}>
@@ -68,8 +98,14 @@ export default function AssignCrewModal({
         <button
           type="button"
           className="btn btn--primary"
-          disabled={!crewId}
-          onClick={() => crewId && onAssign(crewId, note)}
+          disabled={!crewId || !startDate || !endDate}
+          onClick={() => {
+            try {
+              if (crewId) onAssign(crewId, startDate, endDate, note)
+            } catch (err: any) {
+              setError(err.message)
+            }
+          }}
         >
           Assign Crew
         </button>

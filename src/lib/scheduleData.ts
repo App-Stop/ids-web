@@ -28,16 +28,12 @@ export interface ScheduleNote {
 }
 
 export const scheduleJobs: ScheduleJob[] = [
-  { id: 's4827', jobNo: '4827', name: 'Johnson State Prison Kitchen', color: '#FF1FAD', idsSuper: 'John D.', gcSuper: 'Hank Williams', gc: 'Turner Const.', contract: 50000 },
-  { id: 's5914', jobNo: '5914', name: 'Smith County Courthouse Renovation', color: '#56bd6d', idsSuper: 'Alice S.', gcSuper: 'David Richards', gc: 'Skanska', contract: 90000 },
-  { id: 's4706', jobNo: '4706', name: 'Riverside Community Center Demo', color: '#D6C700', idsSuper: 'Michael T.', gcSuper: 'John Smith', gc: 'Laura H.', contract: 80000 },
-  { id: 's3460', jobNo: '3460', name: 'Cedar Valley Library Expansion', color: '#F6162D', idsSuper: 'David L.', gcSuper: 'Michael Johnson', gc: 'Sarah D.', contract: 70000 },
-  { id: 's2049', jobNo: '2049', name: 'Smith County Courthouse Renovation', color: '#F96C00', idsSuper: 'Sophia K.', gcSuper: 'Sarah Wilson', gc: 'Kevin M.', contract: 60000 },
-  { id: 's8602', jobNo: '8602', name: 'Johnson State Prison Kitchen', color: '#4193f7', idsSuper: 'Olivia B.', gcSuper: 'Linda Martinez', gc: 'James L.', contract: 65000 },
-  { id: 's7214', jobNo: '7214', name: 'Cedar Valley Library Expansion', color: '#8640f6', idsSuper: 'Isabella N.', gcSuper: 'Patricia Taylor', gc: 'Daniel W.', contract: 95000 },
-  { id: 's3391', jobNo: '3391', name: 'Harbor Point Parking Garage Repair', color: '#00C064', idsSuper: 'Ethan R.', gcSuper: 'Jude R.', gc: 'Harbor Works', contract: 54000 },
-  { id: 's5108', jobNo: '5108', name: 'Westbrook Fire Station Remodel', color: '#00B8C9', idsSuper: 'Maya K.', gcSuper: 'Leo S.', gc: 'Reyes Builders', contract: 95000 },
-  { id: 's6620', jobNo: '6620', name: 'Copper Hill Waste Transfer Station', color: '#803BFF', idsSuper: 'Noah W.', gcSuper: 'Iris T.', gc: 'Sterling Group', contract: 141000 },
+  { id: '#001', jobNo: '001', name: 'Maplewood Community Center Renovation', color: '#ea3da9', idsSuper: 'Ethan R.', gcSuper: 'Ethan K.', gc: 'John D.', contract: 50000 },
+  { id: '#002', jobNo: '002', name: 'Riverside Bridge Repair', color: '#56bd6d', idsSuper: 'Maya K.', gcSuper: 'Maya R.', gc: 'Alice M.', contract: 50000 },
+  { id: '#003', jobNo: '003', name: 'Greenfield Library Expansion', color: '#df3021', idsSuper: 'Liam J.', gcSuper: 'Liam J.', gc: 'Emily T.', contract: 50000 },
+  { id: '#004', jobNo: '004', name: 'Oakridge High School Gym Upgrade', color: '#4193f7', idsSuper: 'Noah W.', gcSuper: 'Olivia P.', gc: 'Michael B.', contract: 50000 },
+  { id: '#005', jobNo: '005', name: 'Pinecrest Water Treatment Plant Maintenance', color: '#e8752e', idsSuper: 'Olivia P.', gcSuper: 'Noah G.', gc: 'Robert S.', contract: 50000 },
+  { id: '#006', jobNo: '006', name: 'Sunset Park Playground Replacement', color: '#14b8a6', idsSuper: 'Steve P.', gcSuper: 'Mark T.', gc: 'Alice S.', contract: 50000 },
 ]
 
 /** Jobs shown in Schedule / Cost pickers — full sheet roster. */
@@ -45,16 +41,12 @@ export const sheetPickerJobs = scheduleJobs
 
 /** Weekly view assignments (week of TODAY 2026-07-20 … 2026-07-26) — one crew per job, Mon–Sat. */
 const WEEKLY_CREW_BY_JOB: Array<Omit<ScheduleAssignment, 'id' | 'startDate' | 'endDate'>> = [
-  { jobId: 's4827', crewName: "Hank's Crew", rate: 25, workers: 4, note: 'Coordinate with suppliers and schedule weekly progress meetings.' },
-  { jobId: 's5914', crewName: "John's Crew", rate: 32, workers: 5, note: 'Confirm crane delivery Tuesday morning.' },
-  { jobId: 's4706', crewName: "Dan's Crew", rate: 29, workers: 3, note: 'Dust control required near classrooms.' },
-  { jobId: 's3460', crewName: "Bob's Crew", rate: 28, workers: 3, note: 'Watch for permit delays on the west wing.' },
-  { jobId: 's2049', crewName: "Noah's Crew", rate: 30, workers: 6, note: 'Full-week interior soft demo.' },
-  { jobId: 's8602', crewName: "Lucas's Crew", rate: 27, workers: 4, note: 'Second shift covers cleanup.' },
-  { jobId: 's7214', crewName: "Liam's Crew", rate: 33, workers: 5, note: 'Confirm dumpster pickup Friday.' },
-  { jobId: 's3391', crewName: "Aiden's Crew", rate: 30, workers: 5 },
-  { jobId: 's5108', crewName: "Mason's Crew", rate: 29, workers: 4, note: 'Coordinate fire-watch overnight.' },
-  { jobId: 's6620', crewName: "Luca's Crew", rate: 26, workers: 3 },
+  { jobId: '#001', crewName: "Hank's Crew", rate: 35, workers: 4, note: 'Coordinate with suppliers and schedule weekly progress meetings.' },
+  { jobId: '#002', crewName: "John's Crew", rate: 32, workers: 5, note: 'Confirm crane delivery Tuesday morning.' },
+  { jobId: '#003', crewName: "Bob's Crew", rate: 28, workers: 3, note: 'Dust control required near classrooms.' },
+  { jobId: '#004', crewName: "Chris's Crew", rate: 27, workers: 4, note: 'Watch for permit delays on the west wing.' },
+  { jobId: '#005', crewName: "Noah's Crew", rate: 30, workers: 6, note: 'Full-week interior soft demo.' },
+  { jobId: '#006', crewName: "Lucas's Crew", rate: 27, workers: 5, note: 'Tear down old swing sets and prep ground.' },
 ]
 
 export const weeklyScheduleAssignments: ScheduleAssignment[] = WEEKLY_CREW_BY_JOB.map((crew, index) => ({

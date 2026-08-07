@@ -13,6 +13,7 @@ import { assignableCrews, formatMoney, type Job, type UnassignedCrew } from '../
 import { initialManagedJobs, STATUS_COLORS, STATUS_LABELS, type JobStatus, type ManagedJob } from '../lib/jobsManagementData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
+import { useAppStore } from '../lib/store'
 import './JobsManagement.css'
 
 type SortKey = 'newest' | 'oldest' | 'rateLowHigh' | 'rateHighLow' | 'workers' | 'ascending' | 'descending'
@@ -97,6 +98,7 @@ export default function JobsManagement() {
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
+  const { assignCrew } = useAppStore()
 
   let list = jobs.filter((j) => {
     const matchesSearch = !search || j.name.toLowerCase().includes(search.toLowerCase()) || j.id.includes(search)
@@ -427,9 +429,13 @@ export default function JobsManagement() {
         <AssignCrewModal
           job={toJob(activeRow)}
           onCancel={() => setFlow({ type: 'details', jobId: activeRow.id })}
-          onAssign={(crewId, note) => {
+          onAssign={(crewId, startDate, endDate, note) => {
             const crew = assignableCrews.find((c) => c.id === crewId)
             if (!crew) return
+            
+            // This will throw if there's an overlap
+            assignCrew(activeRow.id, crewId, startDate, endDate, note)
+            
             setJobs((prev) =>
               prev.map((j) =>
                 j.id === activeRow.id

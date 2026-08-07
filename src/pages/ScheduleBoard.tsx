@@ -550,6 +550,11 @@ export default function ScheduleBoard() {
                   <tbody>
                     {filteredJobs.map((row, rowIndex) => {
                       const rowAssignments = assignments.filter((a) => a.jobId === row.id)
+                      const firstCrewName = rowAssignments[0]?.crewName
+                      const crewColor = firstCrewName
+                        ? crews.find((c) => c.name === firstCrewName)?.color || row.color
+                        : row.color
+
                       return (
                         <tr key={row.id} className="sb-row">
                           <td className="sb-col-jobno">{row.jobNo}</td>
@@ -562,13 +567,13 @@ export default function ScheduleBoard() {
                                 setCrewHover({
                                   x: rect.right + 8,
                                   y: rect.top + rect.height / 2,
-                                  color: row.color,
-                                  names: rowAssignments.map((a) => a.crewName),
+                                  color: crewColor,
+                                  names: Array.from(new Set(rowAssignments.map((a) => a.crewName))),
                                 })
                               }}
                               onMouseLeave={() => setCrewHover(null)}
                             >
-                              <i className="sb-row-bar" style={{ background: row.color }} />
+                              <i className="sb-row-bar" style={{ background: crewColor }} />
                             </span>
                             <div className="sb-job-inner">
                               <span className="sb-job-name" title={row.name}>{row.name}</span>
@@ -726,7 +731,7 @@ export default function ScheduleBoard() {
                                 {isSpanStart ? (
                                   <AssignmentPill
                                     assignment={assignment}
-                                    color={row.color}
+                                    color={crews.find((c) => c.name === assignment.crewName)?.color || row.color}
                                     compact={compact}
                                     span={span}
                                     onOpenDetails={() =>
