@@ -34,13 +34,12 @@ export function crewAvatarUrl(seed: number) {
 }
 
 export const jobs: Job[] = [
-  { id: 'j1', name: 'Jordan Park Renovation', color: '#e0399f', bidNo: '1038', jobNo: '004', gc: 'Reyes Builders', estimator: 'Mara L.', startDate: '02-07-2026', endDate: '20-08-2026', contractAmount: 98000, laborBudgetUsed: 4210, laborBudgetTotal: 28000 },
-  { id: 'j2', name: 'Johnson State Prison Kitchen', color: '#22c55e', bidNo: '1042', jobNo: '001', gc: 'Turner Const.', estimator: 'John D.', startDate: '12-07-2026', endDate: '13-07-2026', contractAmount: 150000, laborBudgetUsed: 10421, laborBudgetTotal: 45000 },
-  { id: 'j3', name: 'Riverbend School Renovation', color: '#14b8a6', bidNo: '1044', jobNo: '002', gc: 'Vance Contracting', estimator: 'Priya S.', startDate: '18-07-2026', endDate: '30-09-2026', contractAmount: 210000, laborBudgetUsed: 6300, laborBudgetTotal: 52000 },
-  { id: 'j4', name: 'Downtown Highrise Demolition', color: '#ef4444', bidNo: '1046', jobNo: '003', gc: 'Sterling Group', estimator: 'John D.', startDate: '01-08-2026', endDate: '15-11-2026', contractAmount: 480000, laborBudgetUsed: 21000, laborBudgetTotal: 110000 },
-  { id: 'j5', name: 'Greenfield Park Expansion', color: '#f97316', bidNo: '1048', jobNo: '005', gc: 'Reyes Builders', estimator: 'Mara L.', startDate: '05-08-2026', endDate: '25-09-2026', contractAmount: 76000, laborBudgetUsed: 1800, laborBudgetTotal: 19000 },
-  { id: 'j6', name: 'Lakeside Community Center Build', color: '#3b82f6', bidNo: '1051', jobNo: '006', gc: 'Vance Contracting', estimator: 'Priya S.', startDate: '10-08-2026', endDate: '20-12-2026', contractAmount: 320000, laborBudgetUsed: 5200, laborBudgetTotal: 80000 },
-  { id: 'j7', name: 'Old Mill Warehouse Tear Down', color: '#8b5cf6', bidNo: '1053', jobNo: '007', gc: 'Sterling Group', estimator: 'John D.', startDate: '15-08-2026', endDate: '30-08-2026', contractAmount: 54000, laborBudgetUsed: 900, laborBudgetTotal: 12000 },
+  { id: '#001', name: 'Maplewood Community Center Renovation', color: '#ea3da9', bidNo: '1001', jobNo: '001', gc: 'John D.', estimator: 'Ethan R.', startDate: '12-07-2026', endDate: '13-07-2026', contractAmount: 50000, laborBudgetUsed: 10421, laborBudgetTotal: 12000 },
+  { id: '#002', name: 'Riverside Bridge Repair', color: '#56bd6d', bidNo: '1002', jobNo: '002', gc: 'Alice M.', estimator: 'Maya K.', startDate: '20-07-2026', endDate: '21-07-2026', contractAmount: 50000, laborBudgetUsed: 10421, laborBudgetTotal: 12000 },
+  { id: '#003', name: 'Greenfield Library Expansion', color: '#df3021', bidNo: '1003', jobNo: '003', gc: 'Emily T.', estimator: 'Liam J.', startDate: '16-07-2026', endDate: '17-07-2026', contractAmount: 50000, laborBudgetUsed: 10421, laborBudgetTotal: 12000 },
+  { id: '#004', name: 'Oakridge High School Gym Upgrade', color: '#4193f7', bidNo: '1004', jobNo: '004', gc: 'Michael B.', estimator: 'Noah W.', startDate: '14-07-2026', endDate: '15-07-2026', contractAmount: 50000, laborBudgetUsed: 10421, laborBudgetTotal: 12000 },
+  { id: '#005', name: 'Pinecrest Water Treatment Plant Maintenance', color: '#e8752e', bidNo: '1005', jobNo: '005', gc: 'Robert S.', estimator: 'Olivia P.', startDate: '12-07-2026', endDate: '13-07-2026', contractAmount: 50000, laborBudgetUsed: 10421, laborBudgetTotal: 12000 },
+  { id: '#006', name: 'Sunset Park Playground Replacement', color: '#14b8a6', bidNo: '1006', jobNo: '006', gc: 'Alice S.', estimator: 'Steve P.', startDate: '18-07-2026', endDate: '19-07-2026', contractAmount: 50000, laborBudgetUsed: 0, laborBudgetTotal: 12000 },
 ]
 
 export const crewLeads: CrewLead[] = [
@@ -66,7 +65,6 @@ export const assignableCrews: {
   { id: 'chris', name: "Chris's Crew", leadName: 'Chris Lee', rate: 28, color: '#14b8a6', avatar: crewAvatarUrl(15) },
   { id: 'noah', name: "Noah's Crew", leadName: 'Noah Grant', rate: 30, color: '#e8752e', avatar: crewAvatarUrl(22) },
   { id: 'lucas', name: "Lucas's Crew", leadName: 'Lucas Chen', rate: 27, color: '#4193f7', avatar: crewAvatarUrl(41) },
-  { id: 'liam', name: "Liam's Crew", leadName: 'Liam Brooks', rate: 33, color: '#8640f6', avatar: crewAvatarUrl(18) },
 ]
 
 export const initialUnassignedCrews: UnassignedCrew[] = [

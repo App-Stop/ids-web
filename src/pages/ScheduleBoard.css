@@ -859,7 +859,7 @@ td.sb-col-divider {
 /* Wide top hit-area for note hover — leaves left/right edges free for drag handles */
 .sb-pill__note-wrap {
   position: absolute;
-  top: -16px;
+  top: -5px;
   left: 44px;
   right: 44px;
   height: 32px;
