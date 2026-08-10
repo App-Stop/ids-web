@@ -542,15 +542,25 @@ export default function Crew() {
         <CreateCrewModal
           jobs={masterJobs}
           onCancel={() => setFlow({ type: 'none' })}
-          onSubmit={(data) => {
+          onSubmit={(data, apiResponse) => {
             const selectedLead = crewLeads.find((item) => item.id === data.crewLeadId)
+            const createdId = apiResponse?._id ?? `c-${Date.now()}`
+            const createdCrewId = apiResponse?._id ? apiResponse._id.slice(-4) : String(Math.floor(1000 + Math.random() * 9000))
+            const rawStatus = apiResponse?.status ?? data.status
+            const displayStatus: Status =
+              rawStatus === 'active' || rawStatus === 'Active'
+                ? 'Active'
+                : rawStatus === 'inactive' || rawStatus === 'Inactive'
+                ? 'Inactive'
+                : 'Unassigned'
+
             setCrewRows((list) => [
               {
-                id: `c-${Date.now()}`,
-                crewId: String(Math.floor(1000 + Math.random() * 9000)),
-                name: data.crewName,
+                id: createdId,
+                crewId: createdCrewId,
+                name: apiResponse?.name ?? data.crewName,
                 avatar: `https://i.pravatar.cc/64?img=${Math.floor(Math.random() * 70)}`,
-                color: data.color ?? '#94a3b8',
+                color: apiResponse?.crewColor ?? data.color ?? '#94a3b8',
                 jobs: data.jobId
                   ? [
                       {
@@ -564,7 +574,7 @@ export default function Crew() {
                 workers: data.laborNames.length,
                 laborNames: data.laborNames,
                 rate: selectedLead?.rate ?? 25,
-                status: data.status === 'active' ? 'Active' : data.status === 'inactive' ? 'Inactive' : 'Unassigned',
+                status: displayStatus,
               },
               ...list,
             ])

@@ -10,6 +10,7 @@ import CostTracking from './pages/CostTracking'
 import Timesheet from './pages/Timesheet'
 import Profile from './pages/Profile'
 import HelpCenter from './pages/HelpCenter'
+import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
   return (
@@ -17,13 +18,13 @@ function App() {
       <Route path="/" element={<SignIn />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/schedule-board" element={<ScheduleBoard />} />
-      <Route path="/jobs-management" element={<JobsManagement />} />
-      <Route path="/cost-tracking" element={<CostTracking />} />
-      <Route path="/Crew" element={<Crew />} />
-      <Route path="/timesheet" element={<Timesheet />} />
-      <Route path="/profile" element={<Profile />} />
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/schedule-board" element={<ProtectedRoute><ScheduleBoard /></ProtectedRoute>} />
+      <Route path="/jobs-management" element={<ProtectedRoute><JobsManagement /></ProtectedRoute>} />
+      <Route path="/cost-tracking" element={<ProtectedRoute><CostTracking /></ProtectedRoute>} />
+      <Route path="/Crew" element={<ProtectedRoute><Crew /></ProtectedRoute>} />
+      <Route path="/timesheet" element={<ProtectedRoute><Timesheet /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/help-center" element={<HelpCenter />} />
       <Route path="/help-center/:articleId" element={<HelpCenter />} />
       <Route path="*" element={<Navigate to="/" replace />} />

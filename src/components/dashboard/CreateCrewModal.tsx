@@ -3,6 +3,7 @@ import Modal from './Modal'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import { crewColors, crewLeads, type Job } from '../../lib/dashboardData'
+import { createCrew, type CreateCrewPayload, type CrewDataResponse } from '../../api/crewApi'
 
 export type CrewStatus = 'active' | 'inactive' | 'unassigned'
 
@@ -42,7 +43,7 @@ export default function CreateCrewModal({
   jobs: Job[]
   crew?: EditableCrew
   onCancel: () => void
-  onSubmit: (data: CrewFormData) => void
+  onSubmit: (data: CrewFormData, apiResponse?: CrewDataResponse) => void
   onRemove?: () => void
 }) {
   const isEdit = !!crew
@@ -56,11 +57,13 @@ export default function CreateCrewModal({
   const [note, setNote] = useState('')
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [laborError, setLaborError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [apiError, setApiError] = useState('')
 
   const selectedLead = crewLeads.find((c) => c.id === crewLeadId)
   const selectedJob = jobs.find((j) => j.id === jobId)
   const selectedStatus = STATUS_OPTIONS.find((s) => s.id === status)!
-  const canSubmit = Boolean(crewName.trim() && crewLeadId)
+  const canSubmit = Boolean(crewName.trim() && crewLeadId) && !isSubmitting
 
   function addLaborName(rawName: string) {
     const value = rawName.trim()
@@ -105,7 +108,7 @@ export default function CreateCrewModal({
     )
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!canSubmit) return
     if (!crewLeadId) return
     if (laborNames.length === 0) {
@@ -113,7 +116,31 @@ export default function CreateCrewModal({
       return
     }
     setLaborError('')
-    onSubmit({ crewName, crewLeadId: crewLeadId ?? '', laborNames, jobId, status, color, note })
+    setApiError('')
+
+    const formData: CrewFormData = { crewName, crewLeadId, laborNames, jobId, status, color, note }
+
+    if (!isEdit) {
+      setIsSubmitting(true)
+      try {
+        const payload: CreateCrewPayload = {
+          name: crewName,
+          crewLead: crewLeadId,
+          members: laborNames,
+          crewColor: color,
+          status: status,
+        }
+        const response = await createCrew(payload)
+        onSubmit(formData, response.data)
+      } catch (err: any) {
+        const message = err.response?.data?.message || err.message || 'Failed to create crew. Please try again.'
+        setApiError(message)
+      } finally {
+        setIsSubmitting(false)
+      }
+    } else {
+      onSubmit(formData)
+    }
   }
 
   return (
@@ -234,6 +261,8 @@ export default function CreateCrewModal({
         onChange={(e) => setNote(e.target.value)}
       />
 
+      {apiError && <p className="field-error" style={{ marginTop: 12 }}>{apiError}</p>}
+
       <div className={`modal-actions ${isEdit ? 'modal-actions--split' : ''}`}>
         {isEdit && (
           <button type="button" className="cm-remove" onClick={() => setConfirmingRemove(true)}>
@@ -244,11 +273,11 @@ export default function CreateCrewModal({
           </button>
         )}
         <div className="modal-actions__group">
-          <button type="button" className="btn btn--outline" onClick={onCancel}>
+          <button type="button" className="btn btn--outline" disabled={isSubmitting} onClick={onCancel}>
             Cancel
           </button>
           <button type="button" className="btn btn--primary" disabled={!canSubmit} onClick={handleSubmit}>
-            {isEdit ? 'Update Crew' : 'Add Crew'}
+            {isSubmitting ? 'Creating...' : isEdit ? 'Update Crew' : 'Add Crew'}
           </button>
         </div>
       </div>

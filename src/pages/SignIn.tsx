@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from 'react'
+import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import BrandLogos from '../components/BrandLogos'
-import EmailField, { DOMAIN } from '../components/EmailField'
-import { signIn } from '../lib/auth'
+import EmailField from '../components/EmailField'
+import { getErrorMessage } from '../lib/errors'
+import { useAuth } from '../context/AuthContext'
 
 export default function SignIn() {
   const [email, setEmail] = useState('')
@@ -12,15 +13,17 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  async function onSubmit(e: FormEvent) {
+  const {adminLogin} = useAuth()
+
+  async function onSubmit(e : React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      await signIn(email + DOMAIN, password)
+      await adminLogin(email, password)
       navigate('/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed.')
+      setError(getErrorMessage(err, 'Invalid email or password'))
     } finally {
       setLoading(false)
     }
@@ -30,6 +33,7 @@ export default function SignIn() {
     <AuthLayout>
       <form className="auth-card" onSubmit={onSubmit}>
         <BrandLogos />
+
         <h1 className="auth-title">Sign In</h1>
         <p className="auth-subtitle">Enter your credentials to access your account</p>
 
