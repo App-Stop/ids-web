@@ -323,15 +323,13 @@
 .crew-table--leads th:nth-child(5),
 .crew-table--leads td:nth-child(5),
 .crew-table--leads th:nth-child(6),
-.crew-table--leads td:nth-child(6),
-.crew-table--leads th:nth-child(7),
-.crew-table--leads td:nth-child(7) {
+.crew-table--leads td:nth-child(6) {
   padding-left: 0.65rem;
   padding-right: 0.65rem;
 }
 
-.crew-table--leads th:nth-child(8),
-.crew-table--leads td:nth-child(8) {
+.crew-table--leads th:nth-child(7),
+.crew-table--leads td:nth-child(7) {
   padding-left: 0.35rem;
   padding-right: 0.65rem;
   text-align: left !important;
@@ -723,7 +721,8 @@
   background: #fff;
 }
 
-.crew-status--active {
+.crew-status--active,
+.crew-status--assigned {
   color: #16a34a;
   border-color: #86efac;
   background: rgba(34, 197, 94, 0.06);
@@ -739,6 +738,14 @@
   color: #9ca3af;
   border-color: #d1d5db;
   background: #fff;
+}
+
+.crew-empty-cell {
+  text-align: center !important;
+  padding: 3rem 1rem !important;
+  color: #6b7280;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .crew-th-sort {

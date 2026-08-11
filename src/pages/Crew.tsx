@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowDown, PenIcon } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import { Icon } from '../components/dashboard/icons'
@@ -6,12 +6,12 @@ import MenuDropdown from '../components/dashboard/MenuDropdown'
 import AddNewModal from '../components/dashboard/AddNewModal'
 import MultipleJobsModal from '../components/dashboard/MultipleJobsModal'
 import MemberFormModal, { type MemberFormData } from '../components/dashboard/MemberFormModal'
-// Reused as-is from the Dashboard page, per existing pattern.
 import CreateCrewModal from '../components/dashboard/CreateCrewModal'
 import AssignJobModal from '../components/dashboard/AssignJobModal'
 import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
+import { getCrewsSummary, getUsers, type UserResponseData } from '../api/crewApi'
 import {
   assignableCrews,
   crewLeads,
@@ -20,8 +20,6 @@ import {
   type UnassignedCrew,
 } from '../lib/dashboardData'
 import {
-  crewRows as initialCrewRows,
-  rosterRows as initialRosterRows,
   crewMenuOptions,
   jobMenuOptions,
   type CrewJobAssignment,
@@ -35,10 +33,14 @@ import './Dashboard.css'
 type Tab = 'crew' | 'roster'
 type SortKey = 'name-asc' | 'name-desc' | 'rate-desc' | 'rate-asc'
 
-const STATUS_OPTIONS = [
+const CREW_STATUS_OPTIONS = [
+  { id: 'Assigned', label: 'Assigned' },
+  { id: 'Unassigned', label: 'Unassigned' },
+]
+
+const ROSTER_STATUS_OPTIONS = [
   { id: 'Active', label: 'Active' },
   { id: 'Inactive', label: 'Inactive' },
-  { id: 'Unassigned', label: 'Unassigned' },
 ]
 
 const SORT_OPTIONS = [
@@ -114,24 +116,139 @@ function JobNameTooltip({ names, x, y }: { names: string[]; x: number; y: number
 
 export default function Crew() {
   const [tab, setTab] = useState<Tab>('crew')
-  const [crewRows, setCrewRows] = useState(initialCrewRows)
-  const [rosterRows, setRosterRows] = useState(initialRosterRows)
+  const [crewRows, setCrewRows] = useState<CrewRow[]>([])
+  const [rosterRows, setRosterRows] = useState<RosterRow[]>([])
+  const [loading, setLoading] = useState(false)
 
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<string | null>(null)
   const [sort, setSort] = useState<SortKey | null>(null)
-  const [jobFilter, setJobFilter] = useState<string | null>(null) // Crew tab
-  // Roster tab — no crew filter control is rendered yet, so this stays null.
+  const [jobFilter, setJobFilter] = useState<string | null>(null)
   const [crewFilter] = useState<string | null>(null)
   const [jobHover, setJobHover] = useState<{ x: number; y: number; names: string[] } | null>(null)
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
-  const [jobNotes, setJobNotes] = useState<Record<string, string>>({
-    'c8742:1042:001': 'Coordinate with suppliers and schedule weekly progress meetings.',
-  })
+  const [jobNotes, setJobNotes] = useState<Record<string, string>>({})
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
 
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
+
+  useEffect(() => {
+    setStatus(null)
+  }, [tab])
+
+  useEffect(() => {
+    async function fetchCrewsSummary() {
+      setLoading(true)
+      try {
+        let sortByNameParam: 'asc' | 'dec' | undefined
+        if (sort === 'name-asc') sortByNameParam = 'asc'
+        if (sort === 'name-desc') sortByNameParam = 'dec'
+
+        let statusParam: string | undefined
+        if (status) {
+          statusParam = status.toLowerCase() === 'assigned' ? 'assigned' : 'un-assigned'
+        }
+
+        const res = await getCrewsSummary({
+          jobId: jobFilter ?? undefined,
+          status: statusParam,
+          sortByName: sortByNameParam,
+        })
+
+        if (res.success && Array.isArray(res.data)) {
+          const mapped: CrewRow[] = res.data.map((item) => {
+            const leadObj = typeof item.crewLead === 'object' && item.crewLead !== null ? item.crewLead : null
+            const leadName = leadObj ? `${leadObj.firstName || ''} ${leadObj.lastName || ''}`.trim() : item.name
+            const displayStatus: Status = item.job ? 'Assigned' : 'Unassigned'
+
+            return {
+              id: item._id,
+              crewId: item._id.slice(-4),
+              name: item.name,
+              avatar: `https://i.pravatar.cc/64?img=${(item._id.charCodeAt(0) || 10) % 70}`,
+              color: item.crewColor || '#3b82f6',
+              jobs: item.job
+                ? [
+                    {
+                      bidNo: item.job.bidNo || '0000',
+                      jobNo: item.job.jobNo || '000',
+                      date: new Date().toISOString().slice(0, 10),
+                      jobName: item.job.name || 'Assigned Job',
+                    },
+                  ]
+                : [],
+              workers: item.membersCount || 0,
+              laborNames: leadName ? [leadName] : [],
+              rate: 35,
+              status: displayStatus,
+            }
+          })
+          setCrewRows(mapped)
+        } else {
+          setCrewRows([])
+        }
+      } catch (err) {
+        console.error('Failed to fetch crews summary:', err)
+        setCrewRows([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    async function fetchRosterUsers() {
+      setLoading(true)
+      try {
+        let isActiveParam: boolean | undefined
+        if (status === 'Active') {
+          isActiveParam = true
+        } else if (status === 'Inactive') {
+          isActiveParam = false
+        }
+
+        const res = await getUsers({
+          assignCrew: crewFilter ?? undefined,
+          isActive: isActiveParam,
+        })
+
+        if (res.success && Array.isArray(res.data)) {
+          const mapped: RosterRow[] = res.data.map((u) => {
+            const fullName = `${u.firstName} ${u.lastName}`.trim()
+            const roleDisplay = u.role === 'crew-lead' ? 'Crew Lead' : 'Labor'
+            const crewName = u.assignCrew?.name ?? null
+            const crewColor = u.assignCrew?.crewColor ?? '#808080'
+            const displayStatus: Status = u.isActive ? 'Active' : 'Inactive'
+
+            return {
+              id: u._id,
+              rosterId: u._id.slice(-4),
+              name: fullName,
+              avatar: `https://i.pravatar.cc/64?img=${(u._id.charCodeAt(0) || 15) % 70}`,
+              crewName,
+              crewColor,
+              role: roleDisplay,
+              rate: u.hourlyRate ?? 0,
+              status: displayStatus,
+            }
+          })
+          setRosterRows(mapped)
+        } else {
+          setRosterRows([])
+        }
+      } catch (err) {
+        console.error('Failed to fetch roster users:', err)
+        setRosterRows([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (tab === 'crew') {
+      fetchCrewsSummary()
+    } else if (tab === 'roster') {
+      fetchRosterUsers()
+    }
+  }, [tab, jobFilter, crewFilter, status, sort])
 
   const activeCrew =
     flow.type === 'viewJob' || flow.type === 'assignCrew'
@@ -145,55 +262,51 @@ export default function Crew() {
   const activeNote =
     activeCrew && activeAssignment ? (jobNotes[noteKey(activeCrew.id, activeAssignment)] ?? '') : ''
 
-  const filteredCrewRows = useMemo(() => {
-    let rows = crewRows.filter((r) => {
-      const matchesSearch = !search || r.name.toLowerCase().includes(search.toLowerCase()) || r.crewId.includes(search)
-      const matchesStatus = !status || r.status === status
-      const jobLabel = jobMenuOptions.find((j) => j.id === jobFilter)?.label
-      const matchesJob = !jobLabel || r.jobs.some((j) => j.jobName === jobLabel)
-      return matchesSearch && matchesStatus && matchesJob
-    })
-    if (sort) {
-      rows = [...rows].sort((a, b) => {
-        if (sort === 'name-asc') return a.name.localeCompare(b.name)
-        if (sort === 'name-desc') return b.name.localeCompare(a.name)
-        if (sort === 'rate-desc') return b.rate - a.rate
-        return a.rate - b.rate
-      })
-    }
-    return rows
-  }, [crewRows, search, status, jobFilter, sort])
+  const filteredCrewRows = crewRows.filter((row) => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase().trim()
+    return (
+      row.name.toLowerCase().includes(q) ||
+      row.crewId.toLowerCase().includes(q) ||
+      row.jobs.some((j) => j.jobName.toLowerCase().includes(q))
+    )
+  }).sort((a, b) => {
+    if (sort === 'rate-desc') return b.rate - a.rate
+    if (sort === 'rate-asc') return a.rate - b.rate
+    return 0
+  })
 
-  const filteredRosterRows = useMemo(() => {
-    let rows = rosterRows.filter((r) => {
-      const matchesSearch = !search || r.name.toLowerCase().includes(search.toLowerCase()) || r.rosterId.includes(search)
-      const matchesStatus = !status || r.status === status
-      const crewLabel = crewMenuOptions.find((c) => c.id === crewFilter)?.label
-      const matchesCrew = !crewLabel || r.crewName === crewLabel
-      return matchesSearch && matchesStatus && matchesCrew
-    })
-    if (sort) {
-      rows = [...rows].sort((a, b) => {
-        if (sort === 'name-asc') return a.name.localeCompare(b.name)
-        if (sort === 'name-desc') return b.name.localeCompare(a.name)
-        if (sort === 'rate-desc') return b.rate - a.rate
-        return a.rate - b.rate
-      })
-    }
-    return rows
-  }, [rosterRows, search, status, crewFilter, sort])
+  const filteredRosterRows = rosterRows.filter((row) => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase().trim()
+    return (
+      row.name.toLowerCase().includes(q) ||
+      row.rosterId.toLowerCase().includes(q) ||
+      (row.crewName && row.crewName.toLowerCase().includes(q)) ||
+      row.role.toLowerCase().includes(q)
+    )
+  }).sort((a, b) => {
+    if (sort === 'name-asc') return a.name.localeCompare(b.name)
+    if (sort === 'name-desc') return b.name.localeCompare(a.name)
+    if (sort === 'rate-desc') return b.rate - a.rate
+    if (sort === 'rate-asc') return a.rate - b.rate
+    return 0
+  })
 
-  function submitMember(data: MemberFormData) {
+  function submitMember(data: MemberFormData, apiUserData?: UserResponseData) {
     const crew = crewMenuOptions.find((c) => c.id === data.crewId)
-    const rate = Number(data.rate) || 0
+    const rate = apiUserData?.user.hourlyRate ?? (Number(data.rate) || 0)
+    const memberName = apiUserData?.user
+      ? `${apiUserData.user.firstName} ${apiUserData.user.lastName}`.trim()
+      : `${data.firstName} ${data.lastName}`.trim()
 
     if (flow.type === 'addMember') {
       setRosterRows((list) => [
         ...list,
         {
-          id: `r-${Date.now()}`,
-          rosterId: String(Math.floor(60 + Math.random() * 40)),
-          name: `${data.firstName} ${data.lastName}`.trim(),
+          id: apiUserData?.user._id ?? `r-${Date.now()}`,
+          rosterId: apiUserData?.user._id ? apiUserData.user._id.slice(-4) : String(Math.floor(60 + Math.random() * 40)),
+          name: memberName,
           avatar: `https://i.pravatar.cc/64?img=${Math.floor(Math.random() * 70)}`,
           crewName: crew?.label ?? null,
           crewColor: crew?.color ?? '#94a3b8',
@@ -209,7 +322,7 @@ export default function Crew() {
           r.id === targetId
             ? {
                 ...r,
-                name: `${data.firstName} ${data.lastName}`.trim(),
+                name: memberName,
                 crewName: crew?.label ?? null,
                 crewColor: crew?.color ?? r.crewColor,
                 role: data.role,
@@ -268,7 +381,7 @@ export default function Crew() {
           </label>
 
           <span className="crew-count">
-            {tab === 'crew' ? `${crewRows.length} Total Crew` : `${rosterRows.length} Total Members`}
+            {tab === 'crew' ? `${filteredCrewRows.length} Total Crew` : `${filteredRosterRows.length} Total Members`}
           </span>
 
           <div className="sb-toggle crew-tab-toggle">
@@ -295,7 +408,7 @@ export default function Crew() {
 
           <MenuDropdown
             className="crew-dd crew-dd--status"
-            options={STATUS_OPTIONS}
+            options={tab === 'crew' ? CREW_STATUS_OPTIONS : ROSTER_STATUS_OPTIONS}
             value={status}
             onChange={setStatus}
             placeholder="Status"
@@ -326,14 +439,13 @@ export default function Crew() {
           {tab === 'crew' ? (
             <table className="crew-table crew-table--leads">
               <colgroup>
-                <col style={{ width: '3.5%' }} />
+                <col style={{ width: '4%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '22%' }} />
+                <col style={{ width: '34%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '12%' }} />
                 <col style={{ width: '8%' }} />
-                <col style={{ width: '16%' }} />
-                <col style={{ width: '28%' }} />
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '14%' }} />
-                <col style={{ width: '13%' }} />
-                <col style={{ width: '8.5%' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -344,7 +456,6 @@ export default function Crew() {
                   <th>Crew Name</th>
                   <th>Job Name</th>
                   <th className="crew-center">Workers</th>
-                  <th className="crew-center">Hourly Rate ($)</th>
                   <th className="crew-center">
                     <span className="crew-th-sort">
                       Status
@@ -355,90 +466,103 @@ export default function Crew() {
                 </tr>
               </thead>
               <tbody>
-                {filteredCrewRows.map((row) => (
-                  <tr key={row.id}>
-                    <td className="crew-col-check">
-                      <input type="checkbox" />
-                    </td>
-                    <td className="crew-id-cell">
-                      <span
-                        className="crew-id-bar-hit"
-                        onMouseEnter={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect()
-                          setCrewHover({
-                            x: rect.right + 8,
-                            y: rect.top + rect.height / 2,
-                            color: row.color,
-                            names: [row.name],
-                          })
-                        }}
-                        onMouseLeave={() => setCrewHover(null)}
-                      >
-                        <span className="crew-id-bar" style={{ background: row.color }} />
-                      </span>
-                      #{row.crewId}
-                    </td>
-                    <td>
-                      <div className="crew-name-cell">
-                        <img className="crew-avatar" src={row.avatar} alt="" />
-                        {row.name}
-                      </div>
-                    </td>
-                    <td>
-                      {row.jobs.length === 0 ? (
-                        <span className="crew-job-cell">
-                          <span className="crew-job-cell__unassigned">Unassigned</span>
-                          <button type="button" className="crew-assign-link" onClick={() => setFlow({ type: 'assignJob', crew: row })}>
-                            Assign Job
-                          </button>
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="crew-job-cell"
-                          onClick={() =>
-                            row.jobs.length > 1
-                              ? setFlow({ type: 'multipleJobs', crew: row })
-                              : setFlow({ type: 'viewJob', crewId: row.id, jobIndex: 0 })
-                          }
-                        >
-                          <span className="crew-job-cell__name">{row.jobs[0].jobName}</span>
-                          <span className="crew-job-cell__tail">
-                            {row.jobs.length > 1 && <span className="crew-job-cell__more">+{row.jobs.length - 1}</span>}
-                            <Icon.ChevronRight width={14} height={14} />
-                          </span>
-                        </button>
-                      )}
-                    </td>
-                    <td className="crew-center">
-                      <span
-                        className="crew-workers-cell"
-                        onMouseEnter={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect()
-                          setJobHover({
-                            x: rect.left + rect.width / 2,
-                            y: rect.bottom + 8,
-                            names: row.laborNames,
-                          })
-                        }}
-                        onMouseLeave={() => setJobHover(null)}
-                      >
-                        {row.workers}
-                      </span>
-                    </td>
-                    <td className="crew-center">{row.rate}</td>
-                    <td className="crew-center">
-                      <StatusPill status={row.status} />
-                    </td>
-                    <td>
-                      <button type="button" className="btn btn--primary" onClick={() => setFlow({ type: 'editCrew', crew: row })}>
-                        <PenIcon size={20}/>
-                      <p>Edit</p>
-                        {row.status === 'Unassigned' && <span className="crew-edit-btn__dot" />}
-                      </button>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="crew-empty-cell">
+                      Loading crew data...
                     </td>
                   </tr>
-                ))}
+                ) : filteredCrewRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="crew-empty-cell">
+                      No crews found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCrewRows.map((row) => (
+                    <tr key={row.id}>
+                      <td className="crew-col-check">
+                        <input type="checkbox" />
+                      </td>
+                      <td className="crew-id-cell">
+                        <span
+                          className="crew-id-bar-hit"
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            setCrewHover({
+                              x: rect.right + 8,
+                              y: rect.top + rect.height / 2,
+                              color: row.color,
+                              names: [row.name],
+                            })
+                          }}
+                          onMouseLeave={() => setCrewHover(null)}
+                        >
+                          <span className="crew-id-bar" style={{ background: row.color }} />
+                        </span>
+                        #{row.crewId}
+                      </td>
+                      <td>
+                        <div className="crew-name-cell">
+                          <img className="crew-avatar" src={row.avatar} alt="" />
+                          {row.name}
+                        </div>
+                      </td>
+                      <td>
+                        {row.jobs.length === 0 ? (
+                          <span className="crew-job-cell">
+                            <span className="crew-job-cell__unassigned">Unassigned</span>
+                            <button type="button" className="crew-assign-link" onClick={() => setFlow({ type: 'assignJob', crew: row })}>
+                              Assign Job
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="crew-job-cell"
+                            onClick={() =>
+                              row.jobs.length > 1
+                                ? setFlow({ type: 'multipleJobs', crew: row })
+                                : setFlow({ type: 'viewJob', crewId: row.id, jobIndex: 0 })
+                            }
+                          >
+                            <span className="crew-job-cell__name">{row.jobs[0].jobName}</span>
+                            <span className="crew-job-cell__tail">
+                              {row.jobs.length > 1 && <span className="crew-job-cell__more">+{row.jobs.length - 1}</span>}
+                              <Icon.ChevronRight width={14} height={14} />
+                            </span>
+                          </button>
+                        )}
+                      </td>
+                      <td className="crew-center">
+                        <span
+                          className="crew-workers-cell"
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            setJobHover({
+                              x: rect.left + rect.width / 2,
+                              y: rect.bottom + 8,
+                              names: row.laborNames,
+                            })
+                          }}
+                          onMouseLeave={() => setJobHover(null)}
+                        >
+                          {row.workers}
+                        </span>
+                      </td>
+                      <td className="crew-center">
+                        <StatusPill status={row.status} />
+                      </td>
+                      <td>
+                        <button type="button" className="btn btn--primary" onClick={() => setFlow({ type: 'editCrew', crew: row })}>
+                          <PenIcon size={20}/>
+                          <p>Edit</p>
+                          {row.status === 'Unassigned' && <span className="crew-edit-btn__dot" />}
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           ) : (
@@ -468,56 +592,70 @@ export default function Crew() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRosterRows.map((row) => (
-                  <tr key={row.id}>
-                    <td className="crew-col-check">
-                      <input type="checkbox" />
-                    </td>
-                    <td className="crew-id-cell crew-id-cell--roster">#{row.rosterId}</td>
-                    <td>
-                      <div className="crew-name-cell">
-                        <img className="crew-avatar" src={row.avatar} alt="" />
-                        {row.name}
-                      </div>
-                    </td>
-                    <td className={row.crewName ? 'crew-assigned-td' : 'crew-assigned-td crew-assigned-td--empty'}>
-                      {row.crewName ? (
-                        <>
-                          <span
-                            className="crew-assigned-bar-hit"
-                            onMouseEnter={(e) => {
-                              if (!row.crewName) return
-                              const rect = e.currentTarget.getBoundingClientRect()
-                              setCrewHover({
-                                x: rect.right + 8,
-                                y: rect.top + rect.height / 2,
-                                color: row.crewColor ?? '#94a3b8',
-                                names: [row.crewName],
-                              })
-                            }}
-                            onMouseLeave={() => setCrewHover(null)}
-                          >
-                            <span className="crew-assigned-bar" style={{ background: row.crewColor ?? '#94a3b8' }} />
-                          </span>
-                          <span className="crew-assigned-name">{row.crewName}</span>
-                        </>
-                      ) : (
-                        <span className="crew-job-cell__unassigned">Unassigned</span>
-                      )}
-                    </td>
-                    <td className="crew-center">{row.role}</td>
-                    <td className="crew-center">{row.rate}</td>
-                    <td className="crew-center">
-                      <StatusPill status={row.status} />
-                    </td>
-                    <td className="crew-center">
-                      <button type="button" className="btn btn--primary" onClick={() => setFlow({ type: 'editMember', member: row })}>
-                        <PenIcon size={20}/>
-                      <p>Edit</p>
-                      </button>
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="crew-empty-cell">
+                      Loading roster data...
                     </td>
                   </tr>
-                ))}
+                ) : filteredRosterRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="crew-empty-cell">
+                      No members found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRosterRows.map((row) => (
+                    <tr key={row.id}>
+                      <td className="crew-col-check">
+                        <input type="checkbox" />
+                      </td>
+                      <td className="crew-id-cell crew-id-cell--roster">#{row.rosterId}</td>
+                      <td>
+                        <div className="crew-name-cell">
+                          <img className="crew-avatar" src={row.avatar} alt="" />
+                          {row.name}
+                        </div>
+                      </td>
+                      <td className={row.crewName ? 'crew-assigned-td' : 'crew-assigned-td crew-assigned-td--empty'}>
+                        {row.crewName ? (
+                          <>
+                            <span
+                              className="crew-assigned-bar-hit"
+                              onMouseEnter={(e) => {
+                                if (!row.crewName) return
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setCrewHover({
+                                  x: rect.right + 8,
+                                  y: rect.top + rect.height / 2,
+                                  color: row.crewColor ?? '#94a3b8',
+                                  names: [row.crewName],
+                                })
+                              }}
+                              onMouseLeave={() => setCrewHover(null)}
+                            >
+                              <span className="crew-assigned-bar" style={{ background: row.crewColor ?? '#94a3b8' }} />
+                            </span>
+                            <span className="crew-assigned-name">{row.crewName}</span>
+                          </>
+                        ) : (
+                          <span className="crew-job-cell__unassigned">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="crew-center">{row.role}</td>
+                      <td className="crew-center">{row.rate}</td>
+                      <td className="crew-center">
+                        <StatusPill status={row.status} />
+                      </td>
+                      <td className="crew-center">
+                        <button type="button" className="btn btn--primary" onClick={() => setFlow({ type: 'editMember', member: row })}>
+                          <PenIcon size={20}/>
+                          <p>Edit</p>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
@@ -589,44 +727,55 @@ export default function Crew() {
         <CreateCrewModal
           jobs={masterJobs}
           crew={{
+            id: flow.crew.id,
             name: flow.crew.name,
             color: flow.crew.color,
             rate: flow.crew.rate,
             laborNames: flow.crew.laborNames,
-            status: flow.crew.status.toLowerCase() as 'active' | 'inactive' | 'unassigned',
+            status: flow.crew.status === 'Unassigned' ? 'unassigned' : 'active',
             jobId: flow.crew.jobs[0] ? masterJobs.find((job) => job.name === flow.crew.jobs[0].jobName)?.id ?? null : null,
           }}
           onCancel={() => setFlow({ type: 'none' })}
-          onSubmit={(data) => {
-            const targetId = flow.crew.id
-            const selectedJob = data.jobId ? masterJobs.find((job) => job.id === data.jobId) : undefined
-            const selectedLead = crewLeads.find((item) => item.id === data.crewLeadId)
-            setCrewRows((list) =>
-              list.map((r) =>
-                r.id === targetId
-                  ? {
-                      ...r,
-                      name: data.crewName,
-                      color: data.color ?? r.color,
-                      workers: data.laborNames.length,
-                      laborNames: data.laborNames,
-                      rate: selectedLead?.rate ?? r.rate,
-                      status: data.status === 'active' ? 'Active' : data.status === 'inactive' ? 'Inactive' : 'Unassigned',
-                      jobs: selectedJob
-                        ? [
-                            {
-                              bidNo: '0000',
-                              jobNo: '000',
-                              date: new Date().toISOString().slice(0, 10),
-                              jobName: selectedJob.name,
-                            },
-                          ]
-                        : r.jobs,
-                    }
-                  : r,
-              ),
-            )
+          onSubmit={() => {
             setFlow({ type: 'none' })
+            // Refresh list
+            if (tab === 'crew') {
+              getCrewsSummary({
+                jobId: jobFilter ?? undefined,
+                status: status ? (status.toLowerCase() === 'assigned' ? 'assigned' : 'un-assigned') : undefined,
+                sortByName: sort === 'name-asc' ? 'asc' : sort === 'name-desc' ? 'dec' : undefined,
+              }).then((res) => {
+                if (res.success && Array.isArray(res.data)) {
+                  setCrewRows(
+                    res.data.map((item) => {
+                      const leadObj = typeof item.crewLead === 'object' && item.crewLead !== null ? item.crewLead : null
+                      const leadName = leadObj ? `${leadObj.firstName || ''} ${leadObj.lastName || ''}`.trim() : item.name
+                      return {
+                        id: item._id,
+                        crewId: item._id.slice(-4),
+                        name: item.name,
+                        avatar: `https://i.pravatar.cc/64?img=${(item._id.charCodeAt(0) || 10) % 70}`,
+                        color: item.crewColor || '#3b82f6',
+                        jobs: item.job
+                          ? [
+                              {
+                                bidNo: item.job.bidNo || '0000',
+                                jobNo: item.job.jobNo || '000',
+                                date: new Date().toISOString().slice(0, 10),
+                                jobName: item.job.name || 'Assigned Job',
+                              },
+                            ]
+                          : [],
+                        workers: item.membersCount || 0,
+                        laborNames: leadName ? [leadName] : [],
+                        rate: 35,
+                        status: item.job ? 'Assigned' : 'Unassigned',
+                      }
+                    }),
+                  )
+                }
+              })
+            }
           }}
           onRemove={removeCrew}
         />
@@ -661,16 +810,41 @@ export default function Crew() {
           mode="edit"
           crews={crewMenuOptions}
           initial={{
+            memberId: flow.member.id,
             firstName: flow.member.name.split(' ')[0] ?? '',
             lastName: flow.member.name.split(' ').slice(1).join(' '),
-            emailLocalPart: flow.member.name.split(' ')[0]?.toLowerCase() ?? '',
+            emailLocalPart: '',
             role: flow.member.role,
-            crewId: crewMenuOptions.find((c) => c.label === flow.member.crewName)?.id ?? null,
+            crewId: flow.member.crewName,
             rate: String(flow.member.rate),
             status: flow.member.status,
           }}
           onCancel={() => setFlow({ type: 'none' })}
-          onSubmit={submitMember}
+          onSubmit={() => {
+            setFlow({ type: 'none' })
+            if (tab === 'roster') {
+              getUsers({
+                assignCrew: crewFilter ?? undefined,
+                isActive: status === 'Active' ? true : status === 'Inactive' ? false : undefined,
+              }).then((res) => {
+                if (res.success && Array.isArray(res.data)) {
+                  setRosterRows(
+                    res.data.map((u) => ({
+                      id: u._id,
+                      rosterId: u._id.slice(-4),
+                      name: `${u.firstName} ${u.lastName}`.trim(),
+                      avatar: `https://i.pravatar.cc/64?img=${(u._id.charCodeAt(0) || 15) % 70}`,
+                      crewName: u.assignCrew?.name ?? null,
+                      crewColor: u.assignCrew?.crewColor ?? '#808080',
+                      role: u.role === 'crew-lead' ? 'Crew Lead' : 'Labor',
+                      rate: u.hourlyRate ?? 0,
+                      status: u.isActive ? 'Active' : 'Inactive',
+                    })),
+                  )
+                }
+              })
+            }
+          }}
           onRemove={removeMember}
         />
       )}
@@ -757,7 +931,7 @@ export default function Crew() {
                 }
                 if (target && r.id === target.id) {
                   jobs = [...jobs, assignment]
-                  status = 'Active'
+                  status = 'Assigned'
                 }
                 return { ...r, jobs, status }
               })
@@ -773,7 +947,6 @@ export default function Crew() {
       )}
 
       {flow.type === 'assignJob' && (
-        // Reused as-is from the Dashboard page.
         <AssignJobModal
           crew={{ id: flow.crew.id, name: flow.crew.name, leadName: flow.crew.name, rate: flow.crew.rate, avatar: flow.crew.avatar }}
           date={new Date().toISOString().slice(0, 10)}
@@ -788,7 +961,7 @@ export default function Crew() {
                 r.id === targetId
                   ? {
                       ...r,
-                      status: 'Active',
+                      status: 'Assigned',
                       jobs: [{ bidNo: job.bidNo, jobNo: job.jobNo, date: job.startDate, jobName: job.name }],
                     }
                   : r,

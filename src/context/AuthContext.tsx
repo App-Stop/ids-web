@@ -44,7 +44,18 @@ interface AuthProviderProps {
 export const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const savedUser = localStorage.getItem("user");
+      const token = localStorage.getItem("accessToken");
+      if (savedUser && token) {
+        return JSON.parse(savedUser);
+      }
+    } catch (e) {
+      console.error("Failed to parse saved user from localStorage", e);
+    }
+    return null;
+  });
 
   const adminLogin = async (email: string, password: string) => {
     const { data: body } = await api.post<LoginResponse>("/admin/login", {

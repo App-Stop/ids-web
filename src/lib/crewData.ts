@@ -1,4 +1,4 @@
-export type Status = 'Active' | 'Inactive' | 'Unassigned'
+export type Status = 'Active' | 'Inactive' | 'Assigned' | 'Unassigned'
 
 export interface CrewJobAssignment {
   bidNo: string
