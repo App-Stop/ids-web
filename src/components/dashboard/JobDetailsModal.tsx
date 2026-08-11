@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Modal from './Modal'
 import Avatar from './Avatar'
 import ConfirmModal from './ConfirmModal'
 import { Icon } from './icons'
 import { formatMoney, type Job, type UnassignedCrew } from '../../lib/dashboardData'
+import { getJobById, type JobItem } from '../../api/jobApi'
 
 export default function JobDetailsModal({
   job,
@@ -26,6 +27,47 @@ export default function JobDetailsModal({
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [editingNote, setEditingNote] = useState(false)
   const [noteDraft, setNoteDraft] = useState(note)
+  const [fetchedJob, setFetchedJob] = useState<JobItem | null>(null)
+
+  useEffect(() => {
+    async function loadJobDetails() {
+      if (!job.id || job.id.startsWith('#tmp')) {
+        return
+      }
+      try {
+        const res = await getJobById(job.id)
+        if (res.success && res.data) {
+          setFetchedJob(res.data)
+          if (res.data.note) {
+            setNoteDraft(res.data.note)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch job details:', err)
+      }
+    }
+
+    loadJobDetails()
+  }, [job.id])
+
+  const displayJob: Job = fetchedJob
+    ? {
+        id: fetchedJob._id,
+        name: fetchedJob.name,
+        color: job.color,
+        bidNo: String(1000 + (fetchedJob.jobIdNumber || 0)),
+        jobNo: String(fetchedJob.jobIdNumber || 0),
+        gc: fetchedJob.generalContractor || job.gc,
+        estimator: job.estimator,
+        startDate: fetchedJob.startDate ? new Date(fetchedJob.startDate).toISOString().slice(0, 10) : job.startDate,
+        endDate: fetchedJob.endDate ? new Date(fetchedJob.endDate).toISOString().slice(0, 10) : job.endDate,
+        contractAmount: fetchedJob.contractAmount ?? job.contractAmount,
+        laborBudgetUsed: job.laborBudgetUsed,
+        laborBudgetTotal: fetchedJob.laborBudget ?? job.laborBudgetTotal,
+      }
+    : job
+
+  const displayNote = fetchedJob?.note ?? note
 
   if (confirmingRemove) {
     return (
@@ -42,28 +84,28 @@ export default function JobDetailsModal({
   return (
     <Modal onClose={onDone} width={460}>
       <p className="job-head__meta">
-        Bid #{job.bidNo} &middot; Job #{job.jobNo}
+        Bid #{displayJob.bidNo} &middot; Job #{displayJob.jobNo}
       </p>
       <h2 className="modal-title" style={{ marginTop: '0.25rem' }}>
-        {job.name}
+        {displayJob.name}
       </h2>
 
       <div className="detail-grid">
         <div>
           <span className="detail-label">General Contractor</span>
-          <span className="detail-value">{job.gc}</span>
+          <span className="detail-value">{displayJob.gc}</span>
         </div>
         <div>
           <span className="detail-label">Estimator</span>
-          <span className="detail-value">{job.estimator}</span>
+          <span className="detail-value">{displayJob.estimator}</span>
         </div>
         <div>
           <span className="detail-label">Start Date</span>
-          <span className="detail-value">{job.startDate}</span>
+          <span className="detail-value">{displayJob.startDate}</span>
         </div>
         <div>
           <span className="detail-label">End Date</span>
-          <span className="detail-value">{job.endDate}</span>
+          <span className="detail-value">{displayJob.endDate}</span>
         </div>
       </div>
 
@@ -72,12 +114,12 @@ export default function JobDetailsModal({
       <div className="detail-grid">
         <div>
           <span className="detail-label">Contract Amount</span>
-          <span className="detail-value">{formatMoney(job.contractAmount)}</span>
+          <span className="detail-value">{formatMoney(displayJob.contractAmount)}</span>
         </div>
         <div>
           <span className="detail-label">Labor Budget</span>
           <span className="detail-value">
-            {formatMoney(job.laborBudgetUsed)} / {formatMoney(job.laborBudgetTotal)}
+            {formatMoney(displayJob.laborBudgetUsed)} / {formatMoney(displayJob.laborBudgetTotal)}
           </span>
         </div>
       </div>
@@ -91,13 +133,13 @@ export default function JobDetailsModal({
           <span className="crew-row__name">
             {crew.leadName} (${crew.rate}/h)
           </span>
-          <span className="crew-row__date">{job.startDate}</span>
+          <span className="crew-row__date">{displayJob.startDate}</span>
         </div>
       ) : (
         <p className="crew-row__empty">No crew assigned</p>
       )}
 
-      {(note || onSaveNote) && (
+      {(displayNote || onSaveNote) && (
         <>
           <div className="note-section__head">
             <span className="detail-label" style={{marginTop:20}}>Note</span>
@@ -106,11 +148,11 @@ export default function JobDetailsModal({
                 type="button"
                 className="note-section__action"
                 onClick={() => {
-                  setNoteDraft(note)
+                  setNoteDraft(displayNote)
                   setEditingNote(true)
                 }}
               >
-                {note ? 'Edit' : 'Add Note'}
+                {displayNote ? 'Edit' : 'Add Note'}
               </button>
             )}
           </div>
@@ -140,8 +182,8 @@ export default function JobDetailsModal({
                 </button>
               </div>
             </>
-          ) : note ? (
-            <div className="note-box">{note}</div>
+          ) : displayNote ? (
+            <div className="note-box">{displayNote}</div>
           ) : (
             <p className="crew-row__empty">No note added</p>
           )}

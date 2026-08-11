@@ -3,7 +3,7 @@ import { Icon } from './icons'
 import MenuDropdown from './MenuDropdown'
 import type { CrewMenuOption, Status } from '../../lib/crewData'
 import { createUser, updateUser, getUserById, getCrewsSummary, type CreateUserPayload, type UpdateUserPayload, type UserResponseData } from '../../api/crewApi'
-import { getErrorMessage } from '../../lib/errors'
+import { parseApiErrors } from '../../lib/errors'
 import './crew-modals.css'
 
 export interface MemberFormData {
@@ -55,6 +55,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [apiError, setApiError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [tempPassword, setTempPassword] = useState<string | null>(null)
   const [createdUserData, setCreatedUserData] = useState<UserResponseData | null>(null)
   const [useCustomPassword, setUseCustomPassword] = useState(false)
@@ -121,6 +122,9 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
   }
 
   async function handleSubmit() {
+    setApiError('')
+    setFieldErrors({})
+
     if (!form.firstName.trim() || !form.lastName.trim()) {
       setApiError('First Name and Last Name are required.')
       return
@@ -136,7 +140,6 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
       return
     }
 
-    setApiError('')
     setIsSubmitting(true)
 
     try {
@@ -175,7 +178,9 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
         onSubmit(form)
       }
     } catch (err: any) {
-      setApiError(getErrorMessage(err, `Failed to ${mode === 'add' ? 'create' : 'update'} user.`))
+      const parsed = parseApiErrors(err, `Failed to ${mode === 'add' ? 'create' : 'update'} user.`)
+      setApiError(parsed.generalMessage)
+      setFieldErrors(parsed.fieldErrors)
     } finally {
       setIsSubmitting(false)
     }
@@ -233,31 +238,40 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
       <div className="cm-card cm-card--narrow cm-card--member" onClick={(e) => e.stopPropagation()}>
         <h2 className="cm-card__title cm-card__title--pad">{mode === 'add' ? 'Add New Member' : 'Edit Member'}</h2>
 
+        {apiError && (
+          <div className="form-error-alert" style={{ marginTop: '0', marginBottom: '1rem' }}>
+            <Icon.AlertCircle width={18} height={18} />
+            <span>{apiError}</span>
+          </div>
+        )}
+
         <div className="cm-field-row">
           <label className="cm-field">
             <span className="cm-field__label">First Name*</span>
             <input
-              className="cm-input"
+              className={`cm-input${fieldErrors.firstName ? ' field-input--error' : ''}`}
               value={form.firstName}
               onChange={(e) => update('firstName', e.target.value)}
               placeholder="John"
             />
+            {fieldErrors.firstName && <span className="field-error-text">{fieldErrors.firstName}</span>}
           </label>
           <label className="cm-field">
             <span className="cm-field__label">Last Name*</span>
             <input
-              className="cm-input"
+              className={`cm-input${fieldErrors.lastName ? ' field-input--error' : ''}`}
               value={form.lastName}
               onChange={(e) => update('lastName', e.target.value)}
               placeholder="Verdan"
             />
+            {fieldErrors.lastName && <span className="field-error-text">{fieldErrors.lastName}</span>}
           </label>
         </div>
 
         {mode === 'add' && (
           <label className="cm-field">
             <span className="cm-field__label">Email address</span>
-            <span className="cm-input cm-input--split">
+            <span className={`cm-input cm-input--split${fieldErrors.email ? ' field-input--error' : ''}`}>
               <input
                 className="cm-input__bare"
                 value={form.emailLocalPart}
@@ -266,6 +280,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
               />
               <span className="cm-input__suffix">@idsdemo.com</span>
             </span>
+            {fieldErrors.email && <span className="field-error-text">{fieldErrors.email}</span>}
           </label>
         )}
 
@@ -279,6 +294,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
             showDot={false}
             className="cm-field__dropdown"
           />
+          {fieldErrors.role && <span className="field-error-text">{fieldErrors.role}</span>}
         </label>
 
         <label className="cm-field">
@@ -293,11 +309,14 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
             showDot
             className="cm-field__dropdown"
           />
+          {(fieldErrors.assignCrew || fieldErrors.crewId) && (
+            <span className="field-error-text">{fieldErrors.assignCrew || fieldErrors.crewId}</span>
+          )}
         </label>
 
         <label className="cm-field">
           <span className="cm-field__label">Hourly Rate</span>
-          <span className="cm-input cm-input--split">
+          <span className={`cm-input cm-input--split${fieldErrors.hourlyRate || fieldErrors.rate ? ' field-input--error' : ''}`}>
             <span className="cm-input__prefix">$</span>
             <input
               className="cm-input__bare"
@@ -307,6 +326,9 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
               placeholder="20"
             />
           </span>
+          {(fieldErrors.hourlyRate || fieldErrors.rate) && (
+            <span className="field-error-text">{fieldErrors.hourlyRate || fieldErrors.rate}</span>
+          )}
         </label>
 
         {mode === 'edit' && (

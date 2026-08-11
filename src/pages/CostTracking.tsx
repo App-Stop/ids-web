@@ -12,6 +12,12 @@ import { crewRows as initialCrewRows, crewMenuOptions } from '../lib/crewData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import { useSidebarCollapsed } from '../hooks/useSidebarCollapsed'
 import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
+import { AddDailyDumpsterCountModal } from '../components/dashboard/CostTrackingModals'
+import {
+  getCostTrackingReport,
+  type CostTrackingReportData,
+  type CostTrackingReportParams,
+} from '../api/dumpsterCostApi'
 import {
   assignableCrews,
   formatMoney,
@@ -555,6 +561,127 @@ export default function CostTracking() {
   const [startDate, setStartDate] = useState(DEFAULT_RANGE.start)
   const [endDate, setEndDate] = useState(DEFAULT_RANGE.end)
 
+  const [reportData, setReportData] = useState<CostTrackingReportData | null>(null)
+  const [loadingReport, setLoadingReport] = useState(false)
+  const [reportError, setReportError] = useState<string>('')
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function fetchReport() {
+      setLoadingReport(true)
+      setReportError('')
+
+      let dateFilterParam: 'allTime' | 'custom' | 'weekly' | 'monthly' = 'allTime'
+      if (range === 'Weekly') dateFilterParam = 'weekly'
+      else if (range === 'Monthly') dateFilterParam = 'monthly'
+      else if (range === 'Custom Range') dateFilterParam = 'custom'
+
+      const params: CostTrackingReportParams = {
+        dateFilter: dateFilterParam,
+        groupBy: tab === 'jobs' ? 'jobs' : 'crews',
+        limit: 100,
+      }
+
+      if (dateFilterParam === 'custom') {
+        params.dateFrom = startDate
+        params.dateTo = endDate
+      } else if (dateFilterParam === 'weekly' || dateFilterParam === 'monthly') {
+        params.startDate = startDate
+      }
+
+      if (search.trim()) {
+        params.search = search.trim()
+      }
+
+      if (tab === 'jobs' && jobFilter) {
+        params.jobId = jobFilter
+      } else if (tab === 'crew' && crewFilter) {
+        params.crewId = crewFilter
+      }
+
+      try {
+        const response = await getCostTrackingReport(params)
+        if (isMounted && response.success) {
+          setReportData(response.data)
+
+          if (params.groupBy === 'jobs') {
+            const mappedJobRows: JobCostRow[] = response.data.groups.map((grp, index) => {
+              const dailyCosts: Record<string, number | null> = {}
+              grp.costByDate.forEach((c) => {
+                dailyCosts[c.date] = c.totalCost
+              })
+
+              const jobIdStr = grp.jobId ?? `job-${index}`
+              const idNumStr = grp.jobIdNumber ? String(grp.jobIdNumber).padStart(3, '0') : String(index + 1).padStart(3, '0')
+
+              return {
+                id: `#${idNumStr}`,
+                jobId: jobIdStr,
+                jobName: grp.jobName || 'Unnamed Job',
+                color: assignableCrews[index % assignableCrews.length]?.color ?? '#94a3b8',
+                date: grp.costByDate[0]?.date || new Date().toISOString().slice(0, 10),
+                endDate: grp.costByDate[grp.costByDate.length - 1]?.date || new Date().toISOString().slice(0, 10),
+                contract: 0,
+                laborBudgetTotal: 0,
+                laborBudgetUsed: grp.totalLaborCost,
+                balanceLeft: 0,
+                percentSpent: 0,
+                cumulativeLaborCosts: grp.totalLaborCost,
+                laborCost: grp.totalLaborCost,
+                dumpstersCount: 0,
+                dumpsterUnitCost: 0,
+                totalCost: grp.totalLaborCost + grp.totalDumpsterCost,
+                weeklyCosts: [],
+                dailyCosts,
+              }
+            })
+            setJobRows(mappedJobRows)
+          } else {
+            const mappedCrewRows: CrewCostRow[] = response.data.groups.map((grp, index) => {
+              const dates = grp.costByDate.map((c) => c.date)
+              const crewKey = grp.crewId ?? `crew-${index}`
+              const crewDisplayId = grp.crewId ? grp.crewId.slice(-4) : String(8742 + index)
+
+              return {
+                id: crewKey,
+                crewKey,
+                crewId: crewDisplayId,
+                crewName: grp.crewName || 'Unnamed Crew',
+                avatar: assignableCrews[index % assignableCrews.length]?.avatar || '',
+                color: assignableCrews[index % assignableCrews.length]?.color || '#94a3b8',
+                date: dates[0] || new Date().toISOString().slice(0, 10),
+                jobDates: dates,
+                hourlyRate: grp.hourlyRate ?? 0,
+                totalHours: grp.totalHoursWorked,
+                cost: grp.totalLaborCost,
+                laborCost: grp.totalLaborCost,
+                dumpstersCount: 0,
+                dumpsterUnitCost: 0,
+                totalCost: grp.totalLaborCost,
+              }
+            })
+            setCrewRows(mappedCrewRows)
+          }
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          console.error('Failed to fetch cost tracking report:', err)
+          setReportError(err.response?.data?.message || err.message || 'Failed to load report data.')
+        }
+      } finally {
+        if (isMounted) setLoadingReport(false)
+      }
+    }
+
+    fetchReport()
+
+    return () => {
+      isMounted = false
+    }
+  }, [range, startDate, endDate, tab, search, jobFilter, crewFilter, refreshTrigger])
+
   const [prevRange, setPrevRange] = useState(range)
   const [prevStart, setPrevStart] = useState(startDate)
   const [prevEnd, setPrevEnd] = useState(endDate)
@@ -598,36 +725,8 @@ export default function CostTracking() {
     [crewOptions],
   )
 
-  const filteredJobRows = useMemo(() => {
-    const bounds = getRangeBounds(range, startDate, endDate)
-    return jobRows.filter((row) => {
-      const matchesSearch = !search || row.jobName.toLowerCase().includes(search.toLowerCase()) || row.id.includes(search)
-      const matchesFilter = !jobFilter || row.jobId === jobFilter
-      // A job belongs in the grid whenever it runs during any day of the range.
-      const matchesDate = !bounds || (row.date <= bounds[1] && (row.endDate || row.date) >= bounds[0])
-
-      return matchesSearch && matchesFilter && matchesDate
-    })
-  }, [jobRows, search, jobFilter, range, startDate, endDate])
-
-  const filteredCrewRows = useMemo(() => {
-    const bounds = getRangeBounds(range, startDate, endDate)
-    return crewRows.reduce<CrewCostRow[]>((rows, row) => {
-      const matchesSearch = !search || row.crewName.toLowerCase().includes(search.toLowerCase()) || row.crewId.includes(search)
-      const matchesFilter = !crewFilter || row.crewKey === crewFilter
-      if (!matchesSearch || !matchesFilter) return rows
-
-      if (!bounds || row.jobDates.length === 0) {
-        rows.push(row)
-        return rows
-      }
-
-      // Show the crew against the first job it worked inside the range.
-      const dateInRange = row.jobDates.find((date) => date >= bounds[0] && date <= bounds[1])
-      if (dateInRange) rows.push({ ...row, date: dateInRange })
-      return rows
-    }, [])
-  }, [crewRows, search, crewFilter, range, startDate, endDate])
+  const filteredJobRows = jobRows
+  const filteredCrewRows = crewRows
 
   useEffect(() => {
     const el = tableWrapRef.current
@@ -956,38 +1055,44 @@ export default function CostTracking() {
               <span className="stat-card__label">Total Labor</span>
               <Icon.ChevronRight width={14} height={14} />
             </div>
-            <div className="stat-card__value">{formatMoney(97605)}</div>
-            <div className="stat-card__sub">Last Month: $135,231</div>
+            <div className="stat-card__value">{formatMoney(reportData?.totalLaborCost ?? 0)}</div>
           </div>
           <div className="stat-card">
             <div className="stat-card__head">
               <span className="stat-card__label">Total Dumpster Cost</span>
               <Icon.ChevronRight width={14} height={14} />
             </div>
-            <div className="stat-card__value">{formatMoney(7695)}</div>
-            <div className="stat-card__sub">Last Month: $6,983</div>
+            <div className="stat-card__value">{formatMoney(reportData?.totalDumpsterCost ?? 0)}</div>
           </div>
           <div className="stat-card">
             <div className="stat-card__head">
               <span className="stat-card__label">Total Hours</span>
               <Icon.ChevronRight width={14} height={14} />
             </div>
-            <div className="stat-card__value">1,023 hrs</div>
-            <div className="stat-card__sub">Among 12 crews</div>
+            <div className="stat-card__value">{(reportData?.totalHoursWorked ?? 0).toLocaleString()} hrs</div>
           </div>
           <div className="stat-card">
             <div className="stat-card__head">
               <span className="stat-card__label">Total Entries</span>
               <Icon.ChevronRight width={14} height={14} />
             </div>
-            <div className="stat-card__value">104</div>
-            <div className="stat-card__sub">Among 12 crews</div>
+            <div className="stat-card__value">{(reportData?.totalEntries ?? 0).toLocaleString()}</div>
           </div>
         </div>
 
+        {reportError && (
+          <div style={{ color: '#ef4444', margin: '12px 0', fontSize: '14px' }}>
+            {reportError}
+          </div>
+        )}
+
         <div className={`ct-table-wrap${isTableEmpty ? ' ct-table-wrap--empty' : ''}`} ref={tableWrapRef}>
           <div className="ct-table-zoom" style={sheetZoomStyle(zoom)}>
-          {isTableEmpty ? (
+          {loadingReport ? (
+            <div className="ct-empty" style={{ padding: '40px' }}>
+              <p className="ct-empty__text">Loading cost tracking data...</p>
+            </div>
+          ) : isTableEmpty ? (
             <div className="ct-empty">
               <span className="ct-empty__icon" aria-hidden>
                 {hasActiveFilters ? (
@@ -1127,9 +1232,7 @@ export default function CostTracking() {
                     </td>
                     {weekDays.map((day) => {
                       const dayStr = toISO(day)
-                      const value = row.dailyCosts && row.dailyCosts[dayStr] !== undefined
-                        ? row.dailyCosts[dayStr]
-                        : getDeterministicDailyCost(row.laborCost, dayStr, row.jobId)
+                      const value = row.dailyCosts ? row.dailyCosts[dayStr] : null
                       return (
                         <td key={day.toISOString()} className="ct-grid-cell">
                           {value != null ? (
@@ -1220,7 +1323,16 @@ export default function CostTracking() {
         </div>
       )}
 
-      {modalMode !== 'none' && (
+      {modalMode === 'add' && (
+        <AddDailyDumpsterCountModal
+          onCancel={closeModal}
+          onSuccess={() => {
+            setRefreshTrigger((prev) => prev + 1)
+          }}
+        />
+      )}
+
+      {modalMode === 'edit' && (
         <CostModal
           mode={modalMode}
           scope={tab}

@@ -496,6 +496,54 @@
   color: var(--ink);
 }
 
+.jm-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding: 0.75rem 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
+}
+
+.jm-pagination-limit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.jm-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.jm-pagination-info {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.jm-pagination-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.jm-page-btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 @media (max-width: 780px) {
   .jm-header-row {
     flex-direction: column;

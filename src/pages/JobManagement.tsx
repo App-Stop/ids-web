@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { MagnifyingGlass, Plus, CaretDown } from '@phosphor-icons/react'
+import { useEffect, useRef, useState } from 'react'
+import { MagnifyingGlass, Plus, CaretDown, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Topbar from '../components/dashboard/Topbar'
 import Dropdown from '../components/dashboard/Dropdown'
@@ -10,14 +10,17 @@ import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import { Icon } from '../components/dashboard/icons'
 import { assignableCrews, formatMoney, type Job, type UnassignedCrew } from '../lib/dashboardData'
-import { initialManagedJobs, STATUS_COLORS, STATUS_LABELS, type JobStatus, type ManagedJob } from '../lib/jobsManagementData'
+import { STATUS_COLORS, STATUS_LABELS, type JobStatus, type ManagedJob } from '../lib/jobsManagementData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import { useAppStore } from '../lib/store'
+import { getJobs, deleteJob, type JobItem, type Pagination } from '../api/jobApi'
+import { type UserItem } from '../api/crewApi'
+import { getErrorMessage } from '../lib/errors'
 import './JobsManagement.css'
 
 type SortKey = 'newest' | 'oldest' | 'rateLowHigh' | 'rateHighLow' | 'workers' | 'ascending' | 'descending'
-type Row = ManagedJob & { seq: number; note?: string }
+type Row = ManagedJob & { rawId: string; note?: string }
 
 type Flow =
   | { type: 'none' }
@@ -40,14 +43,12 @@ const STATUS_OPTIONS: { id: JobStatus; label: string }[] = [
   { id: 'awarded', label: 'Awarded' },
 ]
 
-let nextSeq = initialManagedJobs.length + 1
-
 function toJob(row: Row): Job {
   const num = row.id.replace('#', '')
   return {
-    id: row.id,
+    id: row.rawId || row.id,
     name: row.name,
-    color: crewBarColor(row.crewName, row.color),
+    color: row.color,
     bidNo: String(1000 + Number(num)),
     jobNo: num,
     gc: row.gc,
@@ -72,21 +73,10 @@ function toCrew(row: Row): UnassignedCrew | null {
   }
 }
 
-/** Color bar + legend must use the assigned crew's color, not a stale job color. */
-function crewBarColor(crewName: string | undefined, fallback: string) {
-  if (!crewName || crewName === 'Unassigned') return fallback
-  return assignableCrews.find((c) => c.name === crewName)?.color ?? fallback
-}
-
 export default function JobsManagement() {
-  const [jobs, setJobs] = useState<Row[]>(
-    initialManagedJobs.map((j, i) => ({
-      ...j,
-      color: crewBarColor(j.crewName, j.color),
-      seq: i + 1,
-      note: i === 0 ? 'Coordinate with suppliers and schedule weekly progress meetings.' : undefined,
-    })),
-  )
+  const [jobs, setJobs] = useState<Row[]>([])
+  const [loading, setLoading] = useState(true)
+  const [apiError, setApiError] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<JobStatus | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('newest')
@@ -95,85 +85,136 @@ export default function JobsManagement() {
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(20)
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 20,
+    totalCount: 0,
+    totalPages: 1,
+  })
+
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
   const { assignCrew } = useAppStore()
 
-  let list = jobs.filter((j) => {
-    const matchesSearch = !search || j.name.toLowerCase().includes(search.toLowerCase()) || j.id.includes(search)
-    const matchesStatus = !statusFilter || j.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  useEffect(() => {
+    fetchJobsList()
+  }, [page, limit, statusFilter, search, sortKey])
 
-  list = [...list].sort((a, b) => {
-    switch (sortKey) {
-      case 'newest':
-        return b.seq - a.seq
-      case 'oldest':
-        return a.seq - b.seq
-      case 'rateLowHigh':
-        return a.crewRate - b.crewRate
-      case 'rateHighLow':
-        return b.crewRate - a.crewRate
-      case 'workers':
-        return b.workers - a.workers
-      case 'ascending':
-        return a.name.localeCompare(b.name)
-      case 'descending':
-        return b.name.localeCompare(a.name)
-      default:
-        return 0
+  async function fetchJobsList() {
+    setLoading(true)
+    setApiError('')
+    try {
+      let sortByParam: string | undefined = undefined
+      if (sortKey === 'newest') sortByParam = 'newest'
+      else if (sortKey === 'oldest') sortByParam = 'oldest'
+      else if (sortKey === 'ascending') sortByParam = 'nameAsc'
+      else if (sortKey === 'descending') sortByParam = 'nameDesc'
+
+      const res = await getJobs({
+        page,
+        limit,
+        search: search.trim() || undefined,
+        status: statusFilter || undefined,
+        sortBy: sortByParam,
+      })
+
+      if (res.success && Array.isArray(res.data)) {
+        const mappedRows: Row[] = res.data.map((j: JobItem) => {
+          const crewObj = typeof j.assignToCrew === 'object' && j.assignToCrew !== null ? j.assignToCrew : null
+          const crewLeadObj = crewObj && typeof crewObj.crewLead === 'object' && crewObj.crewLead !== null ? (crewObj.crewLead as UserItem) : null
+          const leadName = crewLeadObj ? `${crewLeadObj.firstName || ''} ${crewLeadObj.lastName || ''}`.trim() : (crewObj?.name || 'Unassigned')
+          const crewColor = crewObj?.crewColor || '#3b82f6'
+
+          const numStr = String(j.jobIdNumber || 0).padStart(3, '0')
+          const formattedStart = j.startDate ? new Date(j.startDate).toISOString().slice(0, 10) : ''
+          const formattedEnd = j.endDate ? new Date(j.endDate).toISOString().slice(0, 10) : ''
+
+          let normalizedStatus: JobStatus = 'awarded'
+          if (j.status === 'in-progress' || j.status === 'completed' || j.status === 'awarded') {
+            normalizedStatus = j.status
+          }
+
+          const gcSuperVal = j.gcSuper || '-'
+          let idsSuperVal = '-'
+          if (j.idsSuper) {
+            if (typeof j.idsSuper === 'object' && j.idsSuper !== null) {
+              idsSuperVal = `${j.idsSuper.firstName || ''} ${j.idsSuper.lastName || ''}`.trim() || '-'
+            } else if (typeof j.idsSuper === 'string') {
+              idsSuperVal = j.idsSuper
+            }
+          } else if (leadName !== 'Unassigned') {
+            idsSuperVal = leadName
+          }
+
+          return {
+            id: `#${numStr}`,
+            rawId: j._id,
+            name: j.name,
+            color: crewColor,
+            crewName: crewObj ? crewObj.name : 'Unassigned',
+            gc: j.generalContractor || '-',
+            gcSuper: gcSuperVal,
+            idsSuper: idsSuperVal,
+            contract: j.contractAmount || 0,
+            startDate: formattedStart,
+            endDate: formattedEnd,
+            status: normalizedStatus,
+            laborBudgetUsed: 0,
+            laborBudgetTotal: j.laborBudget || 0,
+            crewRate: crewLeadObj?.hourlyRate || 0,
+            workers: Array.isArray(crewObj?.members) ? crewObj.members.length : 1,
+            note: j.note || undefined,
+          }
+        })
+        setJobs(mappedRows)
+        if (res.pagination) {
+          setPagination(res.pagination)
+        }
+      }
+    } catch (err: any) {
+      setApiError(getErrorMessage(err, 'Failed to fetch jobs listing.'))
+    } finally {
+      setLoading(false)
     }
-  })
+  }
 
-  const allSelected = list.length > 0 && list.every((j) => selected.includes(j.id))
+  const allSelected = jobs.length > 0 && jobs.every((j) => selected.includes(j.id))
   const editingJob = editingId ? jobs.find((j) => j.id === editingId) : undefined
-  const activeRow = flow.type !== 'none' ? jobs.find((j) => j.id === flow.jobId) : undefined
+  const activeRow = flow.type !== 'none' ? jobs.find((j) => j.rawId === flow.jobId || j.id === flow.jobId) : undefined
 
   function toggleAll() {
-    setSelected(allSelected ? [] : list.map((j) => j.id))
+    setSelected(allSelected ? [] : jobs.map((j) => j.id))
   }
 
   function toggleOne(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
-  function handleCreate(data: JobFormData) {
-    const lead = assignableCrews.find((c) => c.id === data.crewLeadId) ?? null
-    const seq = nextSeq++
-    const newJob: ManagedJob = {
-      id: `#${String(seq).padStart(3, '0')}`,
-      name: data.name,
-      color: data.color,
-      crewName: lead?.name ?? 'Unassigned',
-      gc: data.gc,
-      gcSuper: '-',
-      idsSuper: '-',
-      contract: data.contractAmount,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      status: 'awarded',
-      laborBudgetUsed: 0,
-      laborBudgetTotal: data.laborBudgetTotal,
-      crewRate: lead?.rate ?? 0,
-      workers: 1,
-    }
-    setJobs((prev) => [{ ...newJob, seq }, ...prev])
+  function handleCreate(_data: JobFormData, createdJob?: JobItem) {
     setShowCreate(false)
-    setSortKey('newest')
+    if (createdJob) {
+      fetchJobsList()
+    }
   }
 
-  function handleUpdate(data: JobFormData) {
-    if (!editingId) return
-    setJobs((prev) =>
-      prev.map((j) =>
-        j.id === editingId
-          ? { ...j, name: data.name, gc: data.gc, color: data.color, contract: data.contractAmount, laborBudgetTotal: data.laborBudgetTotal, startDate: data.startDate, endDate: data.endDate }
-          : j,
-      ),
-    )
+  function handleUpdate(_data: JobFormData, updatedJob?: JobItem) {
     setEditingId(null)
+    if (updatedJob) {
+      fetchJobsList()
+    }
+  }
+
+  async function handleDeleteJob(jobId: string) {
+    try {
+      await deleteJob(jobId)
+      setFlow({ type: 'none' })
+      fetchJobsList()
+    } catch (err: any) {
+      alert(getErrorMessage(err, 'Failed to delete job.'))
+    }
   }
 
   return (
@@ -209,25 +250,38 @@ export default function JobsManagement() {
         <div className="jm-toolbar">
           <label className="jm-search">
             <MagnifyingGlass size={16} weight="regular" />
-            <input placeholder="Search a job..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input
+              placeholder="Search a job..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
+            />
           </label>
 
-          <span className="jm-count">{jobs.length} Total Jobs</span>
+          <span className="jm-count">{pagination.totalCount || jobs.length} Total Jobs</span>
 
           <div className="jm-toolbar__right">
             <div className="jm-dd jm-dd--status">
               <Dropdown
                 value={statusFilter ?? '__all'}
-                staticLabel="Status"
-                onChange={(v) => setStatusFilter(v === '__all' ? null : (v as JobStatus))}
+                selectedLabel={statusFilter ? `${STATUS_OPTIONS.find((s) => s.id === statusFilter)?.label}` : 'All'}
+                onChange={(v) => {
+                  setStatusFilter(v === '__all' ? null : (v as JobStatus))
+                  setPage(1)
+                }}
                 options={[{ id: '__all', label: 'All' }, ...STATUS_OPTIONS.map((s) => ({ id: s.id, label: s.label }))]}
               />
             </div>
             <div className="jm-dd jm-dd--sort">
               <Dropdown
                 value={sortKey}
-                staticLabel="Sort by"
-                onChange={(v) => setSortKey(v as SortKey)}
+                selectedLabel={`${SORT_OPTIONS.find((s) => s.id === sortKey)?.label}`}
+                onChange={(v) => {
+                  setSortKey(v as SortKey)
+                  setPage(1)
+                }}
                 options={SORT_OPTIONS.map((s) => ({ id: s.id, label: s.label }))}
               />
             </div>
@@ -237,6 +291,8 @@ export default function JobsManagement() {
             </button>
           </div>
         </div>
+
+        {apiError && <p className="field-error" style={{ margin: '12px 0' }}>{apiError}</p>}
 
         <div className="jm-table-wrap" ref={tableWrapRef}>
           <div className="jm-table-zoom" style={sheetZoomStyle(zoom)}>
@@ -280,110 +336,167 @@ export default function JobsManagement() {
               </tr>
             </thead>
             <tbody>
-              {list.map((job) => {
-                const overBudget = job.laborBudgetUsed > job.laborBudgetTotal
-                const pct = Math.min(100, Math.round((job.laborBudgetUsed / Math.max(1, job.laborBudgetTotal)) * 100))
-                const barColor = overBudget ? '#ef4444' : job.status === 'awarded' ? '#f97316' : '#22c55e'
-                const barPct = overBudget ? 100 : Math.max(8, pct)
-                const stripeColor = crewBarColor(job.crewName, job.color)
-                return (
-                  <tr key={job.id} className="jm-row">
-                    <td className="jm-sticky jm-sticky--id">
-                      <div className="jm-id-cell">
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(job.id)}
-                          onChange={() => toggleOne(job.id)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <span className="jm-id">{job.id}</span>
-                      </div>
-                      <span
-                        className="jm-color-bar-hit"
-                        onMouseEnter={(e) => {
-                          if (!job.crewName || job.crewName === 'Unassigned') return
-                          const rect = e.currentTarget.getBoundingClientRect()
-                          setCrewHover({
-                            x: rect.right + 8,
-                            y: rect.top + rect.height / 2,
-                            color: stripeColor,
-                            names: [job.crewName],
-                          })
-                        }}
-                        onMouseLeave={() => setCrewHover(null)}
-                      >
-                        <span className="jm-color-bar" style={{ background: stripeColor }} />
-                      </span>
-                    </td>
-                    <td className="jm-name-cell jm-sticky jm-sticky--name">
-                      <button
-                        type="button"
-                        className="jm-name-btn"
-                        onClick={() => setFlow({ type: 'details', jobId: job.id })}
-                      >
-                        <span className="jm-name-inner">
-                          <span>{job.name}</span>
-                          <Icon.ChevronRight width={14} height={14} />
+              {loading ? (
+                <tr>
+                  <td colSpan={11} className="crew-empty-cell" style={{ textAlign: 'center', padding: '32px 0' }}>
+                    Loading jobs...
+                  </td>
+                </tr>
+              ) : jobs.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="crew-empty-cell" style={{ textAlign: 'center', padding: '32px 0' }}>
+                    No jobs found
+                  </td>
+                </tr>
+              ) : (
+                jobs.map((job) => {
+                  const overBudget = job.laborBudgetUsed > job.laborBudgetTotal
+                  const pct = Math.min(100, Math.round((job.laborBudgetUsed / Math.max(1, job.laborBudgetTotal)) * 100))
+                  const barColor = overBudget ? '#ef4444' : job.status === 'awarded' ? '#f97316' : '#22c55e'
+                  const barPct = overBudget ? 100 : Math.max(8, pct)
+                  const stripeColor = job.color
+                  return (
+                    <tr key={job.rawId || job.id} className="jm-row">
+                      <td className="jm-sticky jm-sticky--id">
+                        <div className="jm-id-cell">
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(job.id)}
+                            onChange={() => toggleOne(job.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <span className="jm-id">{job.id}</span>
+                        </div>
+                        <span
+                          className="jm-color-bar-hit"
+                          onMouseEnter={(e) => {
+                            const isUnassigned = !job.crewName || job.crewName === 'Unassigned'
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            setCrewHover({
+                              x: rect.right + 8,
+                              y: rect.top + rect.height / 2,
+                              color: isUnassigned ? '#94a3b8' : stripeColor,
+                              names: [isUnassigned ? 'Unassigned' : job.crewName],
+                            })
+                          }}
+                          onMouseLeave={() => setCrewHover(null)}
+                        >
+                          <span className="jm-color-bar" style={{ background: !job.crewName || job.crewName === 'Unassigned' ? '#94a3b8' : stripeColor }} />
                         </span>
-                      </button>
-                    </td>
-                    <td className="jm-crew-cell">
-                      <span className="jm-crew">
-                        <Avatar
-                          name={job.crewName}
-                          src={assignableCrews.find((c) => c.name === job.crewName)?.avatar}
-                          size={24}
-                        />
-                        {job.crewName}
-                      </span>
-                    </td>
-                    <td>{job.gc}</td>
-                    <td className="jm-center">{job.gcSuper}</td>
-                    <td className="jm-center">{job.idsSuper}</td>
-                    <td className="jm-center jm-contract">${job.contract.toLocaleString('en-US')}</td>
-                    <td className="jm-center jm-duration">
-                      <div>{job.startDate}</div>
-                      <div>{job.endDate}</div>
-                    </td>
-                    <td className="jm-center">
-                      <span
-                        className="jm-status"
-                        style={{
-                          color: STATUS_COLORS[job.status],
-                          borderColor: STATUS_COLORS[job.status],
-                        }}
-                      >
-                        {STATUS_LABELS[job.status]}
-                      </span>
-                    </td>
-                    <td className="jm-center">
-                      <div className="jm-labor">
-                        <div className="jm-labor__label">
-                          {overBudget && <span className="jm-labor__badge">!</span>}
-                          <span className={overBudget ? 'jm-labor__text jm-labor__text--danger' : 'jm-labor__text'}>
-                            {formatMoney(job.laborBudgetUsed)}/{formatMoney(job.laborBudgetTotal)}
+                      </td>
+                      <td className="jm-name-cell jm-sticky jm-sticky--name">
+                        <button
+                          type="button"
+                          className="jm-name-btn"
+                          onClick={() => setFlow({ type: 'details', jobId: job.rawId || job.id })}
+                        >
+                          <span className="jm-name-inner">
+                            <span>{job.name}</span>
+                            <Icon.ChevronRight width={14} height={14} />
+                          </span>
+                        </button>
+                      </td>
+                      <td className="jm-crew-cell">
+                        <span className="jm-crew">
+                          <Avatar
+                            name={job.crewName}
+                            background={!job.crewName || job.crewName === 'Unassigned' ? '#94a3b8' : stripeColor}
+                            size={24}
+                          />
+                          {job.crewName}
+                        </span>
+                      </td>
+                      <td>{job.gc}</td>
+                      <td className="jm-center">{job.gcSuper}</td>
+                      <td className="jm-center">{job.idsSuper}</td>
+                      <td className="jm-center jm-contract">${job.contract.toLocaleString('en-US')}</td>
+                      <td className="jm-center jm-duration">
+                        <div>{job.startDate}</div>
+                        <div>{job.endDate}</div>
+                      </td>
+                      <td className="jm-center">
+                        <span
+                          className="jm-status"
+                          style={{
+                            color: STATUS_COLORS[job.status],
+                            borderColor: STATUS_COLORS[job.status],
+                          }}
+                        >
+                          {STATUS_LABELS[job.status]}
+                        </span>
+                      </td>
+                      <td className="jm-center">
+                        <div className="jm-labor">
+                          <div className="jm-labor__label">
+                            {overBudget && <span className="jm-labor__badge">!</span>}
+                            <span className={overBudget ? 'jm-labor__text jm-labor__text--danger' : 'jm-labor__text'}>
+                              {formatMoney(job.laborBudgetUsed)}/{formatMoney(job.laborBudgetTotal)}
+                            </span>
+                          </div>
+                          <span className="jm-labor__bar">
+                            <span className="jm-labor__fill" style={{ width: `${barPct}%`, background: barColor }} />
                           </span>
                         </div>
-                        <span className="jm-labor__bar">
-                          <span className="jm-labor__fill" style={{ width: `${barPct}%`, background: barColor }} />
-                        </span>
-                      </div>
-                    </td>
-                    <td className="jm-center">
-                      <button
-                        type="button"
-                        className="jm-action-btn"
-                        onClick={() => setEditingId(job.id)}
-                        aria-label="Edit job"
-                      >
-                        <Icon.Edit width={16} height={16} />
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
+                      </td>
+                      <td className="jm-center">
+                        <button
+                          type="button"
+                          className="jm-action-btn"
+                          onClick={() => setEditingId(job.id)}
+                          aria-label="Edit job"
+                        >
+                          <Icon.Edit width={16} height={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
             </tbody>
           </table>
+          </div>
+        </div>
+
+        <div className="jm-pagination-bar">
+          <div className="jm-pagination-limit">
+            <span>Show:</span>
+            <Dropdown
+              value={String(limit)}
+              onChange={(v) => {
+                setLimit(Number(v))
+                setPage(1)
+              }}
+              options={[
+                { id: '10', label: '10 per page' },
+                { id: '20', label: '20 per page' },
+                { id: '50', label: '50 per page' },
+                { id: '100', label: '100 per page' },
+              ]}
+            />
+          </div>
+
+          <div className="jm-pagination-controls">
+            <span className="jm-pagination-info">
+              Page {pagination.page || page} of {pagination.totalPages || 1} ({pagination.totalCount || jobs.length} total)
+            </span>
+            <div className="jm-pagination-btns">
+              <button
+                type="button"
+                className="btn btn--outline jm-page-btn"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <CaretLeft size={16} /> Previous
+              </button>
+              <button
+                type="button"
+                className="btn btn--outline jm-page-btn"
+                disabled={page >= (pagination.totalPages || 1)}
+                onClick={() => setPage((p) => Math.min(pagination.totalPages || 1, p + 1))}
+              >
+                Next <CaretRight size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </main>
@@ -410,25 +523,18 @@ export default function JobsManagement() {
           crew={toCrew(activeRow)}
           note={activeRow.note ?? ''}
           onDone={() => setFlow({ type: 'none' })}
-          onChangeCrew={() => setFlow({ type: 'assignCrew', jobId: activeRow.id })}
+          onChangeCrew={() => setFlow({ type: 'assignCrew', jobId: activeRow.rawId || activeRow.id })}
           onSaveNote={(text) =>
             setJobs((prev) => prev.map((j) => (j.id === activeRow.id ? { ...j, note: text || undefined } : j)))
           }
-          onRemoveCrew={() => {
-            setJobs((prev) =>
-              prev.map((j) =>
-                j.id === activeRow.id ? { ...j, crewName: 'Unassigned', crewRate: 0, note: undefined } : j,
-              ),
-            )
-            setFlow({ type: 'none' })
-          }}
+          onRemoveCrew={() => handleDeleteJob(activeRow.rawId || activeRow.id)}
         />
       )}
 
       {flow.type === 'assignCrew' && activeRow && (
         <AssignCrewModal
           job={toJob(activeRow)}
-          onCancel={() => setFlow({ type: 'details', jobId: activeRow.id })}
+          onCancel={() => setFlow({ type: 'details', jobId: activeRow.rawId || activeRow.id })}
           onAssign={(crewId, startDate, endDate, note) => {
             const crew = assignableCrews.find((c) => c.id === crewId)
             if (!crew) return
@@ -443,7 +549,7 @@ export default function JobsManagement() {
                   : j,
               ),
             )
-            setFlow({ type: 'details', jobId: activeRow.id })
+            setFlow({ type: 'details', jobId: activeRow.rawId || activeRow.id })
           }}
         />
       )}

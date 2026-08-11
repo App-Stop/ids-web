@@ -1,161 +1,184 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal'
-import Dropdown from './Dropdown'
-import type { Job } from '../../lib/dashboardData'
+import MenuDropdown from './MenuDropdown'
+import { getJobs, type JobItem } from '../../api/jobApi'
+import { createDumpsterCost, type DumpsterCostItem } from '../../api/dumpsterCostApi'
+import { parseApiErrors } from '../../lib/errors'
 
-export interface CostEntryData {
-  jobId: string | null
-  date: string
-  laborCost: number
-  dumpstersCount: number
-  eachCost: number
-  note: string
-}
-
-interface CostEntryModalProps {
-  title: string
-  submitLabel: string
-  jobs: Job[]
-  initial?: Partial<CostEntryData>
+export interface DumpsterCostModalProps {
   onCancel: () => void
-  onSubmit: (data: CostEntryData) => void
+  onSuccess?: (newEntry: DumpsterCostItem) => void
 }
 
-function useCostEntryState(initial?: Partial<CostEntryData>) {
-  return useState<CostEntryData>({
-    jobId: initial?.jobId ?? null,
-    date: initial?.date ?? new Date().toISOString().slice(0, 10),
-    laborCost: initial?.laborCost ?? 0,
-    dumpstersCount: initial?.dumpstersCount ?? 1,
-    eachCost: initial?.eachCost ?? 0,
-    note: initial?.note ?? '',
-  })
-}
+export function AddDailyDumpsterCountModal({ onCancel, onSuccess }: DumpsterCostModalProps) {
+  const [jobs, setJobs] = useState<JobItem[]>([])
+  const [loadingJobs, setLoadingJobs] = useState(true)
 
-function CostEntryModal({ title, submitLabel, jobs, initial, onCancel, onSubmit }: CostEntryModalProps) {
-  const [form, setForm] = useCostEntryState(initial)
-  const selectedJob = useMemo(() => jobs.find((job) => job.id === form.jobId), [form.jobId, jobs])
-  const canSubmit = Boolean(form.jobId && form.date.trim())
-  const totalCost = form.laborCost > 0 ? form.laborCost : form.dumpstersCount * form.eachCost
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10))
+  const [dumpsterCount, setDumpsterCount] = useState<string>('1')
+  const [dumpsterCost, setDumpsterCost] = useState<string>('')
+  const [note, setNote] = useState<string>('')
+
+  const [submitting, setSubmitting] = useState(false)
+  const [apiError, setApiError] = useState<string>('')
+
+  useEffect(() => {
+    let isMounted = true
+    async function loadJobs() {
+      setLoadingJobs(true)
+      try {
+        const res = await getJobs({ limit: 100 })
+        if (isMounted && res.data) {
+          setJobs(res.data)
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.error('Failed to load jobs:', err)
+        }
+      } finally {
+        if (isMounted) setLoadingJobs(false)
+      }
+    }
+    loadJobs()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const selectedJob = useMemo(() => jobs.find((j) => j._id === jobId), [jobs, jobId])
+  const parsedCount = Number(dumpsterCount)
+  const parsedCost = Number(dumpsterCost)
+  const calculatedTotalCost = (parsedCount > 0 && parsedCost > 0) ? parsedCount * parsedCost : 0
+
+  const canSubmit = Boolean(jobId && date.trim() && dumpsterCount && dumpsterCost && !submitting)
+
+  async function handleSubmit() {
+    if (!canSubmit || !jobId) return
+
+    setSubmitting(true)
+    setApiError('')
+
+    try {
+      const payload = {
+        jobId,
+        date,
+        dumpsterCount: parsedCount,
+        dumpsterCost: parsedCost,
+        ...(note.trim() ? { note: note.trim() } : {}),
+      }
+
+      const response = await createDumpsterCost(payload)
+      if (response.success) {
+        if (onSuccess) {
+          onSuccess(response.data)
+        }
+        onCancel()
+      } else {
+        setApiError(response.message || 'Failed to create dumpster cost entry.')
+      }
+    } catch (err: any) {
+      console.error('Create dumpster cost error:', err)
+      const parsed = parseApiErrors(err)
+      const msg = parsed.generalMessage || Object.values(parsed.fieldErrors).join(', ') || err.response?.data?.message || err.message || 'An error occurred while creating dumpster cost.'
+      setApiError(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const jobOptions = useMemo(
+    () => jobs.map((job) => ({ id: job._id, label: job.name })),
+    [jobs],
+  )
 
   return (
     <Modal onClose={onCancel} width={560}>
       <div className="modal-head-row">
-        <h2 className="modal-title">{title}</h2>
-        {selectedJob && <span className="job-head__meta">#{selectedJob.bidNo}</span>}
+        <h2 className="modal-title">Add Daily Dumpster Count</h2>
+        {selectedJob && <span className="job-head__meta">#{selectedJob.jobIdNumber}</span>}
       </div>
 
-      <label className="field-label">Job</label>
-      <Dropdown
-        value={form.jobId}
-        placeholder="-"
-        onChange={(jobId) => setForm((prev) => ({ ...prev, jobId }))}
-        selectedLabel={selectedJob?.name}
-        options={jobs.map((job) => ({ id: job.id, label: job.name }))}
+      <label className="field-label">Job*</label>
+      <MenuDropdown
+        options={jobOptions}
+        value={jobId}
+        onChange={(id) => setJobId(id)}
+        placeholder={loadingJobs ? 'Loading jobs...' : 'Select job'}
+        includeAll={false}
+        showDot={false}
+        className="ct-modal-dropdown"
       />
 
       <label className="field-label">Date*</label>
       <input
         type="date"
         className="field-input"
-        value={form.date}
-        onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
+        value={date}
+        onChange={(e) => setDate(e.target.value)}
       />
 
       <div className="field-row">
-        {submitLabel === 'Update Entry' ? (
-          <div>
-            <label className="field-label">Labor Cost*</label>
-            <div className="field-money">
-              <span>$</span>
-              <input
-                type="number"
-                value={form.laborCost}
-                onChange={(e) => setForm((prev) => ({ ...prev, laborCost: Number(e.target.value) }))}
-              />
-            </div>
-          </div>
-        ) : (
-          <div>
-            <label className="field-label">Dumpsters Count*</label>
+        <div>
+          <label className="field-label">Dumpsters Count*</label>
+          <input
+            className="field-input"
+            type="number"
+            min={1}
+            value={dumpsterCount}
+            onChange={(e) => setDumpsterCount(e.target.value)}
+            placeholder="1"
+          />
+        </div>
+        <div>
+          <label className="field-label">Dumpster Cost*</label>
+          <div className="field-money">
+            <span>$</span>
             <input
-              className="field-input"
               type="number"
-              min={1}
-              value={form.dumpstersCount}
-              onChange={(e) => setForm((prev) => ({ ...prev, dumpstersCount: Number(e.target.value) }))}
+              min={0}
+              step="any"
+              value={dumpsterCost}
+              onChange={(e) => setDumpsterCost(e.target.value)}
+              placeholder="500"
             />
           </div>
-        )}
-        {submitLabel === 'Update Entry' ? (
-          <div>
-            <label className="field-label">Dumpsters Count*</label>
-            <input
-              className="field-input"
-              type="number"
-              min={1}
-              value={form.dumpstersCount}
-              onChange={(e) => setForm((prev) => ({ ...prev, dumpstersCount: Number(e.target.value) }))}
-            />
-          </div>
-        ) : (
-          <div>
-            <label className="field-label">Each Cost*</label>
-            <div className="field-money">
-              <span>$</span>
-              <input
-                type="number"
-                value={form.eachCost}
-                onChange={(e) => setForm((prev) => ({ ...prev, eachCost: Number(e.target.value) }))}
-              />
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
-      {submitLabel === 'Add Entry' && (
-        <>
-          <label className="field-label">Add a note</label>
-          <textarea
-            className="field-textarea field-textarea--tall"
-            placeholder="30 yard, fuel, etc"
-            value={form.note}
-            onChange={(e) => setForm((prev) => ({ ...prev, note: e.target.value }))}
-          />
-        </>
-      )}
+      <label className="field-label">Add a note</label>
+      <textarea
+        className="field-textarea field-textarea--tall"
+        placeholder="30 yard, fuel, etc"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
 
       <div className="jm-total-row">
         <span>Total Cost</span>
-        <strong>${totalCost.toLocaleString('en-US')}</strong>
+        <strong>${calculatedTotalCost.toLocaleString('en-US')}</strong>
       </div>
 
+      {apiError && (
+        <div style={{ color: '#ef4444', fontSize: '13px', marginTop: '12px' }}>
+          {apiError}
+        </div>
+      )}
+
       <div className="modal-actions">
-        <button type="button" className="btn btn--outline" onClick={onCancel}>
+        <button type="button" className="btn btn--outline" onClick={onCancel} disabled={submitting}>
           Cancel
         </button>
-        <button type="button" className="btn btn--primary" disabled={!canSubmit} onClick={() => onSubmit(form)}>
-          {submitLabel}
+        <button
+          type="button"
+          className="btn btn--primary"
+          disabled={!canSubmit}
+          onClick={handleSubmit}
+        >
+          {submitting ? 'Adding...' : 'Add Entry'}
         </button>
       </div>
     </Modal>
   )
 }
 
-export function EditAccumulatedCostModal(props: {
-  jobs: Job[]
-  initial?: Partial<CostEntryData>
-  onCancel: () => void
-  onSubmit: (data: CostEntryData) => void
-}) {
-  return <CostEntryModal title="Edit Accumulated Cost" submitLabel="Update Entry" {...props} />
-}
-
-export function AddDailyDumpsterCountModal(props: {
-  jobs: Job[]
-  initial?: Partial<CostEntryData>
-  onCancel: () => void
-  onSubmit: (data: CostEntryData) => void
-}) {
-  return <CostEntryModal title="Add Daily Dumpster Count" submitLabel="Add Entry" {...props} />
-}

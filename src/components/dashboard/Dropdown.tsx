@@ -36,7 +36,12 @@ export default function Dropdown({
   return (
     <div className="dd" ref={ref}>
       <button type="button" className="dd__trigger" onClick={() => setOpen((o) => !o)}>
-        <span className="dd__value">{staticLabel ?? (value ? selectedLabel : placeholder)}</span>
+        <span className="dd__value">
+          {staticLabel ??
+            (selectedLabel ??
+              options.find((o) => o.id === value)?.label ??
+              (value || placeholder))}
+        </span>
         <Icon.ChevronDown className="dd__chevron" />
       </button>
       {open && (

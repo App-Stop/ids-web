@@ -3,8 +3,9 @@ import Modal from './Modal'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import { crewColors, crewLeads as fallbackCrewLeads, type Job } from '../../lib/dashboardData'
+import { Icon } from './icons'
 import { createCrew, updateCrew, getCrewById, getUsers, type CreateCrewPayload, type UpdateCrewPayload, type CrewDataResponse, type UserItem } from '../../api/crewApi'
-import { getErrorMessage } from '../../lib/errors'
+import { getErrorMessage, parseApiErrors } from '../../lib/errors'
 
 export type CrewStatus = 'active' | 'inactive' | 'unassigned'
 
@@ -65,6 +66,7 @@ export default function CreateCrewModal({
   const [laborError, setLaborError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [apiError, setApiError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     async function loadData() {
@@ -229,7 +231,9 @@ export default function CreateCrewModal({
         onSubmit(formData, response.data)
       }
     } catch (err: any) {
-      setApiError(getErrorMessage(err, `Failed to ${isEdit ? 'update' : 'create'} crew. Please try again.`))
+      const parsed = parseApiErrors(err, `Failed to ${isEdit ? 'update' : 'create'} crew. Please try again.`)
+      setApiError(parsed.generalMessage)
+      setFieldErrors(parsed.fieldErrors)
     } finally {
       setIsSubmitting(false)
     }
@@ -239,10 +243,30 @@ export default function CreateCrewModal({
     <Modal onClose={onCancel} width={isEdit ? 520 : 480}>
       <h2 className="modal-title">{isEdit ? 'Edit Crew' : 'Create New Crew'}</h2>
 
+      {apiError && (
+        <div className="form-error-alert">
+          <Icon.AlertCircle width={18} height={18} />
+          <span>{apiError}</span>
+        </div>
+      )}
+
       <label className="field-label">Crew Name*</label>
-      <input className="field-input" placeholder="Enter Crew Name" value={crewName} onChange={(e) => setCrewName(e.target.value)} />
+      <input
+        className={`field-input${fieldErrors.name || fieldErrors.crewName ? ' field-input--error' : ''}`}
+        placeholder="Enter Crew Name"
+        value={crewName}
+        onChange={(e) => setCrewName(e.target.value)}
+      />
+      {(fieldErrors.name || fieldErrors.crewName) && (
+        <span className="field-error-text">{fieldErrors.name || fieldErrors.crewName}</span>
+      )}
 
       <label className="field-label">Crew Leader*</label>
+      {(fieldErrors.crewLead || fieldErrors.crewLeadId) && (
+        <span className="field-error-text" style={{ marginBottom: '4px' }}>
+          {fieldErrors.crewLead || fieldErrors.crewLeadId}
+        </span>
+      )}
       <Dropdown
         value={crewLeadId}
         placeholder="Select Crew Leader"
