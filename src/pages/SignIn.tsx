@@ -5,7 +5,9 @@ import BrandLogos from '../components/BrandLogos'
 import EmailField from '../components/EmailField'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
+import { homePathForRole } from '../components/ProtectedRoute'
 
+/** Admin-only sign in. Crew-lead / labour use /login. */
 export default function SignIn() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,8 +22,8 @@ export default function SignIn() {
     setError('')
     setLoading(true)
     try {
-      await adminLogin(email, password)
-      navigate('/dashboard')
+      const body = await adminLogin(email, password)
+      navigate(homePathForRole(body.data?.admin?.role ?? 'admin'), { replace: true })
     } catch (err) {
       setError(getErrorMessage(err, 'Invalid email or password'))
     } finally {
