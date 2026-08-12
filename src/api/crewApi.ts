@@ -220,6 +220,29 @@ export async function updateUser(id: string, payload: UpdateUserPayload): Promis
   return response.data
 }
 
+export interface ChangePasswordPayload {
+  currentPassword: string
+  newPassword: string
+}
+
+/** Crew-lead / labour self-service password change (user token). */
+export async function changePassword(payload: ChangePasswordPayload): Promise<DeleteResponse> {
+  const response = await api.patch<DeleteResponse>('/users/me/password', payload)
+  return response.data
+}
+
+export interface ChangeAdminPasswordPayload extends ChangePasswordPayload {
+  confirmNewPassword: string
+}
+
+/** Admin self-service password change. Admin tokens are rejected by /users/me/password. */
+export async function changeAdminPassword(
+  payload: ChangeAdminPasswordPayload,
+): Promise<DeleteResponse> {
+  const response = await api.patch<DeleteResponse>('/admin/me/password', payload)
+  return response.data
+}
+
 export interface DeleteResponse {
   success: boolean
   message: string

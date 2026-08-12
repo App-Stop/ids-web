@@ -24,7 +24,8 @@ export default function CrewLogin() {
     setError('')
     setLoading(true)
     try {
-      const body = await userLogin(email + DOMAIN, password)
+      const fullEmail = email.includes('@') ? email : `${email.trim()}${DOMAIN}`
+      const body = await userLogin(fullEmail, password)
       navigate(homePathForRole(body.data?.user?.role ?? body.data?.admin?.role), {
         replace: true,
       })

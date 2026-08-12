@@ -25,8 +25,8 @@ export const STATUS_LABELS: Record<JobStatus, string> = {
 }
 
 export const STATUS_COLORS: Record<JobStatus, string> = {
-  'in-progress': '#22c55e',
-  completed: '#60a5fa',
+  'in-progress': '#3b82f6',
+  completed: '#22c55e',
   awarded: '#e0399f',
 }
 

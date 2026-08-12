@@ -20,6 +20,10 @@ api.interceptors.request.use(
 
 const LOGIN_ENDPOINTS = ['/admin/login', '/auth/login'];
 
+// Endpoints that answer 401 for a bad credential in the body, not a bad token.
+// Bouncing to login there would hide the real error from the form.
+const SELF_HANDLED_401_ENDPOINTS = ['/me/password'];
+
 // Send an expired session back to the login page that matches its role
 function loginPathForStoredUser() {
   try {
@@ -37,7 +41,8 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     const url = error.config?.url ?? '';
     const isLoginCall = LOGIN_ENDPOINTS.some((p) => url.includes(p));
-    if (error.response?.status === 401 && !isLoginCall) {
+    const isSelfHandled = SELF_HANDLED_401_ENDPOINTS.some((p) => url.includes(p));
+    if (error.response?.status === 401 && !isLoginCall && !isSelfHandled) {
       const target = loginPathForStoredUser();
       localStorage.removeItem('accessToken');
       localStorage.removeItem('user');

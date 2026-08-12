@@ -201,7 +201,7 @@
 .profile-table__head,
 .profile-table__row {
   display: grid;
-  grid-template-columns: 36px 70px 1.5fr 150px 180px 64px;
+  grid-template-columns: 36px 1.5fr 150px 180px 64px;
   align-items: center;
   gap: 0.35rem;
 }

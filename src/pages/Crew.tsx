@@ -576,9 +576,8 @@ export default function Crew() {
             <table className="crew-table crew-table--leads">
               <colgroup>
                 <col style={{ width: '4%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '22%' }} />
-                <col style={{ width: '34%' }} />
+                <col style={{ width: '28%' }} />
+                <col style={{ width: '38%' }} />
                 <col style={{ width: '10%' }} />
                 <col style={{ width: '12%' }} />
                 <col style={{ width: '8%' }} />
@@ -588,7 +587,6 @@ export default function Crew() {
                   <th className="crew-col-check">
                     <input type="checkbox" />
                   </th>
-                  <th>Crew ID</th>
                   <th>Crew Name</th>
                   <th>Job Name</th>
                   <th className="crew-center">Workers</th>
@@ -604,13 +602,13 @@ export default function Crew() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="crew-empty-cell">
+                    <td colSpan={6} className="crew-empty-cell">
                       Loading crew data...
                     </td>
                   </tr>
                 ) : visibleCrewRows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="crew-empty-cell">
+                    <td colSpan={6} className="crew-empty-cell">
                       No crews found
                     </td>
                   </tr>
@@ -620,26 +618,23 @@ export default function Crew() {
                       <td className="crew-col-check">
                         <input type="checkbox" />
                       </td>
-                      <td className="crew-id-cell">
-                        <span
-                          className="crew-id-bar-hit"
-                          onMouseEnter={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            setCrewHover({
-                              x: rect.right + 8,
-                              y: rect.top + rect.height / 2,
-                              color: row.color,
-                              names: [row.name],
-                            })
-                          }}
-                          onMouseLeave={() => setCrewHover(null)}
-                        >
-                          <span className="crew-id-bar" style={{ background: row.color }} />
-                        </span>
-                        #{row.crewId}
-                      </td>
                       <td>
-                        <div className="crew-name-cell">
+                        <div className="crew-name-cell" style={{ position: 'relative', paddingLeft: '14px' }}>
+                          <span
+                            className="crew-id-bar-hit"
+                            onMouseEnter={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setCrewHover({
+                                x: rect.right + 8,
+                                y: rect.top + rect.height / 2,
+                                color: row.color,
+                                names: [row.name],
+                              })
+                            }}
+                            onMouseLeave={() => setCrewHover(null)}
+                          >
+                            <span className="crew-id-bar" style={{ background: row.color }} />
+                          </span>
                           <Avatar name={row.name} size={28} />
                           {row.name}
                         </div>
@@ -648,13 +643,6 @@ export default function Crew() {
                         {row.jobs.length === 0 ? (
                           <span className="crew-job-cell">
                             <span className="crew-job-cell__unassigned">Unassigned</span>
-                            <button
-                              type="button"
-                              className="crew-assign-link"
-                              onClick={() => setFlow({ type: 'assignJob', crew: row })}
-                            >
-                              Assign Job
-                            </button>
                           </span>
                         ) : (
                           <button
@@ -711,21 +699,19 @@ export default function Crew() {
           ) : (
             <table className="crew-table crew-table--roster">
               <colgroup>
-                <col style={{ width: '3.5%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '17%' }} />
-                <col style={{ width: '16%' }} />
-                <col style={{ width: '13%' }} />
+                <col style={{ width: '4%' }} />
+                <col style={{ width: '22%' }} />
+                <col style={{ width: '20%' }} />
                 <col style={{ width: '15%' }} />
-                <col style={{ width: '14%' }} />
-                <col style={{ width: '13.5%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '12%' }} />
               </colgroup>
               <thead>
                 <tr>
                   <th className="crew-col-check">
                     <input type="checkbox" />
                   </th>
-                  <th>Roster ID</th>
                   <th>Name</th>
                   <th>Crew Assigned</th>
                   <th className="crew-center">Role</th>
@@ -737,13 +723,13 @@ export default function Crew() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="crew-empty-cell">
+                    <td colSpan={7} className="crew-empty-cell">
                       Loading roster data...
                     </td>
                   </tr>
                 ) : visibleRosterRows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="crew-empty-cell">
+                    <td colSpan={7} className="crew-empty-cell">
                       No members found
                     </td>
                   </tr>
@@ -753,7 +739,6 @@ export default function Crew() {
                       <td className="crew-col-check">
                         <input type="checkbox" />
                       </td>
-                      <td className="crew-id-cell crew-id-cell--roster">#{row.rosterId}</td>
                       <td>
                         <div className="crew-name-cell">
                           <Avatar name={row.name} size={28} />

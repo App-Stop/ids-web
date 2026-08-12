@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Modal from './Modal'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
+import ConfirmModal from './ConfirmModal'
 import { crewColorFor } from '../../lib/scheduleData'
 import type { CrewSummaryItem } from '../../api/crewApi'
 import type { CrewAssignment } from '../../api/jobApi'
@@ -60,8 +61,24 @@ export default function ScheduleAssignModal({
   const [startDate, setStartDate] = useState(assignment?.startDate?.slice(0, 10) ?? defaultStartDate)
   const [endDate, setEndDate] = useState(assignment?.endDate?.slice(0, 10) ?? '')
   const [note, setNote] = useState(assignment?.note ?? '')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const selected = crews.find((c) => c._id === crewId)
+
+  if (confirmingDelete) {
+    return (
+      <ConfirmModal
+        title="Are you sure you want to remove this assignment?"
+        message="This action is irreversible."
+        confirmLabel="Yes Remove"
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={() => {
+          setConfirmingDelete(false)
+          onDelete?.()
+        }}
+      />
+    )
+  }
 
   return (
     <Modal onClose={onCancel} width={440}>
@@ -134,7 +151,7 @@ export default function ScheduleAssignModal({
 
       <div className={canDelete ? 'modal-actions modal-actions--split' : 'modal-actions'}>
         {canDelete && (
-          <button type="button" className="btn btn--danger" disabled={saving} onClick={onDelete}>
+          <button type="button" className="btn btn--danger" disabled={saving} onClick={() => setConfirmingDelete(true)}>
             Remove
           </button>
         )}

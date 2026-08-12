@@ -51,7 +51,8 @@ type JobCostRow = {
   laborCost: number
   dumpstersCount: number
   dumpsterUnitCost: number
-  totalCost: number
+  currentCrewName?: string
+  currentCrewId?: string
   weeklyCosts: Array<number | null>
   dailyCosts?: Record<string, number | null>
 }
@@ -320,11 +321,19 @@ export default function CostTracking() {
               const jobIdStr = grp.jobId ?? `job-${index}`
               const idNumStr = grp.jobIdNumber ? String(grp.jobIdNumber).padStart(3, '0') : String(index + 1).padStart(3, '0')
 
+              const currentCrew = (grp as any).currentCrew
+              const crewObj = typeof currentCrew === 'object' && currentCrew !== null ? currentCrew : null
+              const crewId = crewObj?._id ?? (typeof currentCrew === 'string' ? currentCrew : null)
+              const crewName = crewObj?.name ?? (crewId ? 'Crew' : 'Unassigned')
+              const color = crewId ? crewColorFor(crewId, crewObj?.crewColor) : '#94a3b8'
+
               return {
                 id: `#${idNumStr}`,
                 jobId: jobIdStr,
                 jobName: grp.jobName || 'Unnamed Job',
-                color: assignableCrews[index % assignableCrews.length]?.color ?? '#94a3b8',
+                color,
+                currentCrewName: crewName,
+                currentCrewId: crewId ?? undefined,
                 date: grp.costByDate[0]?.date || new Date().toISOString().slice(0, 10),
                 endDate: grp.costByDate[grp.costByDate.length - 1]?.date || new Date().toISOString().slice(0, 10),
                 contract: (grp as any).contractAmount ?? 0,
@@ -816,10 +825,7 @@ export default function CostTracking() {
                       <span
                         className="ct-job-bar-hit"
                         onMouseEnter={(e) => {
-                          const assigned = jobCrews[row.jobId] ?? jobCrews[row.id]
-                          const matched = assignableCrews.find((c) => c.color === row.color)
-                          const name = assigned?.name ?? matched?.name
-                          if (!name) return
+                          const name = row.currentCrewName || 'Unassigned'
                           const rect = e.currentTarget.getBoundingClientRect()
                           setCrewHover({
                             x: rect.right + 8,

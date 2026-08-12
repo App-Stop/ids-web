@@ -72,6 +72,13 @@ export const Icon = {
   AlertCircle: (p: SVGProps<SVGSVGElement>) => (
     <svg {...base} {...p}><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" /></svg>
   ),
+  QuestionCircle: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...base} {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  ),
   Panel: (p: SVGProps<SVGSVGElement>) => (
     <svg {...base} {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg>
   ),
@@ -106,6 +113,12 @@ export const Icon = {
       <path d="M2 18h20" />
       <path d="M12 10V4" />
       <path d="M9 4h6" />
+    </svg>
+  ),
+  MapPin: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...base} {...p}>
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
     </svg>
   ),
 }

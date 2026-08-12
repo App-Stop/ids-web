@@ -8,6 +8,8 @@ import "./Dashboard.css";
 import "./Profile.css";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axiosInstance";
+import { changeAdminPassword } from "../api/crewApi";
+import { parseApiErrors } from "../lib/errors";
 
 type Tab = "settings" | "team" | "notifications";
 type MemberRole = "Super Admin" | "Controller" | "Ops Manager";
@@ -158,6 +160,13 @@ export default function Profile() {
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
 
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
   const { logout } = useAuth();
 
   useEffect(() => {
@@ -272,6 +281,51 @@ export default function Profile() {
     closeMemberModal();
   }
 
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (!currentPassword) {
+      setPasswordError("Please enter your current password.");
+      return;
+    }
+    if (!newPassword) {
+      setPasswordError("Please enter a new password.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords do not match.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await changeAdminPassword({
+        currentPassword,
+        newPassword,
+        confirmNewPassword: confirmPassword,
+      });
+      setPasswordSuccess("Password updated successfully!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setPasswordError("Incorrect current password.");
+      } else {
+        const parsed = parseApiErrors(err, "Failed to update password. Please try again.");
+        setPasswordError(parsed.generalMessage);
+      }
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }
+
   function removeMember() {
     if (memberModal.type !== "edit") return;
     setTeamMembers((list) =>
@@ -378,35 +432,75 @@ export default function Profile() {
               </label>
             </div>
 
-            <div className="profile-password">
+            <form className="profile-password" onSubmit={handleChangePassword}>
               <h2>Change Password</h2>
+
+              {passwordError && (
+                <div className="form-error-alert" style={{ marginBottom: "1rem" }}>
+                  <Icon.AlertCircle width={18} height={18} />
+                  <span>{passwordError}</span>
+                </div>
+              )}
+
+              {passwordSuccess && (
+                <div style={{ padding: "0.6rem 0.9rem", background: "#dcfce7", color: "#16a34a", borderRadius: "8px", fontSize: "0.88rem", fontWeight: 600, marginBottom: "1rem" }}>
+                  {passwordSuccess}
+                </div>
+              )}
+
               <div className="profile-password__grid">
                 <label className="profile-field profile-field--full">
-                  <span>Current Password</span>
+                  <span>Current Password*</span>
                   <input
                     placeholder="Enter your current password"
                     type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
                   />
                 </label>
                 <label className="profile-field profile-field--full">
-                  <span>New Password</span>
-                  <input placeholder="Enter new password" type="password" />
+                  <span>New Password*</span>
+                  <input
+                    placeholder="Enter new password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
                 </label>
                 <label className="profile-field profile-field--full">
-                  <span>Confirm New Password</span>
-                  <input placeholder="Re-enter new password" type="password" />
+                  <span>Confirm New Password*</span>
+                  <input
+                    placeholder="Re-enter new password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
                 </label>
               </div>
-            </div>
 
-            <div className="profile-actions">
-              <button type="button" className="btn profile-secondary-btn">
-                Reset
-              </button>
-              <button type="button" className="btn btn--primary">
-                Save Changes
-              </button>
-            </div>
+              <div className="profile-actions" style={{ marginTop: "1.5rem" }}>
+                <button
+                  type="button"
+                  className="btn profile-secondary-btn"
+                  onClick={() => {
+                    setCurrentPassword("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+                    setPasswordError("");
+                    setPasswordSuccess("");
+                  }}
+                >
+                  Reset
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn--primary"
+                  disabled={isChangingPassword || !currentPassword || !newPassword}
+                >
+                  {isChangingPassword ? "Updating..." : "Update Password"}
+                </button>
+              </div>
+            </form>
           </section>
         )}
 
@@ -416,7 +510,6 @@ export default function Profile() {
               <div className="profile-table">
                 <div className="profile-table__head">
                   <span />
-                  <span>ID</span>
                   <span>Member</span>
                   <span>Join Date</span>
                   <span>Role</span>
@@ -430,7 +523,6 @@ export default function Profile() {
                         aria-label={`Select ${member.member}`}
                       />
                     </span>
-                    <span>{member.rosterId}</span>
                     <span className="profile-member">
                       <Avatar name={member.member} size={28} />
                       {member.member}

@@ -482,10 +482,34 @@
 }
 
 .btn--danger {
-  background: none;
-  border: none;
-  color: #ea0101;
-  padding: 0.6rem 0;
+  background: #dc2626;
+  border: 1px solid #dc2626;
+  color: #fff;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.btn--danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
+}
+
+.btn--complete {
+  background: #16a34a;
+  border: 1px solid #16a34a;
+  color: #fff;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.btn--complete:hover {
+  background: #15803d;
+  border-color: #15803d;
+  color: #fff;
 }
 
 .btn--danger-solid {

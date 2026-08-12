@@ -14,7 +14,7 @@ import { STATUS_COLORS, STATUS_LABELS, type JobStatus, type ManagedJob } from '.
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import { useAppStore } from '../lib/store'
-import { getJobs, deleteJob, type JobItem, type Pagination } from '../api/jobApi'
+import { getJobs, deleteJob, updateJob, type JobItem, type Pagination } from '../api/jobApi'
 import { getCrewsSummary, type CrewSummaryItem, type UserItem } from '../api/crewApi'
 import { crewColorFor } from '../lib/scheduleData'
 import { getErrorMessage } from '../lib/errors'
@@ -224,6 +224,15 @@ export default function JobsManagement() {
     }
   }
 
+  async function handleStatusChange(jobId: string, newStatus: JobStatus) {
+    try {
+      await updateJob(jobId, { status: newStatus })
+      fetchJobsList()
+    } catch (err: any) {
+      alert(getErrorMessage(err, 'Failed to update job status.'))
+    }
+  }
+
   async function handleDeleteJob(jobId: string) {
     try {
       await deleteJob(jobId)
@@ -406,7 +415,6 @@ export default function JobsManagement() {
                         >
                           <span className="jm-name-inner">
                             <span>{job.name}</span>
-                            <Icon.ChevronRight width={14} height={14} />
                           </span>
                         </button>
                       </td>
@@ -429,15 +437,25 @@ export default function JobsManagement() {
                         <div>{job.endDate}</div>
                       </td>
                       <td className="jm-center">
-                        <span
-                          className="jm-status"
-                          style={{
-                            color: STATUS_COLORS[job.status],
-                            borderColor: STATUS_COLORS[job.status],
-                          }}
-                        >
-                          {STATUS_LABELS[job.status]}
-                        </span>
+                        <div style={{ display: 'inline-block', textAlign: 'left' }}>
+                          <Dropdown
+                            value={job.status}
+                            selectedLabel={
+                              <span
+                                className="jm-status"
+                                style={{
+                                  color: STATUS_COLORS[job.status],
+                                  borderColor: STATUS_COLORS[job.status],
+                                }}
+                              >
+                                {STATUS_LABELS[job.status]}
+                                <Icon.ChevronDown width={12} height={12} style={{ opacity: 0.7 }} />
+                              </span>
+                            }
+                            onChange={(v) => handleStatusChange(job.rawId || job.id, v as JobStatus)}
+                            options={STATUS_OPTIONS.map((s) => ({ id: s.id, label: s.label }))}
+                          />
+                        </div>
                       </td>
                       <td className="jm-center">
                         <div className="jm-labor">
@@ -453,15 +471,17 @@ export default function JobsManagement() {
                         </div>
                       </td>
                       <td className="jm-center">
-                        <button
-                          type="button"
-                          className="btn--primary btn"
-                          onClick={() => setEditingId(job.id)}
-                          aria-label={`Edit job ${job.name}`}
-                        >
-                          <PenIcon size={20} />
-                          <p>Edit</p>
-                        </button>
+                        <div className="jm-action-cell">
+                          <button
+                            type="button"
+                            className="btn btn--primary"
+                            onClick={() => setEditingId(job.id)}
+                            aria-label={`Edit job ${job.name}`}
+                          >
+                            <PenIcon size={16} />
+                            <p>Edit</p>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -492,13 +512,13 @@ export default function JobsManagement() {
 
           <div className="jm-pagination-controls">
             <span className="jm-pagination-info">
-              Page {pagination.page || page} of {pagination.totalPages || 1} ({pagination.totalCount || jobs.length} total)
+              Page {pagination.page || page} of {pagination.totalPages || 1}
             </span>
             <div className="jm-pagination-btns">
               <button
                 type="button"
                 className="btn btn--outline jm-page-btn"
-                disabled={page <= 1}
+                disabled={loading || (pagination.page || page) <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
                 <CaretLeft size={16} /> Previous
@@ -506,7 +526,7 @@ export default function JobsManagement() {
               <button
                 type="button"
                 className="btn btn--outline jm-page-btn"
-                disabled={page >= (pagination.totalPages || 1)}
+                disabled={loading || (pagination.page || page) >= (pagination.totalPages || 1)}
                 onClick={() => setPage((p) => Math.min(pagination.totalPages || 1, p + 1))}
               >
                 Next <CaretRight size={16} />
@@ -539,7 +559,7 @@ export default function JobsManagement() {
           note={activeRow.note ?? ''}
           onDone={() => setFlow({ type: 'none' })}
           onChangeCrew={() => setFlow({ type: 'assignCrew', jobId: activeRow.rawId || activeRow.id })}
-          onSaveNote={(text) =>
+          onSaveNote={(text: string) =>
             setJobs((prev) => prev.map((j) => (j.id === activeRow.id ? { ...j, note: text || undefined } : j)))
           }
           onRemoveCrew={() => handleDeleteJob(activeRow.rawId || activeRow.id)}
