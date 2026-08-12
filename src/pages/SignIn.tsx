@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import BrandLogos from '../components/BrandLogos'
-import EmailField from '../components/EmailField'
+import EmailField, { DOMAIN } from '../components/EmailField'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import { homePathForRole } from '../components/ProtectedRoute'
@@ -22,7 +22,8 @@ export default function SignIn() {
     setError('')
     setLoading(true)
     try {
-      const body = await adminLogin(email, password)
+      const fullEmail = email.includes('@') ? email : `${email.trim()}${DOMAIN}`
+      const body = await adminLogin(fullEmail, password)
       navigate(homePathForRole(body.data?.admin?.role ?? 'admin'), { replace: true })
     } catch (err) {
       setError(getErrorMessage(err, 'Invalid email or password'))
@@ -54,7 +55,7 @@ export default function SignIn() {
             required
           />
           <Link to="/forgot-password" className="auth-forgot">
-            Forgot Password
+            Forgot Password?
           </Link>
         </div>
 

@@ -3,6 +3,7 @@ import Modal from './Modal'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import { Icon } from './icons'
+import LocationPickerInput from './LocationPickerInput'
 import { crewColors, type Job } from '../../lib/dashboardData'
 import { createJob, updateJob, getJobById, createCrewAssignment, type CreateJobPayload, type UpdateJobPayload, type JobItem } from '../../api/jobApi'
 import { getCrewsSummary, type UserItem } from '../../api/crewApi'
@@ -119,17 +120,20 @@ export default function CreateJobModal({
   const [note, setNote] = useState<string>('')
 
   const [assignCrewNow, setAssignCrewNow] = useState(false)
+  const [excludeWeekends, setExcludeWeekends] = useState(false)
   const [assignStartDate, setAssignStartDate] = useState<string>(toMdyDate(new Date().toISOString().slice(0, 10)))
   const [assignEndDate, setAssignEndDate] = useState<string>('')
   const [presetId, setPresetId] = useState<string>('')
   const [availableCrews, setAvailableCrews] = useState<AvailableCrewItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoadingData, setIsLoadingData] = useState(true)
   const [apiError, setApiError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const color = job?.color ?? crewColors[0]
 
   useEffect(() => {
     async function loadData() {
+      setIsLoadingData(true)
       try {
         const crewsRes = await getCrewsSummary()
         if (crewsRes.success && Array.isArray(crewsRes.data)) {
@@ -175,6 +179,8 @@ export default function CreateJobModal({
         }
       } catch (err) {
         console.error('Failed to fetch modal details:', err)
+      } finally {
+        setIsLoadingData(false)
       }
     }
 
@@ -182,7 +188,7 @@ export default function CreateJobModal({
   }, [isEdit, job?.id])
 
   const selectedCrew = availableCrews.find((c) => c.id === crewLeadId)
-  const canSubmit = !isSubmitting
+  const canSubmit = !isSubmitting && !isLoadingData
 
   function applyPreset(id: string) {
     setPresetId(id)
@@ -242,6 +248,7 @@ export default function CreateJobModal({
               crewId: crewLeadId,
               startDate: toIsoDate(assignStartDate) || toIsoDate(startDate) || new Date().toISOString().slice(0, 10),
               endDate: toIsoDate(assignEndDate) || undefined,
+              excludeWeekend: excludeWeekends,
               note: note.trim() || undefined,
             })
           } catch (assignErr: any) {
@@ -275,6 +282,7 @@ export default function CreateJobModal({
               crewId: crewLeadId,
               startDate: toIsoDate(assignStartDate) || toIsoDate(startDate) || new Date().toISOString().slice(0, 10),
               endDate: toIsoDate(assignEndDate) || undefined,
+              excludeWeekend: excludeWeekends,
               note: note.trim() || undefined,
             })
           } catch (assignErr: any) {
@@ -308,6 +316,12 @@ export default function CreateJobModal({
           )}
         </div>
 
+        {isLoadingData && (
+          <div style={{ padding: '0.4rem 0', color: '#6b7280', fontSize: '0.875rem', fontStyle: 'italic' }}>
+            Loading job details…
+          </div>
+        )}
+
         {apiError && (
           <div className="form-error-alert">
             <Icon.AlertCircle width={18} height={18} />
@@ -315,6 +329,7 @@ export default function CreateJobModal({
           </div>
         )}
 
+        <fieldset disabled={isLoadingData || isSubmitting} style={{ border: 'none', padding: 0, margin: 0, opacity: isLoadingData ? 0.6 : 1 }}>
         <div className="job-form-modal__grid">
           <div className="job-form-modal__main">
             {!isEdit && presetJobs && presetJobs.length > 0 && (
@@ -339,7 +354,7 @@ export default function CreateJobModal({
                 <input
                   type="number"
                   className={`field-input${fieldErrors.jobIdNumber ? ' field-input--error' : ''}`}
-                  placeholder="Auto / #1"
+                  placeholder="Enter Job ID"
                   value={jobIdNumber}
                   onChange={(e) => setJobIdNumber(e.target.value === '' ? '' : Number(e.target.value))}
                 />
@@ -358,11 +373,12 @@ export default function CreateJobModal({
             </div>
 
             <label className="field-label">Site Address*</label>
-            <input
-              className={`field-input${fieldErrors.siteAddress ? ' field-input--error' : ''}`}
-              placeholder="Enter Address"
+            <LocationPickerInput
               value={siteAddress}
-              onChange={(e) => setSiteAddress(e.target.value)}
+              onChange={setSiteAddress}
+              hasError={Boolean(fieldErrors.siteAddress)}
+              placeholder="Start typing address..."
+              disabled={isLoadingData || isSubmitting}
             />
             {fieldErrors.siteAddress && <span className="field-error-text">{fieldErrors.siteAddress}</span>}
 
@@ -453,6 +469,17 @@ export default function CreateJobModal({
                 />
                 <span>Assign crew now</span>
               </label>
+
+              {assignCrewNow && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: '#475569', marginTop: '8px', marginLeft: '24px' }}>
+                  <input
+                    type="checkbox"
+                    checked={excludeWeekends}
+                    onChange={(e) => setExcludeWeekends(e.target.checked)}
+                  />
+                  <span>Exclude Weekends From Schedule</span>
+                </label>
+              )}
             </div>
 
             {assignCrewNow && (
@@ -516,6 +543,7 @@ export default function CreateJobModal({
             {isSubmitting ? (isEdit ? 'Updating...' : 'Creating...') : isEdit ? 'Update Job' : 'Create Job'}
           </button>
         </div>
+        </fieldset>
       </div>
     </Modal>
   )

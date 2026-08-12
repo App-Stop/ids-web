@@ -7,9 +7,8 @@ import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import CrewDetailsModal from '../components/dashboard/CrewDetailsModal'
 import CreateJobModal from '../components/dashboard/CreateJobModal'
-import { CaretRight, Hammer, Users, Money, WarningCircle } from '@phosphor-icons/react'
+import { Hammer, Users, Money, WarningCircle } from '@phosphor-icons/react'
 import {
-  assignableCrews,
   formatMoney,
   jobs as initialJobs,
   type CrewLead,
@@ -72,33 +71,33 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const res = await getDashboardSummary()
-        const data = res.data
-        setCardData(data)
-        setUnassignedJobs(data.unassignedJobsList ?? [])
-        setUnassigned(
-          (data.unassignedCrewsList ?? []).map((crew) => ({
-            id: crew._id,
-            name: crew.name,
-            leadName: crew.name,
-            rate: 0,
-            color: crew.crewColor,
-            memberCount: crew.members?.length ?? 0,
-          })),
-        )
-      } catch (err: any) {
-        setError(err?.response?.data?.message ?? 'Failed to load dashboard')
-      } finally {
-        setLoading(false)
-      }
+  async function fetchDashboardData() {
+    try {
+      setLoading(true)
+      setError(null)
+      const res = await getDashboardSummary()
+      const data = res.data
+      setCardData(data)
+      setUnassignedJobs(data.unassignedJobsList ?? [])
+      setUnassigned(
+        (data.unassignedCrewsList ?? []).map((crew) => ({
+          id: crew._id,
+          name: crew.name,
+          leadName: crew.name,
+          rate: 0,
+          color: crew.crewColor,
+          memberCount: crew.members?.length ?? 0,
+        })),
+      )
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Failed to load dashboard')
+    } finally {
+      setLoading(false)
     }
+  }
 
-    fetchDashboard()
+  useEffect(() => {
+    fetchDashboardData()
   }, [])
 
   const overBudget = cardData?.jobsOverBudget ?? []
@@ -162,7 +161,6 @@ export default function Dashboard() {
                 {unassignedJobs.map((item) => (
                   <li key={item._id} className="unassigned-item">
                     <span className="unassigned-item__name">{item.Name}</span>
-                    <CaretRight size={14} weight="bold" className="unassigned-item__chevron" />
                     <button
                       type="button"
                       className="btn btn--primary btn--sm"
@@ -189,13 +187,10 @@ export default function Dashboard() {
         <AssignJobModal
           crew={flow.crew}
           date={TODAY}
-          jobs={jobs}
           onCancel={() => setFlow({ step: 'none' })}
-          onAssign={(jobId, note) => {
-            const job = jobs.find((j) => j.id === jobId)
-            if (!job) return
-            setUnassigned((list) => list.filter((c) => c.id !== flow.crew.id))
-            setFlow({ step: 'jobDetails', crew: flow.crew, job, note })
+          onSuccess={() => {
+            fetchDashboardData()
+            setFlow({ step: 'none' })
           }}
         />
       )}
@@ -217,18 +212,11 @@ export default function Dashboard() {
       {flow.step === 'assignCrew' && (
         <AssignCrewModal
           job={flow.job}
+          jobId={flow.job?.id}
           onCancel={() => setFlow({ step: 'none' })}
-          onAssign={(crewId, note) => {
-            const crew = assignableCrews.find((c) => c.id === crewId)
-            if (!crew) return
-            const crewLead: CrewLead = {
-              id: crew.id,
-              name: crew.leadName,
-              rate: crew.rate,
-              color: crew.color,
-              avatar: crew.avatar,
-            }
-            setFlow({ step: 'crewDetails', job: flow.job, crewLead, note })
+          onSuccess={() => {
+            fetchDashboardData()
+            setFlow({ step: 'none' })
           }}
         />
       )}

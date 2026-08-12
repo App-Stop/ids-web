@@ -61,9 +61,11 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
   const [useCustomPassword, setUseCustomPassword] = useState(false)
   const [customPassword, setCustomPassword] = useState('')
   const [availableCrews, setAvailableCrews] = useState<CrewMenuOption[]>(crews)
+  const [isLoadingData, setIsLoadingData] = useState(true)
 
   useEffect(() => {
     async function loadData() {
+      setIsLoadingData(true)
       try {
         const [crewsRes, userRes] = await Promise.all([
           getCrewsSummary(),
@@ -105,6 +107,8 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
         }
       } catch (err) {
         console.error('Failed to load member modal details:', err)
+      } finally {
+        setIsLoadingData(false)
       }
     }
 
@@ -237,12 +241,20 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
       <div className="cm-card cm-card--narrow cm-card--member" onClick={(e) => e.stopPropagation()}>
         <h2 className="cm-card__title cm-card__title--pad">{mode === 'add' ? 'Add New Member' : 'Edit Member'}</h2>
 
+        {isLoadingData && (
+          <div style={{ padding: '0.4rem 0', color: '#6b7280', fontSize: '0.875rem', fontStyle: 'italic' }}>
+            Loading member details…
+          </div>
+        )}
+
         {apiError && (
           <div className="form-error-alert" style={{ marginTop: '0', marginBottom: '1rem' }}>
             <Icon.AlertCircle width={18} height={18} />
             <span>{apiError}</span>
           </div>
         )}
+
+        <fieldset disabled={isLoadingData || isSubmitting} style={{ border: 'none', padding: 0, margin: 0, opacity: isLoadingData ? 0.6 : 1 }}>
 
         <div className="cm-field-row">
           <label className="cm-field">
@@ -392,6 +404,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
             </button>
           </div>
         </div>
+        </fieldset>
       </div>
     </div>
   )

@@ -395,7 +395,6 @@ function MemberFilter({
                   <span className={`ts-check ${isSelected ? 'is-on' : ''}`}>{isSelected && <Icon.Check width={12} height={12} />}</span>
                   <Avatar name={member.name} size={24} />
                   <span className="ts-member-filter__name">{member.name}</span>
-                  <span className="ts-member-filter__meta">#{member.rosterId}</span>
                 </button>
               )
             })}
@@ -636,7 +635,6 @@ function AttendanceModal({
             <Avatar name={selectedMember.name} size={42} />
             <span>{selectedMember.name}</span>
           </div>
-          <span className="ts-modal-head__meta">#{selectedMember.rosterId}</span>
         </div>
       )}
 
@@ -652,7 +650,6 @@ function AttendanceModal({
                 <span className="ts-member-picker">
                   <Avatar name={selectedMember.name} size={24} />
                   {selectedMember.name}
-                  <span className="ts-member-picker__meta">#{selectedMember.rosterId}</span>
                 </span>
               )
             }
@@ -662,7 +659,6 @@ function AttendanceModal({
                 <span className="ts-member-picker">
                   <Avatar name={member.name} size={24} />
                   {member.name}
-                  <span className="ts-member-picker__meta">#{member.rosterId}</span>
                 </span>
               ),
             }))}
@@ -1265,9 +1261,7 @@ export default function Timesheet() {
                             <Avatar name={summary.name} size={28} />
                             <span className="ts-member-cell__text">
                               <span>{summary.name}</span>
-                              <span className="ts-member-cell__meta">
-                                #{summary.rosterId} · {summary.role}
-                              </span>
+                              <span className="ts-member-cell__meta">{summary.role}</span>
                             </span>
                           </button>
                         </td>
@@ -1353,7 +1347,6 @@ export default function Timesheet() {
                   <th className="ts-col-check">
                     <input type="checkbox" />
                   </th>
-                  <th>Roster ID</th>
                   <th>Name</th>
                   <th>Role</th>
                   <th>Date</th>
@@ -1376,7 +1369,6 @@ export default function Timesheet() {
                     <td className="ts-col-check">
                       <input type="checkbox" />
                     </td>
-                    <td className="ts-id-cell">#{row.rosterId}</td>
                     <td>
                       <div className="ts-member-cell">
                         <Avatar name={row.name} size={26} />

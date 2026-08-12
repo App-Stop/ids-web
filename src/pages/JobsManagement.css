@@ -210,7 +210,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--muted);
   background: #f5f5f7;
@@ -409,13 +409,23 @@
 }
 
 .jm-status {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   padding: 0.28rem 0.7rem;
   border-radius: 999px;
   border: 1.5px solid;
   font-size: 0.78rem;
   font-weight: 700;
   background: transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.jm-status:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
 }
 
 .jm-labor {
@@ -492,9 +502,30 @@
   border-radius: 6px;
 }
 
-.jm-action-btn:hover {
-  background: var(--field-bg);
-  color: var(--ink);
+.jm-action-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.jm-action-cell .btn {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.jm-action-cell .btn p {
+  margin: 0;
+  padding: 0;
+  line-height: 1;
 }
 
 .jm-pagination-bar {
@@ -543,6 +574,12 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+}
+
+.jm-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 @media (max-width: 780px) {

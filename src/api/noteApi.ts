@@ -42,7 +42,7 @@ export async function createDayNote(payload: {
   date: string
   note: string
 }): Promise<DayNoteResponse> {
-  const response = await api.post<DayNoteResponse>('/notes', payload)
+  const response = await api.post<DayNoteResponse>('/notes/create', payload)
   return response.data
 }
 

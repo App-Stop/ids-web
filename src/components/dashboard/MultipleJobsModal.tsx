@@ -1,4 +1,3 @@
-import { Icon } from './icons'
 import type { CrewJobAssignment } from '../../lib/crewData'
 import './crew-modals.css'
 
@@ -28,7 +27,6 @@ export default function MultipleJobsModal({ jobs, onDone, onOpenJob }: MultipleJ
                 </span>
                 <span className="cm-job-row__name">{job.jobName}</span>
               </span>
-              <Icon.ChevronRight width={16} height={16} className="cm-job-row__chevron" />
             </button>
           ))}
         </div>

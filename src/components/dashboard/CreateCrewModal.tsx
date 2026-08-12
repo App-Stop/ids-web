@@ -69,11 +69,13 @@ export default function CreateCrewModal({
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [laborError, setLaborError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoadingData, setIsLoadingData] = useState(true)
   const [apiError, setApiError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     async function loadData() {
+      setIsLoadingData(true)
       try {
         const [leadsRes, laborsRes] = await Promise.all([
           getUsers({ role: 'crew-lead', isActive: true }),
@@ -129,6 +131,8 @@ export default function CreateCrewModal({
         }
       } catch (err) {
         console.error('Failed to load crew modal options:', err)
+      } finally {
+        setIsLoadingData(false)
       }
     }
 
@@ -140,7 +144,7 @@ export default function CreateCrewModal({
   const selectedLeadRate = selectedLead?.hourlyRate
 
   const selectedJob = jobs.find((j) => j.id === jobId)
-  const canSubmit = Boolean(crewName.trim() && crewLeadId) && !isSubmitting
+  const canSubmit = Boolean(crewName.trim() && crewLeadId) && !isSubmitting && !isLoadingData
 
   function toggleMember(memberId: string, memberName: string) {
     if (selectedMemberIds.includes(memberId)) {
@@ -246,12 +250,20 @@ export default function CreateCrewModal({
     <Modal onClose={onCancel} width={isEdit ? 520 : 480}>
       <h2 className="modal-title">{isEdit ? 'Edit Crew' : 'Create New Crew'}</h2>
 
+      {isLoadingData && (
+        <div style={{ padding: '0.4rem 0', color: '#6b7280', fontSize: '0.875rem', fontStyle: 'italic' }}>
+          Loading crew details…
+        </div>
+      )}
+
       {apiError && (
         <div className="form-error-alert">
           <Icon.AlertCircle width={18} height={18} />
           <span>{apiError}</span>
         </div>
       )}
+
+      <fieldset disabled={isLoadingData || isSubmitting} style={{ border: 'none', padding: 0, margin: 0, opacity: isLoadingData ? 0.6 : 1 }}>
 
       <label className="field-label">Crew Name*</label>
       <input
@@ -426,6 +438,7 @@ export default function CreateCrewModal({
           </button>
         </div>
       </div>
+      </fieldset>
     </Modal>
   )
 }

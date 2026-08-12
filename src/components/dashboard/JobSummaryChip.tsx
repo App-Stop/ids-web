@@ -1,4 +1,3 @@
-import { Icon } from './icons'
 import { formatMoney, type Job } from '../../lib/dashboardData'
 
 export default function JobSummaryChip({ job }: { job: Job }) {
@@ -13,7 +12,6 @@ export default function JobSummaryChip({ job }: { job: Job }) {
           {job.gc} &middot; {formatMoney(job.contractAmount)}
         </span>
       </div>
-      <Icon.ChevronRight width={16} height={16} />
     </div>
   )
 }

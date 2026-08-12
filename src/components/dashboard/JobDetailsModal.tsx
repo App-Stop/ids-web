@@ -28,12 +28,15 @@ export default function JobDetailsModal({
   const [editingNote, setEditingNote] = useState(false)
   const [noteDraft, setNoteDraft] = useState(note)
   const [fetchedJob, setFetchedJob] = useState<JobItem | null>(null)
+  const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(Boolean(job.id && !job.id.startsWith('#tmp')))
 
   useEffect(() => {
     async function loadJobDetails() {
       if (!job.id || job.id.startsWith('#tmp')) {
+        setIsLoadingDetails(false)
         return
       }
+      setIsLoadingDetails(true)
       try {
         const res = await getJobById(job.id)
         if (res.success && res.data) {
@@ -44,6 +47,8 @@ export default function JobDetailsModal({
         }
       } catch (err) {
         console.error('Failed to fetch job details:', err)
+      } finally {
+        setIsLoadingDetails(false)
       }
     }
 
@@ -84,9 +89,15 @@ export default function JobDetailsModal({
 
   return (
     <Modal onClose={onDone} width={460}>
-      <p className="job-head__meta">
-        {displayJob.bidNo ? `Bid #${displayJob.bidNo} · ` : ''}Job #{displayJob.jobNo}
-      </p>
+      {isLoadingDetails && (
+        <div style={{ padding: '0.5rem 0', color: '#6b7280', fontSize: '0.875rem', fontStyle: 'italic' }}>
+          Loading latest job details…
+        </div>
+      )}
+      <div style={isLoadingDetails ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
+        <p className="job-head__meta">
+          {displayJob.bidNo ? `Bid #${displayJob.bidNo} · ` : ''}Job #{displayJob.jobNo}
+        </p>
       <h2 className="modal-title" style={{ marginTop: '0.25rem' }}>
         {displayJob.name}
       </h2>
@@ -208,6 +219,7 @@ export default function JobDetailsModal({
             Done
           </button>
         </div>
+      </div>
       </div>
     </Modal>
   )
