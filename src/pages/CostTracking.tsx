@@ -1,24 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MagnifyingGlass, Plus, CalendarBlank } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
-import Modal from '../components/dashboard/Modal'
 import Dropdown from '../components/dashboard/Dropdown'
 import MenuDropdown from '../components/dashboard/MenuDropdown'
 import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import ZoomControl from '../components/dashboard/ZoomControl'
 import { Icon } from '../components/dashboard/icons'
-import { crewRows as initialCrewRows, crewMenuOptions } from '../lib/crewData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import { useSidebarCollapsed } from '../hooks/useSidebarCollapsed'
 import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
+import { AddDailyDumpsterCountModal, EditCostAdjustmentModal } from '../components/dashboard/CostTrackingModals'
+import { getJobs, type JobItem } from '../api/jobApi'
+import { getCrewsSummary, type CrewSummaryItem } from '../api/crewApi'
+import {
+  getCostTrackingReport,
+  type CostTrackingReportData,
+  type CostTrackingReportParams,
+} from '../api/dumpsterCostApi'
+import { crewColorFor } from '../lib/scheduleData'
 import {
   assignableCrews,
   formatMoney,
   type Job,
   type UnassignedCrew,
 } from '../lib/dashboardData'
-import { initialManagedJobs, type ManagedJob } from '../lib/jobsManagementData'
 import './Dashboard.css'
 import './CostTracking.css'
 
@@ -72,15 +78,6 @@ type CrewCostRow = {
   totalCost: number
 }
 
-type CostRecordForm = {
-  jobId: string | null
-  crewId: string | null
-  date: string
-  laborCost: string
-  dumpstersCount: string
-  dumpsterUnitCost: string
-}
-
 const RANGE_OPTIONS: { id: RangeMode; label: RangeMode }[] = [
   { id: 'Custom Range', label: 'Custom Range' },
   { id: 'Weekly', label: 'Weekly' },
@@ -111,20 +108,6 @@ function parseIsoDate(value: string) {
   return new Date(year, month - 1, day)
 }
 
-/** Job data stores dates day-first (`30-07-2026`). */
-function dmyToIso(value: string) {
-  const [day, month, year] = value.split('-')
-  if (!day || !month || !year) return value
-  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-}
-
-/** Crew data stores dates month-first (`07-14-2026`). */
-function mdyToIso(value: string) {
-  const [month, day, year] = value.split('-')
-  if (!month || !day || !year) return value
-  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-}
-
 function addDays(date: Date, amount: number) {
   const next = new Date(date)
   next.setDate(next.getDate() + amount)
@@ -153,23 +136,10 @@ function formatGridDate(date: Date) {
   return `${month}-${day}-${year}`
 }
 
-/** ISO row date -> `MM-DD-YYYY` for display in the crew table. */
 function formatCrewDate(value: string) {
   const [year, month, day] = value.split('-')
   if (!year || !month || !day) return value
   return `${month}-${day}-${year}`
-}
-
-function makeWeeklyCosts(laborCost: number) {
-  return [
-    Math.round(laborCost * 0.5),
-    Math.round(laborCost * 0.5),
-    Math.round(laborCost * 0.35),
-    Math.round(laborCost * 0.25),
-    Math.round(laborCost * 0.2),
-    Math.round(laborCost * 0.18),
-    null,
-  ]
 }
 
 function DateField({ value, onChange, className = '' }: { value: string; onChange: (value: string) => void; className?: string }) {
@@ -199,44 +169,11 @@ function DateField({ value, onChange, className = '' }: { value: string; onChang
   )
 }
 
-function managedToJob(job: ManagedJob): Job {
-  const num = job.id.replace(/\D/g, '') || '1'
-  return {
-    id: job.id,
-    name: job.name,
-    color: job.color,
-    bidNo: String(1000 + Number(num)),
-    jobNo: num.padStart(3, '0'),
-    gc: job.gc,
-    estimator: job.idsSuper,
-    startDate: job.startDate,
-    endDate: job.endDate,
-    contractAmount: job.contract,
-    laborBudgetUsed: job.laborBudgetUsed,
-    laborBudgetTotal: job.laborBudgetTotal,
-  }
-}
-
-function makeCostJobs(): Job[] {
-  return initialManagedJobs.map(managedToJob)
-}
-
 function toISO(date: Date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
-}
-
-function getDeterministicDailyCost(laborCost: number, dateString: string, jobId: string) {
-  const d = parseIsoDate(dateString)
-  const dayOfWeek = d.getDay()
-  if (dayOfWeek === 0) return null // Sunday no work
-  const idNum = Number(jobId.replace(/\D/g, '')) || 1
-  if (dayOfWeek === 6 && (idNum % 2 === 0)) return null // Saturday off for some
-  const dayNum = d.getDate()
-  const factor = 0.03 + ((dayNum * 7 + idNum * 13) % 8) * 0.015
-  return Math.round(laborCost * factor)
 }
 
 /** Inclusive ISO bounds of the selected range; `null` = no date filtering. */
@@ -258,85 +195,21 @@ function getRangeBounds(range: RangeMode, startDate: string, endDate: string): [
   return start <= end ? [toISO(start), toISO(end)] : [toISO(end), toISO(start)]
 }
 
-const EARLIEST_JOB_ISO =
-  initialManagedJobs.map((job) => dmyToIso(job.startDate)).sort()[0] ?? toISO(new Date())
-
-/** Open on the month the earliest job starts in, so the grid never lands on an empty window. */
-const DEFAULT_RANGE = (() => {
-  const anchor = parseIsoDate(EARLIEST_JOB_ISO)
-  return {
-    start: toISO(new Date(anchor.getFullYear(), anchor.getMonth(), 1)),
-    end: toISO(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0)),
-  }
-})()
-
-function makeJobRows(): JobCostRow[] {
-  return initialManagedJobs.map((job, index) => {
-    const dumpstersCount = 1 + (index % 3)
-    const dumpsterUnitCost = 500 + index * 25
-    const laborCost = job.laborBudgetUsed
-    const balanceLeft = Math.max(0, job.laborBudgetTotal - job.laborBudgetUsed)
-    const percentSpent = job.laborBudgetTotal > 0 ? job.laborBudgetUsed / job.laborBudgetTotal : 0
-    const startIso = dmyToIso(job.startDate)
-    const endIso = dmyToIso(job.endDate)
-
-    const dailyCosts: Record<string, number | null> = {}
-    const baseDate = parseIsoDate(startIso)
-    for (let i = 0; i < 90; i++) {
-      const currentDay = addDays(baseDate, i)
-      const dayStr = toISO(currentDay)
-      dailyCosts[dayStr] = getDeterministicDailyCost(laborCost, dayStr, job.id)
-    }
-
-    return {
-      id: job.id,
-      jobId: job.id,
-      jobName: job.name,
-      color: job.color,
-      date: startIso,
-      endDate: endIso,
-      contract: job.contract,
-      laborBudgetTotal: job.laborBudgetTotal,
-      laborBudgetUsed: job.laborBudgetUsed,
-      balanceLeft,
-      percentSpent,
-      cumulativeLaborCosts: job.laborBudgetUsed,
-      laborCost,
-      dumpstersCount,
-      dumpsterUnitCost,
-      totalCost: laborCost + dumpstersCount * dumpsterUnitCost,
-      weeklyCosts: makeWeeklyCosts(laborCost),
-      dailyCosts,
-    }
-  })
+function getCurrentMonthRange() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), 1)
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  return { start: toISO(start), end: toISO(end) }
 }
 
-function makeCrewRows(): CrewCostRow[] {
-  return initialCrewRows.map((crew, index) => {
-    const totalHours = crew.workers * 11 + index * 3
-    const laborCost = totalHours * crew.rate
-    const dumpstersCount = Math.max(1, (crew.laborNames.length % 3) + 1)
-    const dumpsterUnitCost = 450 + index * 30
-    const jobDates = crew.jobs.map((job) => mdyToIso(job.date)).sort()
-    return {
-      id: crew.id,
-      crewKey: crew.id,
-      crewId: crew.crewId,
-      crewName: crew.name,
-      avatar: crew.avatar,
-      color: crew.color,
-      date: jobDates[0] ?? toISO(new Date()),
-      jobDates,
-      hourlyRate: crew.rate,
-      totalHours,
-      cost: laborCost,
-      laborCost,
-      dumpstersCount,
-      dumpsterUnitCost,
-      totalCost: laborCost + dumpstersCount * dumpsterUnitCost,
-    }
-  })
+function getCurrentWeekRange() {
+  const now = new Date()
+  const monday = getMonday(now)
+  const sunday = addDays(monday, 6)
+  return { start: toISO(monday), end: toISO(sunday) }
 }
+
+const DEFAULT_RANGE = getCurrentMonthRange()
 
 function toDetailsJob(row: JobCostRow, catalog: Job[]): Job {
   const match = catalog.find((j) => j.name === row.jobName)
@@ -347,8 +220,8 @@ function toDetailsJob(row: JobCostRow, catalog: Job[]): Job {
     color: row.color,
     bidNo: match?.bidNo ?? String(1000 + Number(num)),
     jobNo: match?.jobNo ?? num.padStart(3, '0'),
-    gc: match?.gc ?? 'Turner Const.',
-    estimator: match?.estimator ?? 'John D.',
+    gc: match?.gc ?? 'N/A',
+    estimator: match?.estimator ?? 'N/A',
     startDate: match?.startDate ?? row.date,
     endDate: match?.endDate ?? row.date,
     contractAmount: row.contract,
@@ -357,185 +230,7 @@ function toDetailsJob(row: JobCostRow, catalog: Job[]): Job {
   }
 }
 
-function CostModal({
-  mode,
-  scope,
-  jobs,
-  jobRows,
-  crews,
-  record,
-  selectedDate,
-  onCancel,
-  onSubmit,
-}: {
-  mode: 'add' | 'edit'
-  scope: ViewMode
-  jobs: Job[]
-  jobRows: JobCostRow[]
-  crews: typeof crewMenuOptions
-  record?: JobCostRow | CrewCostRow
-  selectedDate?: string | null
-  onCancel: () => void
-  onSubmit: (form: CostRecordForm) => void
-}) {
-  const isCrewScope = scope === 'crew'
-  const initialJobId = record && 'jobId' in record ? record.jobId : null
-  // The dropdown is keyed on crewMenuOptions ids, so seed it from crewKey — not
-  // the display number in crewId.
-  const initialCrewId = record && 'crewKey' in record ? record.crewKey : null
-  const [form, setForm] = useState<CostRecordForm>(() => {
-    const jobId = !isCrewScope ? initialJobId ?? jobs[0]?.id ?? null : jobs[0]?.id ?? null
-    const existing = jobId ? jobRows.find((row) => row.jobId === jobId || row.id === jobId) : undefined
-    const job = jobId ? jobs.find((item) => item.id === jobId) : undefined
 
-    let initialLaborCost = String(record?.laborCost ?? existing?.laborCost ?? job?.laborBudgetUsed ?? 0)
-    if (selectedDate && record && 'dailyCosts' in record) {
-      const dailyCosts = (record as JobCostRow).dailyCosts
-      const dayVal = dailyCosts && dailyCosts[selectedDate] !== undefined
-        ? dailyCosts[selectedDate]
-        : getDeterministicDailyCost((record as JobCostRow).laborCost, selectedDate, record.jobId)
-      initialLaborCost = String(dayVal ?? 0)
-    }
-
-    return {
-      jobId,
-      crewId: isCrewScope ? initialCrewId ?? crews[0]?.id ?? null : crews[0]?.id ?? null,
-      date: selectedDate ?? record?.date ?? new Date().toISOString().slice(0, 10),
-      laborCost: initialLaborCost,
-      dumpstersCount: String(record?.dumpstersCount ?? existing?.dumpstersCount ?? 1),
-      dumpsterUnitCost: String(record?.dumpsterUnitCost ?? existing?.dumpsterUnitCost ?? 500),
-    }
-  })
-
-  const selectedJob = jobs.find((job) => job.id === form.jobId)
-  const laborCost = Number(form.laborCost) || 0
-  const dumpstersCount = Number(form.dumpstersCount) || 0
-  const dumpsterUnitCost = Number(form.dumpsterUnitCost) || 0
-  const totalCost = laborCost + dumpstersCount * dumpsterUnitCost
-
-  function selectJob(id: string | null) {
-    if (!id) {
-      setForm((current) => ({ ...current, jobId: null }))
-      return
-    }
-    const existing = jobRows.find((row) => row.jobId === id || row.id === id)
-    const job = jobs.find((item) => item.id === id)
-    setForm((current) => ({
-      ...current,
-      jobId: id,
-      laborCost: String(existing?.laborCost ?? job?.laborBudgetUsed ?? current.laborCost),
-      dumpstersCount: String(existing?.dumpstersCount ?? current.dumpstersCount),
-      dumpsterUnitCost: String(existing?.dumpsterUnitCost ?? current.dumpsterUnitCost),
-    }))
-  }
-
-  return (
-    <Modal onClose={onCancel} width={540}>
-      <div className="ct-modal-head">
-        <h2 className="modal-title">{mode === 'edit' ? 'Edit Accumulated Cost' : 'Add Daily Dumpster Count'}</h2>
-        <span className="ct-modal-id">ID #{selectedJob?.jobNo ?? '001'}</span>
-      </div>
-
-      <label className="field-label">{isCrewScope ? 'Crew' : 'Job'}</label>
-      {isCrewScope ? (
-        <MenuDropdown
-          options={crews}
-          value={form.crewId}
-          onChange={(id) => setForm((current) => ({ ...current, crewId: id }))}
-          placeholder="Select crew"
-          includeAll={false}
-          showDot
-          showAvatar
-          className="ct-modal-dropdown"
-        />
-      ) : (
-        <MenuDropdown
-          options={jobs.map((job) => ({
-            id: job.id,
-            label: job.name,
-          }))}
-          value={form.jobId}
-          onChange={selectJob}
-          placeholder="Select job"
-          includeAll={false}
-          showDot={false}
-          className="ct-modal-dropdown"
-        />
-      )}
-
-      <label className="field-label">Date*</label>
-      <DateField value={form.date} onChange={(date) => setForm((current) => ({ ...current, date }))} className="ct-modal-date" />
-
-      <div className="field-row">
-        <label className="field-label">
-          {mode === 'edit' ? 'Labor Cost*' : 'Dumpsters Count*'}
-          <input
-            className="field-input"
-            inputMode="decimal"
-            value={form.laborCost}
-            onChange={(e) => setForm((current) => ({ ...current, laborCost: e.target.value }))}
-            placeholder="6,000"
-          />
-        </label>
-        <label className="field-label">
-          {mode === 'edit' ? 'Dumpsters Count*' : 'Each Cost*'}
-          <input
-            className="field-input"
-            inputMode="decimal"
-            value={mode === 'edit' ? form.dumpstersCount : form.dumpsterUnitCost}
-            onChange={(e) =>
-              setForm((current) =>
-                mode === 'edit'
-                  ? { ...current, dumpstersCount: e.target.value }
-                  : { ...current, dumpsterUnitCost: e.target.value },
-              )
-            }
-            placeholder={mode === 'edit' ? '4' : '600'}
-          />
-        </label>
-      </div>
-
-      {mode === 'add' && (
-        <label className="field-label">
-          Add a note
-          <textarea
-            className="field-textarea"
-            placeholder="30 yard, fuel, etc"
-            rows={5}
-            onChange={() => {}}
-          />
-        </label>
-      )}
-
-      <div className="ct-total-row">
-        <span>Total Cost</span>
-        <strong>{formatMoney(totalCost)}</strong>
-      </div>
-
-      <div className="modal-actions">
-        <button type="button" className="btn btn--outline" onClick={onCancel}>
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={() =>
-            onSubmit({
-              jobId: form.jobId,
-              crewId: form.crewId,
-              date: form.date,
-              laborCost: form.laborCost,
-              dumpstersCount: String(mode === 'edit' ? dumpstersCount : dumpstersCount),
-              dumpsterUnitCost: String(dumpsterUnitCost),
-            })
-          }
-        >
-          {mode === 'edit' ? 'Update Entry' : 'Add Entry'}
-        </button>
-      </div>
-    </Modal>
-  )
-}
 
 export default function CostTracking() {
   const [isPhone, setIsPhone] = useState(() => window.innerWidth <= 720)
@@ -548,12 +243,148 @@ export default function CostTracking() {
   const [activeRecord, setActiveRecord] = useState<JobCostRow | CrewCostRow | undefined>()
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [extraDays, setExtraDays] = useState(0)
-  const [jobs] = useState<Job[]>(makeCostJobs)
-  const [jobRows, setJobRows] = useState<JobCostRow[]>(makeJobRows)
-  const [crewRows, setCrewRows] = useState<CrewCostRow[]>(makeCrewRows)
-  const [crewOptions] = useState(crewMenuOptions)
+  const [jobs] = useState<Job[]>([])
+  const [jobRows, setJobRows] = useState<JobCostRow[]>([])
+  const [crewRows, setCrewRows] = useState<CrewCostRow[]>([])
+  const [crewsList, setCrewsList] = useState<CrewSummaryItem[]>([])
   const [startDate, setStartDate] = useState(DEFAULT_RANGE.start)
   const [endDate, setEndDate] = useState(DEFAULT_RANGE.end)
+
+  const [jobsList, setJobsList] = useState<JobItem[]>([])
+
+  useEffect(() => {
+    async function fetchInitialData() {
+      try {
+        const [crewsRes, jobsRes] = await Promise.all([getCrewsSummary(), getJobs({ limit: 100 })])
+        if (crewsRes.success && crewsRes.data) setCrewsList(crewsRes.data)
+        if (jobsRes.success && jobsRes.data) setJobsList(jobsRes.data)
+      } catch (err) {
+        console.error('Failed to fetch initial dropdown data:', err)
+      }
+    }
+    fetchInitialData()
+  }, [])
+
+  const [reportData, setReportData] = useState<CostTrackingReportData | null>(null)
+  const [loadingReport, setLoadingReport] = useState(false)
+  const [reportError, setReportError] = useState<string>('')
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function fetchReport() {
+      setLoadingReport(true)
+      setReportError('')
+
+      let dateFilterParam: 'allTime' | 'custom' | 'weekly' | 'monthly' = 'allTime'
+      if (range === 'Weekly') dateFilterParam = 'weekly'
+      else if (range === 'Monthly') dateFilterParam = 'monthly'
+      else if (range === 'Custom Range') dateFilterParam = 'custom'
+
+      const params: CostTrackingReportParams = {
+        dateFilter: dateFilterParam,
+        groupBy: tab === 'jobs' ? 'jobs' : 'crews',
+        limit: 100,
+      }
+
+      if (dateFilterParam === 'custom') {
+        params.dateFrom = startDate
+        params.dateTo = endDate
+      } else if (dateFilterParam === 'weekly' || dateFilterParam === 'monthly') {
+        params.startDate = startDate
+      }
+
+      if (search.trim()) {
+        params.search = search.trim()
+      }
+
+      if (tab === 'jobs' && jobFilter) {
+        params.jobId = jobFilter
+      } else if (tab === 'crew' && crewFilter) {
+        params.crewId = crewFilter
+      }
+
+      try {
+        const response = await getCostTrackingReport(params)
+        if (isMounted && response.success) {
+          setReportData(response.data)
+
+          if (params.groupBy === 'jobs') {
+            const mappedJobRows: JobCostRow[] = response.data.groups.map((grp, index) => {
+              const dailyCosts: Record<string, number | null> = {}
+              grp.costByDate.forEach((c) => {
+                dailyCosts[c.date] = c.totalCost
+              })
+
+              const jobIdStr = grp.jobId ?? `job-${index}`
+              const idNumStr = grp.jobIdNumber ? String(grp.jobIdNumber).padStart(3, '0') : String(index + 1).padStart(3, '0')
+
+              return {
+                id: `#${idNumStr}`,
+                jobId: jobIdStr,
+                jobName: grp.jobName || 'Unnamed Job',
+                color: assignableCrews[index % assignableCrews.length]?.color ?? '#94a3b8',
+                date: grp.costByDate[0]?.date || new Date().toISOString().slice(0, 10),
+                endDate: grp.costByDate[grp.costByDate.length - 1]?.date || new Date().toISOString().slice(0, 10),
+                contract: (grp as any).contractAmount ?? 0,
+                laborBudgetTotal: (grp as any).laborBudget ?? 0,
+                laborBudgetUsed: grp.totalLaborCost,
+                balanceLeft: (grp as any).laborBudgetBalance ?? 0,
+                percentSpent: (grp as any).laborBudgetPercentSpent,
+                cumulativeLaborCosts: grp.totalLaborCost,
+                laborCost: grp.totalLaborCost,
+                dumpstersCount: (grp as any).dumpsterCount ?? 0,
+                dumpsterUnitCost: 0,
+                totalCost: grp.totalLaborCost + grp.totalDumpsterCost,
+                weeklyCosts: [],
+                dailyCosts,
+              }
+            })
+            setJobRows(mappedJobRows)
+          } else {
+            const mappedCrewRows: CrewCostRow[] = response.data.groups.map((grp, index) => {
+              const dates = grp.costByDate.map((c) => c.date)
+              const crewKey = grp.crewId ?? `crew-${index}`
+              const crewDisplayId = grp.crewId ? grp.crewId.slice(-4) : String(8742 + index)
+
+              return {
+                id: crewKey,
+                crewKey,
+                crewId: crewDisplayId,
+                crewName: grp.crewName || 'Unnamed Crew',
+                avatar: assignableCrews[index % assignableCrews.length]?.avatar || '',
+                color: assignableCrews[index % assignableCrews.length]?.color || '#94a3b8',
+                date: dates[0] || new Date().toISOString().slice(0, 10),
+                jobDates: dates,
+                hourlyRate: grp.hourlyRate ?? 0,
+                totalHours: grp.totalHoursWorked,
+                cost: grp.totalLaborCost,
+                laborCost: grp.totalLaborCost,
+                dumpstersCount: 0,
+                dumpsterUnitCost: 0,
+                totalCost: grp.totalLaborCost,
+              }
+            })
+            setCrewRows(mappedCrewRows)
+          }
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          console.error('Failed to fetch cost tracking report:', err)
+          setReportError(err.response?.data?.message || err.message || 'Failed to load report data.')
+        }
+      } finally {
+        if (isMounted) setLoadingReport(false)
+      }
+    }
+
+    fetchReport()
+
+    return () => {
+      isMounted = false
+    }
+  }, [range, startDate, endDate, tab, search, jobFilter, crewFilter, refreshTrigger])
 
   const [prevRange, setPrevRange] = useState(range)
   const [prevStart, setPrevStart] = useState(startDate)
@@ -572,12 +403,8 @@ export default function CostTracking() {
   useClickDragScroll(tableWrapRef)
   const [jobFlow, setJobFlow] = useState<JobFlow>({ type: 'none' })
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
-  const [jobNotes, setJobNotes] = useState<Record<string, string>>({
-    '#001': 'Coordinate with suppliers and schedule weekly progress meetings.',
-  })
-  const [jobCrews, setJobCrews] = useState<Record<string, UnassignedCrew | null>>({
-    '#001': { id: 'hank', name: "Hank's Crew", leadName: 'Hank Williams', rate: 25, avatar: assignableCrews.find((c) => c.id === 'hank')?.avatar },
-  })
+  const [jobNotes, setJobNotes] = useState<Record<string, string>>({})
+  const [jobCrews, setJobCrews] = useState<Record<string, UnassignedCrew | null>>({})
 
   const detailsRow =
     jobFlow.type !== 'none' ? jobRows.find((row) => row.jobId === jobFlow.jobId || row.id === jobFlow.jobId) : undefined
@@ -590,44 +417,32 @@ export default function CostTracking() {
   }
 
   const jobFilterOptions = useMemo(
-    () => jobs.map((job) => ({ id: job.id, label: job.name })),
-    [jobs],
+    () => jobsList.map((job) => ({ id: job._id, label: job.name })),
+    [jobsList],
   )
+  const crewOptions = useMemo(
+    () =>
+      crewsList.map((crew) => {
+        const leadObj = typeof crew.crewLead === 'object' && crew.crewLead !== null ? crew.crewLead : null
+        const leadName = leadObj ? `${leadObj.firstName || ''} ${leadObj.lastName || ''}`.trim() : ''
+        return {
+          id: crew._id,
+          label: crew.name,
+          color: crew.crewColor || '#94a3b8',
+          avatar: '',
+          avatarName: leadName || crew.name.slice(0, 2).toUpperCase(),
+        }
+      }),
+    [crewsList],
+  )
+
   const crewFilterOptions = useMemo(
     () => crewOptions.map((crew) => ({ id: crew.id, label: crew.label, color: crew.color, avatar: crew.avatar, avatarName: crew.avatarName })),
     [crewOptions],
   )
 
-  const filteredJobRows = useMemo(() => {
-    const bounds = getRangeBounds(range, startDate, endDate)
-    return jobRows.filter((row) => {
-      const matchesSearch = !search || row.jobName.toLowerCase().includes(search.toLowerCase()) || row.id.includes(search)
-      const matchesFilter = !jobFilter || row.jobId === jobFilter
-      // A job belongs in the grid whenever it runs during any day of the range.
-      const matchesDate = !bounds || (row.date <= bounds[1] && (row.endDate || row.date) >= bounds[0])
-
-      return matchesSearch && matchesFilter && matchesDate
-    })
-  }, [jobRows, search, jobFilter, range, startDate, endDate])
-
-  const filteredCrewRows = useMemo(() => {
-    const bounds = getRangeBounds(range, startDate, endDate)
-    return crewRows.reduce<CrewCostRow[]>((rows, row) => {
-      const matchesSearch = !search || row.crewName.toLowerCase().includes(search.toLowerCase()) || row.crewId.includes(search)
-      const matchesFilter = !crewFilter || row.crewKey === crewFilter
-      if (!matchesSearch || !matchesFilter) return rows
-
-      if (!bounds || row.jobDates.length === 0) {
-        rows.push(row)
-        return rows
-      }
-
-      // Show the crew against the first job it worked inside the range.
-      const dateInRange = row.jobDates.find((date) => date >= bounds[0] && date <= bounds[1])
-      if (dateInRange) rows.push({ ...row, date: dateInRange })
-      return rows
-    }, [])
-  }, [crewRows, search, crewFilter, range, startDate, endDate])
+  const filteredJobRows = jobRows
+  const filteredCrewRows = crewRows
 
   useEffect(() => {
     const el = tableWrapRef.current
@@ -643,16 +458,12 @@ export default function CostTracking() {
     }
 
     el.addEventListener('scroll', handleScroll)
-    return () => {
-      if (el) {
-        el.removeEventListener('scroll', handleScroll)
-      }
-    }
+    return () => el.removeEventListener('scroll', handleScroll)
   }, [range])
 
   const weekDays = useMemo(() => {
+    let baseDays: Date[] = []
     const start = parseIsoDate(startDate)
-    let baseDays: Date[]
 
     if (range === 'Weekly') {
       const weekStart = getMonday(start)
@@ -663,7 +474,7 @@ export default function CostTracking() {
       const numDays = new Date(year, month + 1, 0).getDate()
       baseDays = Array.from({ length: numDays }, (_, index) => new Date(year, month, index + 1))
     } else if (range === 'All Time') {
-      const startAll = parseIsoDate(EARLIEST_JOB_ISO)
+      const startAll = parseIsoDate(startDate)
       baseDays = Array.from({ length: 60 }, (_, index) => addDays(startAll, index))
     } else {
       const end = parseIsoDate(endDate)
@@ -740,90 +551,6 @@ export default function CostTracking() {
     setSelectedDate(null)
   }
 
-  function handleSubmit(form: CostRecordForm) {
-    if (tab === 'jobs') {
-      const job = jobs.find((item) => item.id === form.jobId) ?? jobs[0]
-      const laborCost = Number(form.laborCost) || 0
-      const dumpstersCount = Number(form.dumpstersCount) || 0
-      const dumpsterUnitCost = Number(form.dumpsterUnitCost) || 0
-      const baseRow = activeRecord && 'jobId' in activeRecord ? activeRecord : undefined
-      const budgetTotal = baseRow?.laborBudgetTotal ?? job?.laborBudgetTotal ?? laborCost
-
-      const updatedDailyCosts = { ...(baseRow?.dailyCosts ?? {}) }
-      if (selectedDate) {
-        updatedDailyCosts[selectedDate] = laborCost
-      } else {
-        updatedDailyCosts[form.date] = laborCost
-      }
-
-      const totalLaborCost = Object.values(updatedDailyCosts).reduce((sum: number, val) => sum + (val ?? 0), 0)
-
-      const nextRow: JobCostRow = {
-        id: baseRow
-          ? baseRow.id
-          : `#${String(
-              Math.max(0, ...jobRows.map((row) => Number(row.id.replace(/\D/g, '')) || 0)) + 1,
-            ).padStart(3, '0')}`,
-        jobId: job?.id ?? form.jobId ?? jobs[0]?.id ?? '',
-        jobName: job?.name ?? 'New Job',
-        color: job?.color ?? '#94a3b8',
-        date: baseRow?.date ?? form.date,
-        endDate: baseRow?.endDate ?? form.date,
-        contract: baseRow?.contract ?? job?.contractAmount ?? 0,
-        laborBudgetTotal: budgetTotal,
-        laborBudgetUsed: totalLaborCost,
-        balanceLeft: Math.max(0, budgetTotal - totalLaborCost),
-        percentSpent: budgetTotal > 0 ? totalLaborCost / budgetTotal : 0,
-        cumulativeLaborCosts: totalLaborCost,
-        laborCost: totalLaborCost,
-        dumpstersCount,
-        dumpsterUnitCost,
-        totalCost: totalLaborCost + dumpstersCount * dumpsterUnitCost,
-        weeklyCosts: baseRow ? baseRow.weeklyCosts : makeWeeklyCosts(totalLaborCost),
-        dailyCosts: updatedDailyCosts,
-      }
-      setJobRows((list) => {
-        if (modalMode === 'edit' && activeRecord && 'jobId' in activeRecord) {
-          return list.map((row) => (row.id === activeRecord.id ? nextRow : row))
-        }
-        return [nextRow, ...list]
-      })
-    } else {
-      const crew = initialCrewRows.find((item) => item.id === form.crewId) ?? initialCrewRows[0]
-      const laborCost = Number(form.laborCost) || 0
-      const dumpstersCount = Number(form.dumpstersCount) || 0
-      const dumpsterUnitCost = Number(form.dumpsterUnitCost) || 0
-      const totalHours = crew?.workers ?? 1
-      const hourlyRate = crew?.rate ?? 0
-      const baseCrewRow = activeRecord && 'crewId' in activeRecord ? activeRecord : undefined
-      const jobDates = Array.from(new Set([...(baseCrewRow?.jobDates ?? []), form.date])).sort()
-      const nextRow: CrewCostRow = {
-        id: baseCrewRow ? baseCrewRow.id : `crew-cost-${Date.now()}`,
-        crewKey: crew?.id ?? form.crewId ?? '',
-        crewId: crew?.crewId ?? '',
-        crewName: crew?.name ?? 'New Crew',
-        avatar: crew?.avatar ?? '',
-        color: crew?.color ?? '#94a3b8',
-        date: form.date,
-        jobDates,
-        hourlyRate,
-        totalHours,
-        cost: laborCost,
-        laborCost,
-        dumpstersCount,
-        dumpsterUnitCost,
-        totalCost: laborCost + dumpstersCount * dumpsterUnitCost,
-      }
-      setCrewRows((list) => {
-        if (modalMode === 'edit' && activeRecord && 'crewId' in activeRecord) {
-          return list.map((row) => (row.id === activeRecord.id ? nextRow : row))
-        }
-        return [nextRow, ...list]
-      })
-    }
-    closeModal()
-  }
-
   return (
     <div className="dash">
       <Sidebar
@@ -849,9 +576,9 @@ export default function CostTracking() {
             <p className="dash__subtitle">Labor and dumpster cost analysis</p>
           </div>
           <div className="sb-legend">
-            {assignableCrews.map((crew) => (
-              <span key={crew.id} className="sb-legend__item">
-                <i style={{ background: crew.color }} />
+            {crewsList.map((crew) => (
+              <span key={crew._id} className="sb-legend__item">
+                <i style={{ background: crewColorFor(crew._id, crew.crewColor) }} />
                 {crew.name}
               </span>
             ))}
@@ -867,7 +594,19 @@ export default function CostTracking() {
               value={range}
               options={RANGE_OPTIONS.map((option) => ({ id: option.id, label: option.label }))}
               selectedLabel={range}
-              onChange={(id) => setRange(id as RangeMode)}
+              onChange={(id) => {
+                const newRange = id as RangeMode
+                setRange(newRange)
+                if (newRange === 'Weekly') {
+                  const week = getCurrentWeekRange()
+                  setStartDate(week.start)
+                  setEndDate(week.end)
+                } else if (newRange === 'Monthly' || newRange === 'Custom Range') {
+                  const month = getCurrentMonthRange()
+                  setStartDate(month.start)
+                  setEndDate(month.end)
+                }
+              }}
               placeholder="Custom Range"
             />
           </div>
@@ -956,38 +695,44 @@ export default function CostTracking() {
               <span className="stat-card__label">Total Labor</span>
               <Icon.ChevronRight width={14} height={14} />
             </div>
-            <div className="stat-card__value">{formatMoney(97605)}</div>
-            <div className="stat-card__sub">Last Month: $135,231</div>
+            <div className="stat-card__value">{formatMoney(reportData?.totalLaborCost ?? 0)}</div>
           </div>
           <div className="stat-card">
             <div className="stat-card__head">
               <span className="stat-card__label">Total Dumpster Cost</span>
               <Icon.ChevronRight width={14} height={14} />
             </div>
-            <div className="stat-card__value">{formatMoney(7695)}</div>
-            <div className="stat-card__sub">Last Month: $6,983</div>
+            <div className="stat-card__value">{formatMoney(reportData?.totalDumpsterCost ?? 0)}</div>
           </div>
           <div className="stat-card">
             <div className="stat-card__head">
               <span className="stat-card__label">Total Hours</span>
               <Icon.ChevronRight width={14} height={14} />
             </div>
-            <div className="stat-card__value">1,023 hrs</div>
-            <div className="stat-card__sub">Among 12 crews</div>
+            <div className="stat-card__value">{(reportData?.totalHoursWorked ?? 0).toLocaleString()} hrs</div>
           </div>
           <div className="stat-card">
             <div className="stat-card__head">
               <span className="stat-card__label">Total Entries</span>
               <Icon.ChevronRight width={14} height={14} />
             </div>
-            <div className="stat-card__value">104</div>
-            <div className="stat-card__sub">Among 12 crews</div>
+            <div className="stat-card__value">{(reportData?.totalEntries ?? 0).toLocaleString()}</div>
           </div>
         </div>
 
+        {reportError && (
+          <div style={{ color: '#ef4444', margin: '12px 0', fontSize: '14px' }}>
+            {reportError}
+          </div>
+        )}
+
         <div className={`ct-table-wrap${isTableEmpty ? ' ct-table-wrap--empty' : ''}`} ref={tableWrapRef}>
           <div className="ct-table-zoom" style={sheetZoomStyle(zoom)}>
-          {isTableEmpty ? (
+          {loadingReport ? (
+            <div className="ct-empty" style={{ padding: '40px' }}>
+              <p className="ct-empty__text">Loading cost tracking data...</p>
+            </div>
+          ) : isTableEmpty ? (
             <div className="ct-empty">
               <span className="ct-empty__icon" aria-hidden>
                 {hasActiveFilters ? (
@@ -1127,9 +872,7 @@ export default function CostTracking() {
                     </td>
                     {weekDays.map((day) => {
                       const dayStr = toISO(day)
-                      const value = row.dailyCosts && row.dailyCosts[dayStr] !== undefined
-                        ? row.dailyCosts[dayStr]
-                        : getDeterministicDailyCost(row.laborCost, dayStr, row.jobId)
+                      const value = row.dailyCosts ? row.dailyCosts[dayStr] : null
                       return (
                         <td key={day.toISOString()} className="ct-grid-cell">
                           {value != null ? (
@@ -1154,10 +897,8 @@ export default function CostTracking() {
                   <th>Crew ID</th>
                   <th>Crew Name</th>
                   <th>Date</th>
-                  <th>Hourly Rate ($)</th>
                   <th>Total Hours</th>
                   <th>Cost</th>
-                  <th className="ct-col-action">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -1189,15 +930,9 @@ export default function CostTracking() {
                         <span>{row.crewName}</span>
                       </div>
                     </td>
-                    <td>{formatCrewDate(row.date)}</td>
-                    <td>{row.hourlyRate}</td>
+                    <td>{row.jobDates && row.jobDates.length > 0 ? formatCrewDate(row.date) : '-'}</td>
                     <td>{row.totalHours}</td>
                     <td>{formatMoney(row.cost)}</td>
-                    <td className="ct-col-action">
-                      <button type="button" className="ct-action-btn" onClick={() => openEditModal(row)} aria-label="Edit accumulated cost">
-                        <Icon.Edit width={15} height={15} />
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1220,17 +955,25 @@ export default function CostTracking() {
         </div>
       )}
 
-      {modalMode !== 'none' && (
-        <CostModal
-          mode={modalMode}
-          scope={tab}
-          jobs={jobs}
-          jobRows={jobRows}
-          crews={crewOptions}
-          record={activeRecord}
-          selectedDate={selectedDate}
+      {modalMode === 'add' && (
+        <AddDailyDumpsterCountModal
           onCancel={closeModal}
-          onSubmit={handleSubmit}
+          onSuccess={() => {
+            setRefreshTrigger((prev) => prev + 1)
+          }}
+        />
+      )}
+
+      {modalMode === 'edit' && activeRecord && 'jobId' in activeRecord && (
+        <EditCostAdjustmentModal
+          jobId={activeRecord.jobId}
+          jobName={activeRecord.jobName}
+          jobIdNumber={Number(activeRecord.id.replace(/\D/g, '')) || undefined}
+          date={selectedDate || activeRecord.date}
+          onCancel={closeModal}
+          onSuccess={() => {
+            setRefreshTrigger((prev) => prev + 1)
+          }}
         />
       )}
 

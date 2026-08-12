@@ -27,6 +27,8 @@ export interface UnassignedCrew {
   leadName: string
   rate: number
   avatar?: string
+  color?: string
+  memberCount?: number
 }
 
 export function crewAvatarUrl(seed: number) {

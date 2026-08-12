@@ -10,22 +10,32 @@ import CostTracking from './pages/CostTracking'
 import Timesheet from './pages/Timesheet'
 import Profile from './pages/Profile'
 import HelpCenter from './pages/HelpCenter'
+import ProtectedRoute from './components/ProtectedRoute'
+
+/* The crew-side (mobile / PWA) screens are shelved for now. Their pages and
+   styles still live under src/pages/crew and src/components/crew, built from
+   the Figma designs — re-add the routes here to bring them back. */
 
 function App() {
   return (
     <Routes>
+      {/* ---- auth ---- */}
       <Route path="/" element={<SignIn />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/schedule-board" element={<ScheduleBoard />} />
-      <Route path="/jobs-management" element={<JobsManagement />} />
-      <Route path="/cost-tracking" element={<CostTracking />} />
-      <Route path="/Crew" element={<Crew />} />
-      <Route path="/timesheet" element={<Timesheet />} />
-      <Route path="/profile" element={<Profile />} />
+
+      {/* ---- admin console ---- */}
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/schedule-board" element={<ProtectedRoute><ScheduleBoard /></ProtectedRoute>} />
+      <Route path="/jobs-management" element={<ProtectedRoute><JobsManagement /></ProtectedRoute>} />
+      <Route path="/cost-tracking" element={<ProtectedRoute><CostTracking /></ProtectedRoute>} />
+      <Route path="/crew-management" element={<ProtectedRoute><Crew /></ProtectedRoute>} />
+      <Route path="/timesheet" element={<ProtectedRoute><Timesheet /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+
       <Route path="/help-center" element={<HelpCenter />} />
       <Route path="/help-center/:articleId" element={<HelpCenter />} />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

@@ -1,0 +1,356 @@
+/* Crew home screen, built from the Figma mobile frames (402px artboard,
+   16px gutters -> 370px content column). Tokens are scoped to .chome so the
+   admin console, which uses a different palette, is unaffected. */
+
+.chome {
+  --h-success: #11af63;
+  --h-success-light: #e1fdf0;
+  --h-error: #ea0101;
+  --h-blue: #0095ff;
+  --h-pink: #ff1fad;
+  --h-50: #fcfcfc;
+  --h-100: #f5f5f5;
+  --h-chip: #e8e8e8;
+  --h-300: #dcdcdc;
+  --h-muted: #6a6a6a;
+  --h-meta: #777777;
+  --h-faint: #848484;
+  --h-chip-text: #515151;
+  --h-500: #444444;
+  --h-900: #111111;
+  --h-transparent-black: rgba(0, 0, 0, 0.1);
+  --h-radius-card: 20px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  font-family: var(--sans);
+  color: var(--h-900);
+}
+
+/* ---------- greeting ---------- */
+
+.chome-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 45px;
+}
+
+.chome-greeting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.chome-greeting__hello {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: normal;
+  color: var(--h-muted);
+}
+
+.chome-greeting__name {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: normal;
+  color: #000;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chome-icon-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 11px;
+  border: 1px solid var(--h-300);
+  border-radius: 10px;
+  background: var(--h-50);
+  box-shadow: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
+  color: var(--h-900);
+  cursor: pointer;
+}
+
+/* ---------- clock ---------- */
+
+.chome-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+}
+
+.chome-now {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.chome-now__time {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: normal;
+  color: #000;
+}
+
+.chome-now__date {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: normal;
+  color: var(--h-muted);
+}
+
+.chome-punch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.chome-punch__btn {
+  width: 288px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm, 6px);
+  padding: 12px 18px;
+  border: 1px solid var(--h-transparent-black);
+  border-radius: 100px;
+  background: var(--h-success);
+  box-shadow: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
+  color: var(--h-50);
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: normal;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.chome-punch__btn.is-out {
+  background: var(--h-error);
+}
+
+.chome-punch__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.chome-punch__note {
+  font-size: 12px;
+  font-style: italic;
+  line-height: normal;
+  color: var(--h-muted);
+  text-align: center;
+}
+
+.chome-status {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--h-chip);
+  color: var(--h-chip-text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: normal;
+  text-align: center;
+}
+
+.chome-status.is-in {
+  background: var(--h-success-light);
+  color: var(--h-success);
+}
+
+/* ---------- sections ---------- */
+
+.chome-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.chome-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chome-section__title {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: normal;
+  color: #000;
+}
+
+.chome-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--h-300);
+  border-radius: var(--h-radius-card);
+  background: var(--h-50);
+  overflow: hidden;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  font-family: inherit;
+}
+
+/* Role accent running down the left edge of the job card. */
+.chome-card--job::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: var(--h-pink);
+}
+
+.chome-card--job.is-lead::before {
+  background: var(--h-blue);
+}
+
+.chome-job__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.chome-job__heading {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chome-job__name {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: normal;
+  color: var(--h-900);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chome-job__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: normal;
+  color: var(--h-meta);
+}
+
+.chome-job__dot {
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.chome-job__caret {
+  flex-shrink: 0;
+  color: var(--h-900);
+}
+
+.chome-job__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  line-height: normal;
+  color: var(--h-900);
+}
+
+.chome-job__row--crew {
+  gap: 6px;
+}
+
+.chome-job__row svg {
+  flex-shrink: 0;
+}
+
+.chome-job__avatar {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--h-100);
+}
+
+.chome-job__dates {
+  display: flex;
+  gap: 10px;
+}
+
+.chome-job__dates span:nth-child(2) {
+  color: var(--h-faint);
+}
+
+.chome-job__note {
+  padding: 10px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--h-100);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--h-900);
+}
+
+.chome-empty {
+  padding: 4px 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--h-muted);
+}
+
+/* ---------- hours ---------- */
+
+.chome-hours__total {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: normal;
+  color: var(--h-900);
+}
+
+.chome-hours__bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chome-hours__track {
+  height: 6px;
+  border-radius: 20px;
+  background: var(--h-300);
+  overflow: hidden;
+}
+
+.chome-hours__fill {
+  height: 100%;
+  border-radius: 20px;
+  background: var(--h-success);
+}
+
+.chome-hours__legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: normal;
+  color: var(--h-500);
+}

@@ -18,13 +18,13 @@ export default function MultipleJobsModal({ jobs, onDone, onOpenJob }: MultipleJ
           {jobs.map((job) => (
             <button
               type="button"
-              key={`${job.bidNo}-${job.jobNo}`}
+              key={job.jobId || `${job.jobNo}-${job.date}`}
               className="cm-job-row"
               onClick={() => onOpenJob?.(job)}
             >
               <span className="cm-job-row__text">
                 <span className="cm-job-row__meta">
-                  Bid #{job.bidNo} · Job #{job.jobNo} · {job.date}
+                  {job.bidNo ? `Bid #${job.bidNo} · ` : ''}Job #{job.jobNo} · {job.date}
                 </span>
                 <span className="cm-job-row__name">{job.jobName}</span>
               </span>

@@ -1,10 +1,13 @@
-import { useState, type FormEvent } from 'react'
+import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import BrandLogos from '../components/BrandLogos'
-import EmailField, { DOMAIN } from '../components/EmailField'
-import { signIn } from '../lib/auth'
+import EmailField from '../components/EmailField'
+import { getErrorMessage } from '../lib/errors'
+import { useAuth } from '../context/AuthContext'
+import { homePathForRole } from '../components/ProtectedRoute'
 
+/** Admin-only sign in. Crew-lead / labour use /login. */
 export default function SignIn() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -12,15 +15,17 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  async function onSubmit(e: FormEvent) {
+  const {adminLogin} = useAuth()
+
+  async function onSubmit(e : React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      await signIn(email + DOMAIN, password)
-      navigate('/dashboard')
+      const body = await adminLogin(email, password)
+      navigate(homePathForRole(body.data?.admin?.role ?? 'admin'), { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed.')
+      setError(getErrorMessage(err, 'Invalid email or password'))
     } finally {
       setLoading(false)
     }
@@ -30,6 +35,7 @@ export default function SignIn() {
     <AuthLayout>
       <form className="auth-card" onSubmit={onSubmit}>
         <BrandLogos />
+
         <h1 className="auth-title">Sign In</h1>
         <p className="auth-subtitle">Enter your credentials to access your account</p>
 

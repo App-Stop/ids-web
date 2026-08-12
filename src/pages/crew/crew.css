@@ -1,0 +1,159 @@
+/* Mobile-first styles for the crew (crew-lead / labour) side of the app.
+   Sized for phones; capped and centred on larger screens so it still reads
+   well in a desktop browser before it ships as a PWA. */
+
+.crew-app {
+  /* 402px artboard; the 16px gutters leave the design's 370px column. */
+  --crew-max: 402px;
+  --crew-tabbar-h: 102px;
+  min-height: 100dvh;
+  background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- content ---------- */
+.crew-main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--crew-max);
+  margin: 0 auto;
+  /* Content starts 10px below the status bar in the frame (y=72 of an 62px
+     bar); the floor keeps it breathable in a desktop browser, where there
+     is no inset at all. */
+  padding: max(20px, calc(env(safe-area-inset-top, 0px) + 12px)) 16px
+    calc(var(--crew-tabbar-h) + env(safe-area-inset-bottom));
+}
+
+.crew-section-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.crew-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.crew-card + .crew-card {
+  margin-top: 12px;
+}
+
+.crew-greeting {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.crew-greeting__sub {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.crew-role-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.crew-empty {
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+  padding: 28px 8px;
+}
+
+/* ---------- floating tab bar ----------
+   A rounded pill sitting over a blurred gradient that fades the content out
+   behind it, per the Figma frames. */
+.crew-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  padding: 21px;
+  padding-bottom: calc(21px + env(safe-area-inset-bottom));
+  background: linear-gradient(
+    to top,
+    rgba(244, 244, 244, 0.7) 26.374%,
+    rgba(244, 244, 244, 0)
+  );
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+
+.crew-tabbar__pill {
+  pointer-events: auto;
+  width: 100%;
+  max-width: calc(var(--crew-max) - 42px);
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 1px solid #dcdcdc;
+  border-radius: 60px;
+  background: #fcfcfc;
+  box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.06);
+}
+
+.crew-tab {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 0.5px solid transparent;
+  border-radius: 40px;
+  color: #6a6a6a;
+  text-decoration: none;
+  font-size: 10px;
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.crew-tab.is-active {
+  background: #f5f5f5;
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #111111;
+}
+
+/* Login and the other auth screens now live in crew-auth.css, built from
+   the Figma mobile frames. */
+
+.crew-logout {
+  width: 100%;
+  margin-top: 12px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}

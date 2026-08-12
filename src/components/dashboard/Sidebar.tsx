@@ -26,7 +26,7 @@ const OPERATIONS = [
 ];
 
 const MANAGEMENT = [
-  { label: "Crew Management", icon: Users, path: "/Crew" },
+  { label: "Crew Management", icon: Users, path: "/crew-management" },
   { label: "Timesheet", icon: ListChecks, path: "/timesheet" },
 ];
 

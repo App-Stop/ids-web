@@ -1,11 +1,20 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MagnifyingGlass, PenIcon } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Modal from '../components/dashboard/Modal'
 import Dropdown from '../components/dashboard/Dropdown'
 import Avatar from '../components/dashboard/Avatar'
 import { Icon } from '../components/dashboard/icons'
-import { rosterRows as initialRosterRows, type RosterRow } from '../lib/crewData'
+import { type RosterRow } from '../lib/crewData'
+import { getUsers } from '../api/crewApi'
+import {
+  createTimesheetLog,
+  deleteTimeEntry,
+  getTimeEntries,
+  updateTimeEntry,
+  type TimeEntryItem,
+} from '../api/timeEntryApi'
+import { getErrorMessage } from '../lib/errors'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import './Dashboard.css'
 import '../components/dashboard/crew-modals.css'
@@ -138,31 +147,6 @@ function formatHours(value: number) {
   return Math.round(value * 10) / 10
 }
 
-/* -------------------------------------------------------------------------- */
-/* Seed data — generated relative to today so the range filters have something */
-/* to filter. Deterministic, so it stays stable across renders.               */
-/* -------------------------------------------------------------------------- */
-
-const SHIFT_PRESETS = [
-  { clockIn: '07:00', clockOut: '15:00' },
-  { clockIn: '07:30', clockOut: '15:30' },
-  { clockIn: '08:00', clockOut: '16:30' },
-  { clockIn: '08:30', clockOut: '16:30' },
-  { clockIn: '08:30', clockOut: '12:30' },
-  { clockIn: '09:00', clockOut: '15:00' },
-  { clockIn: '06:30', clockOut: '15:30' },
-]
-
-const SEED_DAYS = 75
-
-function seededRandom(seed: number) {
-  let state = seed
-  return () => {
-    state = (state * 1664525 + 1013904223) % 4294967296
-    return state / 4294967296
-  }
-}
-
 function parseTime(value: string) {
   const [hours, minutes] = value.split(':').map(Number)
   return hours * 60 + minutes
@@ -175,39 +159,89 @@ function calculateHours(clockIn: string, clockOut: string) {
   return Math.round((totalMinutes / 60) * 2) / 2
 }
 
-function buildInitialRows(): AttendanceRow[] {
-  const random = seededRandom(20260720)
-  const today = startOfDay(new Date())
-  const rows: AttendanceRow[] = []
-  let sequence = 0
+/* -------------------------------------------------------------------------- */
+/* API <-> UI mapping                                                          */
+/*                                                                             */
+/* The backend stores `date` as UTC midnight and clockIn/clockOut as full      */
+/* timestamps. The UI works entirely in the admin's local timezone, so a row's */
+/* display date is derived from the local date of its clock-in — that keeps    */
+/* an edited entry round-tripping to exactly the values it was loaded with.    */
+/* Entries that were never clocked in fall back to the stored `date`.          */
+/* -------------------------------------------------------------------------- */
 
-  for (let offset = SEED_DAYS; offset >= 0; offset -= 1) {
-    const day = addDays(today, -offset)
-    const isWeekend = day.getDay() === 0 || day.getDay() === 6
-    // Weekends are mostly off, but today always gets logs so "Today" is never empty.
-    if (isWeekend && offset !== 0) continue
+/** HH:MM in local time. */
+function formatClockTime(iso: string | null) {
+  if (!iso) return ''
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
 
-    initialRosterRows.forEach((member) => {
-      if (random() < 0.15) return // occasional absence
-      const shift = SHIFT_PRESETS[Math.floor(random() * SHIFT_PRESETS.length)]
-      sequence += 1
-      rows.push({
-        id: `att-seed-${sequence}`,
-        memberId: member.id,
-        rosterId: member.rosterId,
-        name: member.name,
-        avatar: member.avatar,
-        role: member.role,
-        date: formatDate(day),
-        clockIn: shift.clockIn,
-        clockOut: shift.clockOut,
-        hoursWorked: calculateHours(shift.clockIn, shift.clockOut),
-        createdAt: sequence,
-      })
-    })
+/** MM-DD-YYYY for the day the entry belongs to. */
+function entryDisplayDate(entry: TimeEntryItem) {
+  if (entry.clockIn) {
+    const clockIn = new Date(entry.clockIn)
+    if (!Number.isNaN(clockIn.getTime())) return formatDate(clockIn)
   }
+  if (entry.date) {
+    // Date-only values are stored at UTC midnight — read them back in UTC so
+    // they don't slide a day in negative-offset timezones.
+    const stored = new Date(entry.date)
+    if (!Number.isNaN(stored.getTime())) {
+      return `${pad(stored.getUTCMonth() + 1)}-${pad(stored.getUTCDate())}-${stored.getUTCFullYear()}`
+    }
+  }
+  return formatDate(new Date())
+}
 
-  return rows
+/** MM-DD-YYYY + HH:MM (local) -> full ISO timestamp. */
+function toTimestamp(displayDate: string, time: string) {
+  const [month, day, year] = displayDate.split('-').map(Number)
+  const [hours, minutes] = time.split(':').map(Number)
+  return new Date(year, month - 1, day, hours, minutes, 0, 0).toISOString()
+}
+
+/**
+ * Clock-out timestamp, rolling to the next day when the shift crosses midnight
+ * — matching how `calculateHours` reads such a shift.
+ */
+function toClockOutTimestamp(displayDate: string, clockIn: string, clockOut: string) {
+  const overnight = parseTime(clockOut) < parseTime(clockIn)
+  const base = overnight ? formatDate(addDays(parseDate(displayDate), 1)) : displayDate
+  return toTimestamp(base, clockOut)
+}
+
+/** YYYY-MM-DD, the date-only form the API expects. */
+function toApiDate(date: Date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function toAttendanceRow(entry: TimeEntryItem, members: Map<string, RosterRow>): AttendanceRow {
+  const userIdStr = typeof entry.userId === 'object' && entry.userId !== null ? entry.userId._id : typeof entry.userId === 'string' ? entry.userId : null
+  const populatedUser = typeof entry.userId === 'object' && entry.userId !== null ? entry.userId : null
+
+  const member = userIdStr ? members.get(userIdStr) : undefined
+  const clockIn = formatClockTime(entry.clockIn)
+  const clockOut = formatClockTime(entry.clockOut)
+
+  const name = member?.name || (populatedUser ? `${populatedUser.firstName || ''} ${populatedUser.lastName || ''}`.trim() : '') || 'Unknown member'
+  const role = member?.role || (populatedUser?.role === 'crew-lead' ? 'Crew Lead' : 'Labor')
+
+  return {
+    id: entry._id,
+    memberId: userIdStr ?? entry._id,
+    rosterId: member?.rosterId ?? (userIdStr ? userIdStr.slice(-4) : '—'),
+    name,
+    avatar: member?.avatar ?? '',
+    role,
+    date: entryDisplayDate(entry),
+    clockIn,
+    clockOut,
+    // Trust the server's figure; fall back to the clock times for open shifts.
+    hoursWorked:
+      entry.hoursWorked ?? (clockIn && clockOut ? calculateHours(clockIn, clockOut) : 0),
+    createdAt: entry.createdAt ? new Date(entry.createdAt).getTime() : 0,
+  }
 }
 
 function ClockIcon() {
@@ -527,6 +561,9 @@ function AttendanceModal({
   mode,
   members,
   record,
+  apiError,
+  saving,
+  removing,
   onCancel,
   onSubmit,
   onRemove,
@@ -534,6 +571,9 @@ function AttendanceModal({
   mode: 'add' | 'edit'
   members: RosterRow[]
   record?: AttendanceRow
+  apiError: string
+  saving: boolean
+  removing: boolean
   onCancel: () => void
   onSubmit: (form: AttendanceForm) => void
   onRemove?: () => void
@@ -541,9 +581,9 @@ function AttendanceModal({
   const isEdit = mode === 'edit'
   const [memberId, setMemberId] = useState<string | null>(record?.memberId ?? members[0]?.id ?? null)
   const [date, setDate] = useState(record?.date ?? formatDate(new Date()))
-  const [clockIn, setClockIn] = useState(record?.clockIn ?? '08:30')
-  const [clockOut, setClockOut] = useState(record?.clockOut ?? '16:30')
-  const [overrideAutoCheckIn, setOverrideAutoCheckIn] = useState(false)
+  const [clockIn, setClockIn] = useState(record?.clockIn || '08:30')
+  const [clockOut, setClockOut] = useState(record?.clockOut || '16:30')
+  const [overrideAutoCheckIn, setOverrideAutoCheckIn] = useState(isEdit)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
 
   const selectedMember = members.find((member) => member.id === memberId)
@@ -557,19 +597,18 @@ function AttendanceModal({
           </div>
           <h2 className="modal-title">Remove attendance log?</h2>
           <p className="ts-confirm-card__sub">This action cannot be undone.</p>
+          {apiError && (
+            <div className="form-error-alert">
+              <Icon.AlertCircle width={18} height={18} />
+              <span>{apiError}</span>
+            </div>
+          )}
           <div className="modal-actions modal-actions--split">
-            <button type="button" className="btn btn--outline" onClick={() => setConfirmingRemove(false)}>
+            <button type="button" className="btn btn--outline" onClick={() => setConfirmingRemove(false)} disabled={removing}>
               Cancel
             </button>
-            <button
-              type="button"
-              className="btn btn--danger"
-              onClick={() => {
-                onRemove?.()
-                setConfirmingRemove(false)
-              }}
-            >
-              Confirm Delete
+            <button type="button" className="btn btn--danger" disabled={removing} onClick={() => onRemove?.()}>
+              {removing ? 'Deleting…' : 'Confirm Delete'}
             </button>
           </div>
         </div>
@@ -583,6 +622,13 @@ function AttendanceModal({
         <h2 className="modal-title">{isEdit ? 'Edit Attendance' : 'Log new Attendance'}</h2>
         <span className="ts-modal-head__meta">{date}</span>
       </div>
+
+      {apiError && (
+        <div className="form-error-alert" style={{ marginTop: 0, marginBottom: '1rem' }}>
+          <Icon.AlertCircle width={18} height={18} />
+          <span>{apiError}</span>
+        </div>
+      )}
 
       {isEdit && selectedMember && (
         <div className="ts-modal-summary">
@@ -653,19 +699,19 @@ function AttendanceModal({
 
       <div className={`modal-actions ${isEdit ? 'modal-actions--split' : ''}`}>
         {isEdit && (
-          <button type="button" className="ts-remove-btn" onClick={() => setConfirmingRemove(true)}>
+          <button type="button" className="ts-remove-btn" onClick={() => setConfirmingRemove(true)} disabled={saving}>
             <Icon.Trash width={16} height={16} />
             Remove
           </button>
         )}
         <div className="modal-actions__group">
-          <button type="button" className="btn btn--outline" onClick={onCancel}>
+          <button type="button" className="btn btn--outline" onClick={onCancel} disabled={saving}>
             Cancel
           </button>
           <button
             type="button"
             className="btn btn--primary"
-            disabled={!memberId}
+            disabled={!memberId || saving}
             onClick={() =>
               onSubmit({
                 memberId,
@@ -676,7 +722,7 @@ function AttendanceModal({
               })
             }
           >
-            {isEdit ? 'Update' : 'Add Log'}
+            {saving ? 'Saving…' : isEdit ? 'Update' : 'Add Log'}
           </button>
         </div>
       </div>
@@ -691,12 +737,58 @@ export default function Timesheet() {
   const [memberFilter, setMemberFilter] = useState<string[]>([])
   const [viewMode, setViewMode] = useState<ViewMode>('summary')
   const [expanded, setExpanded] = useState<string[]>([])
-  const [rows, setRows] = useState<AttendanceRow[]>(buildInitialRows)
+  const [entries, setEntries] = useState<TimeEntryItem[]>([])
+  const [members, setMembers] = useState<RosterRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [modalMode, setModalMode] = useState<ModalMode>('none')
   const [activeRow, setActiveRow] = useState<AttendanceRow | undefined>()
+  const [modalError, setModalError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [removing, setRemoving] = useState(false)
   const [flashId, setFlashId] = useState<string | null>(null)
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
+
+  /** Roster members, keyed by user id — the source of names/roles for a log. */
+  const memberMap = useMemo(() => new Map(members.map((member) => [member.id, member])), [members])
+  const rows = useMemo(
+    () => entries.map((entry) => toAttendanceRow(entry, memberMap)),
+    [entries, memberMap],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchMembers() {
+      try {
+        const res = await getUsers()
+        if (cancelled || !res.success || !Array.isArray(res.data)) return
+        setMembers(
+          res.data
+            .filter((user) => user.role === 'labor' || user.role === 'crew-lead')
+            .map((user) => ({
+              id: user._id,
+              rosterId: user._id.slice(-4),
+              name: `${user.firstName} ${user.lastName}`.trim(),
+              avatar: `https://i.pravatar.cc/64?img=${(user._id.charCodeAt(0) || 15) % 70}`,
+              crewName: user.assignCrew?.name ?? null,
+              crewColor: user.assignCrew?.crewColor ?? '#808080',
+              role: user.role === 'crew-lead' ? 'Crew Lead' : 'Labor',
+              rate: user.hourlyRate ?? 0,
+              status: user.isActive ? 'Active' : 'Inactive',
+            })),
+        )
+      } catch (err) {
+        console.error('Failed to fetch roster members:', err)
+      }
+    }
+
+    fetchMembers()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!flashId) return
@@ -717,6 +809,31 @@ export default function Timesheet() {
     if (range === 'monthly') return { start: startOfMonth(anchor), end: endOfMonth(anchor) }
     return null
   }, [range, anchor, today])
+
+  /**
+   * Every entry, fetched once. The list endpoint is not paginated and the
+   * range/search/member filters below all run client-side — the period
+   * navigator in particular needs the full span of logged dates to build its
+   * list of selectable weeks/months.
+   */
+  const loadEntries = useCallback(async () => {
+    setLoading(true)
+    setLoadError('')
+    try {
+      const res = await getTimeEntries()
+      setEntries(res.success && Array.isArray(res.data) ? res.data : [])
+    } catch (err) {
+      console.error('Failed to fetch time entries:', err)
+      setLoadError(getErrorMessage(err, 'Could not load attendance logs.'))
+      setEntries([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadEntries()
+  }, [loadEntries])
 
   /** Span of every logged date, so navigation stops where the data does. */
   const dataSpan = useMemo(() => {
@@ -902,77 +1019,119 @@ export default function Timesheet() {
 
   function openAddModal() {
     setActiveRow(undefined)
+    setModalError('')
     setModalMode('add')
   }
 
   function openEditModal(row: AttendanceRow) {
     setActiveRow(row)
+    setModalError('')
     setModalMode('edit')
   }
 
   function closeModal() {
     setModalMode('none')
     setActiveRow(undefined)
+    setModalError('')
   }
 
-  function handleSubmit(form: AttendanceForm) {
-    const member = initialRosterRows.find((row) => row.id === form.memberId)
-    if (!member) return
-
-    const nextRow: AttendanceRow = {
-      id: activeRow?.id ?? `att-${Date.now()}`,
-      memberId: member.id,
-      rosterId: member.rosterId,
-      name: member.name,
-      avatar: member.avatar,
-      role: member.role,
-      date: form.date,
-      clockIn: form.clockIn,
-      clockOut: form.clockOut,
-      hoursWorked: calculateHours(form.clockIn, form.clockOut),
-      // Editing keeps its original position; a new log gets the highest sequence.
-      createdAt: activeRow?.createdAt ?? Date.now(),
-    }
-
-    setRows((list) => {
-      if (modalMode === 'edit' && activeRow) {
-        return list.map((row) => (row.id === activeRow.id ? nextRow : row))
-      }
-      return [nextRow, ...list]
-    })
-
-    // Make sure the log we just saved is actually visible, instead of being
-    // silently dropped by the range/search/member filters that were active.
-    const date = parseDate(nextRow.date)
+  /**
+   * Reveal a just-saved log that the active range/search/member filters would
+   * otherwise hide, so saving never looks like it silently did nothing.
+   */
+  function revealSaved(row: { memberId: string; date: string; name: string; rosterId: string; role: string }, isNew: boolean) {
+    const date = parseDate(row.date)
     if (bounds && (date < bounds.start || date > bounds.end)) {
       // Move the viewed period onto the saved date rather than jumping to All Time.
       setAnchor(date)
       if (range === 'today' && date.getTime() !== today.getTime()) setRange('weekly')
     }
-    if (memberFilter.length > 0 && !memberFilter.includes(nextRow.memberId)) {
-      setMemberFilter((list) => [...list, nextRow.memberId])
+    if (memberFilter.length > 0 && !memberFilter.includes(row.memberId)) {
+      setMemberFilter((list) => [...list, row.memberId])
     }
     const query = search.trim().toLowerCase()
-    if (query && !nextRow.name.toLowerCase().includes(query) && !nextRow.rosterId.includes(query) && !nextRow.role.toLowerCase().includes(query)) {
+    if (query && !row.name.toLowerCase().includes(query) && !row.rosterId.includes(query) && !row.role.toLowerCase().includes(query)) {
       setSearch('')
     }
-    if (modalMode === 'add') {
+    if (isNew) {
       setSortKey('newest')
-      setExpanded((list) => (list.includes(nextRow.memberId) ? list : [...list, nextRow.memberId]))
+      setExpanded((list) => (list.includes(row.memberId) ? list : [...list, row.memberId]))
     }
-
-    setFlashId(nextRow.id)
-    closeModal()
   }
 
-  function handleRemove() {
+  async function handleSubmit(form: AttendanceForm) {
+    if (!form.memberId) return
+    const member = memberMap.get(form.memberId)
+    // A new log needs a real roster member; an edit only needs the entry id, so
+    // it still works for a log whose member has since been removed.
+    if (!member && modalMode === 'add') return
+
+    setSaving(true)
+    setModalError('')
+    try {
+      const clockIn = toTimestamp(form.date, form.clockIn)
+      const clockOut = toClockOutTimestamp(form.date, form.clockIn, form.clockOut)
+
+      let savedId: string
+      if (modalMode === 'edit' && activeRow) {
+        const res = await updateTimeEntry(activeRow.id, {
+          date: toApiDate(parseDate(form.date)),
+          clockIn,
+          clockOut,
+          override: form.overrideAutoCheckIn,
+        })
+        savedId = res.data?._id ?? activeRow.id
+      } else {
+        const res = await createTimesheetLog({
+          userId: form.memberId,
+          date: toApiDate(parseDate(form.date)),
+          clockIn,
+          clockOut,
+          override: form.overrideAutoCheckIn,
+        })
+        savedId = res.data?._id ?? ''
+      }
+
+      await loadEntries()
+      revealSaved(
+        {
+          memberId: form.memberId,
+          date: form.date,
+          name: member?.name ?? activeRow?.name ?? '',
+          rosterId: member?.rosterId ?? activeRow?.rosterId ?? '',
+          role: member?.role ?? activeRow?.role ?? '',
+        },
+        modalMode === 'add',
+      )
+      setFlashId(savedId || null)
+      closeModal()
+    } catch (err) {
+      setModalError(getErrorMessage(err, 'Could not save this attendance log.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleRemove() {
     if (!activeRow) return
-    setRows((list) => list.filter((row) => row.id !== activeRow.id))
-    closeModal()
+    setRemoving(true)
+    setModalError('')
+    try {
+      await deleteTimeEntry(activeRow.id)
+      await loadEntries()
+      closeModal()
+    } catch (err) {
+      setModalError(getErrorMessage(err, 'Could not delete this attendance log.'))
+    } finally {
+      setRemoving(false)
+    }
   }
 
   const detailColSpan = 9
   const gridColSpan = buckets.length + 4
+  const emptyMessage = loading
+    ? 'Loading attendance…'
+    : loadError || 'No attendance logged for this period.'
 
   return (
     <div className="dash ts-page">
@@ -1001,7 +1160,7 @@ export default function Timesheet() {
               selectedLabel={RANGE_OPTIONS.find((option) => option.id === range)?.label}
             />
 
-            <MemberFilter members={initialRosterRows} selected={memberFilter} onChange={setMemberFilter} />
+            <MemberFilter members={members} selected={memberFilter} onChange={setMemberFilter} />
 
             {(range === 'weekly' || range === 'monthly') && (
               <div className="ts-view-toggle">
@@ -1081,7 +1240,7 @@ export default function Timesheet() {
                 {summaries.length === 0 && (
                   <tr>
                     <td colSpan={gridColSpan} className="ts-empty">
-                      No attendance logged for this period.
+                      {emptyMessage}
                     </td>
                   </tr>
                 )}
@@ -1146,9 +1305,9 @@ export default function Timesheet() {
                                 {summary.entries.map((entry) => (
                                   <tr key={entry.id} className={flashId === entry.id ? 'is-new' : ''}>
                                     <td>{entry.date}</td>
-                                    <td>{entry.clockIn}</td>
-                                    <td>{entry.clockOut}</td>
-                                    <td>{entry.hoursWorked}</td>
+                                    <td>{entry.clockIn || '—'}</td>
+                                    <td>{entry.clockOut || '—'}</td>
+                                    <td>{formatHours(entry.hoursWorked)}</td>
                                     <td>
                                       <button
                                         type="button"
@@ -1208,7 +1367,7 @@ export default function Timesheet() {
                 {sortedRows.length === 0 && (
                   <tr>
                     <td colSpan={detailColSpan} className="ts-empty">
-                      No attendance logged for this period.
+                      {emptyMessage}
                     </td>
                   </tr>
                 )}
@@ -1226,9 +1385,9 @@ export default function Timesheet() {
                     </td>
                     <td>{row.role}</td>
                     <td>{row.date}</td>
-                    <td>{row.clockIn}</td>
-                    <td>{row.clockOut}</td>
-                    <td>{row.hoursWorked}</td>
+                    <td>{row.clockIn || '—'}</td>
+                    <td>{row.clockOut || '—'}</td>
+                    <td>{formatHours(row.hoursWorked)}</td>
                     <td>
                       <button type="button" className="btn--primary btn" onClick={() => openEditModal(row)} aria-label={`Edit attendance for ${row.name}`}>
                         <PenIcon size={20} />
@@ -1246,8 +1405,11 @@ export default function Timesheet() {
       {modalMode !== 'none' && (
         <AttendanceModal
           mode={modalMode}
-          members={initialRosterRows}
+          members={members}
           record={activeRow}
+          apiError={modalError}
+          saving={saving}
+          removing={removing}
           onCancel={closeModal}
           onSubmit={handleSubmit}
           onRemove={handleRemove}

@@ -20,7 +20,7 @@ export default function UnassignedCrewList({
         <ul className="unassigned-list">
           {crews.map((crew) => (
             <li key={crew.id} className="unassigned-item">
-              <Avatar name={crew.leadName} src={crew.avatar} />
+              <Avatar name={crew.leadName} src={crew.avatar} background={crew.color} />
               <span className="unassigned-item__name">{crew.name}</span>
               <button type="button" className="btn btn--primary
                btn--sm" onClick={() => onAssignJob(crew)}>

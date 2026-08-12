@@ -1,20 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Modal from './Modal'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
-import { crewColors, crewLeads, type Job } from '../../lib/dashboardData'
+import { crewColors, type Job } from '../../lib/dashboardData'
+import { Icon } from './icons'
+import { createCrew, updateCrew, getCrewById, getUsers, type CreateCrewPayload, type UpdateCrewPayload, type CrewDataResponse, type UserItem } from '../../api/crewApi'
+import { getErrorMessage, parseApiErrors } from '../../lib/errors'
 
 export type CrewStatus = 'active' | 'inactive' | 'unassigned'
-
-const STATUS_OPTIONS: { id: CrewStatus; label: string; color: string }[] = [
-  { id: 'active', label: 'Active', color: '#22c55e' },
-  { id: 'inactive', label: 'Inactive', color: '#9ca3af' },
-  { id: 'unassigned', label: 'Unassigned', color: '#f97316' },
-]
 
 export interface CrewFormData {
   crewName: string
   crewLeadId: string
+  members: string[]
   laborNames: string[]
   jobId: string | null
   status: CrewStatus
@@ -23,14 +21,22 @@ export interface CrewFormData {
 }
 
 export interface EditableCrew {
+  id: string
   name: string
   color: string
-  rate: number
+  rate?: number
   crewLeadId?: string
+  members?: string[]
   laborNames?: string[]
   jobId?: string | null
   status?: CrewStatus
+  note?: string
 }
+
+const CREW_STATUS_DROPDOWN = [
+  { id: 'assigned', label: 'Assigned' },
+  { id: 'un-assigned', label: 'Unassigned' },
+]
 
 export default function CreateCrewModal({
   jobs,
@@ -42,36 +48,114 @@ export default function CreateCrewModal({
   jobs: Job[]
   crew?: EditableCrew
   onCancel: () => void
-  onSubmit: (data: CrewFormData) => void
+  /**
+   * `assignedJobId` is the job picked in create mode — POST /crews can't attach
+   * a job, so the caller follows up with a crew assignment on that job.
+   */
+  onSubmit: (data: CrewFormData, apiResponse?: CrewDataResponse, assignedJobId?: string | null) => void
   onRemove?: () => void
 }) {
   const isEdit = !!crew
   const [crewName, setCrewName] = useState(crew?.name ?? '')
-  const [crewLeadId, setCrewLeadId] = useState<string | null>(crew?.crewLeadId ?? crewLeads[0]?.id ?? null)
+  const [availableLeads, setAvailableLeads] = useState<UserItem[]>([])
+  const [availableLabors, setAvailableLabors] = useState<UserItem[]>([])
+  const [crewLeadId, setCrewLeadId] = useState<string | null>(crew?.crewLeadId ?? null)
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(crew?.members ?? [])
   const [laborNames, setLaborNames] = useState<string[]>(crew?.laborNames ?? [])
-  const [laborInput, setLaborInput] = useState('')
   const [jobId, setJobId] = useState<string | null>(crew?.jobId ?? null)
-  const [status, setStatus] = useState<CrewStatus>(crew?.status ?? 'active')
+  const [status, setStatus] = useState<string>(crew?.status === 'unassigned' ? 'un-assigned' : 'assigned')
   const [color, setColor] = useState(crew?.color ?? crewColors[0])
-  const [note, setNote] = useState('')
+  const [note, setNote] = useState(crew?.note ?? '')
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [laborError, setLaborError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [apiError, setApiError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
-  const selectedLead = crewLeads.find((c) => c.id === crewLeadId)
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [leadsRes, laborsRes] = await Promise.all([
+          getUsers({ role: 'crew-lead', isActive: true }),
+          getUsers({ role: 'labor', isActive: true }),
+        ])
+
+        if (leadsRes.success && Array.isArray(leadsRes.data)) {
+          setAvailableLeads(leadsRes.data)
+        }
+
+        if (laborsRes.success && Array.isArray(laborsRes.data)) {
+          setAvailableLabors(laborsRes.data)
+        }
+
+        if (isEdit && crew?.id) {
+          try {
+            const crewRes = await getCrewById(crew.id)
+            if (crewRes.success && crewRes.data) {
+              const cData = crewRes.data
+              setCrewName(cData.name || '')
+              if (cData.crewColor) setColor(cData.crewColor)
+              if (cData.note) setNote(cData.note)
+              if (cData.status) {
+                setStatus(cData.status.toLowerCase() === 'unassigned' || cData.status.toLowerCase() === 'un-assigned' ? 'un-assigned' : 'assigned')
+              }
+
+              // Set Crew Lead ID
+              if (cData.crewLead) {
+                const leadId = typeof cData.crewLead === 'object' ? cData.crewLead._id : cData.crewLead
+                setCrewLeadId(leadId)
+              }
+
+              // Set Members IDs and Names
+              if (Array.isArray(cData.members)) {
+                const ids: string[] = []
+                const names: string[] = []
+                cData.members.forEach((m) => {
+                  if (typeof m === 'object' && m !== null) {
+                    if (m._id) ids.push(m._id)
+                    const mName = `${m.firstName || ''} ${m.lastName || ''}`.trim()
+                    if (mName) names.push(mName)
+                  } else if (typeof m === 'string') {
+                    ids.push(m)
+                  }
+                })
+                setSelectedMemberIds(ids)
+                if (names.length > 0) setLaborNames(names)
+              }
+            }
+          } catch (fetchErr) {
+            setApiError(getErrorMessage(fetchErr, 'Failed to load crew details.'))
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load crew modal options:', err)
+      }
+    }
+
+    loadData()
+  }, [isEdit, crew?.id])
+
+  const selectedLead = availableLeads.find((c) => c._id === crewLeadId)
+  const selectedLeadName = selectedLead ? `${selectedLead.firstName} ${selectedLead.lastName}`.trim() : undefined
+  const selectedLeadRate = selectedLead?.hourlyRate
+
   const selectedJob = jobs.find((j) => j.id === jobId)
-  const selectedStatus = STATUS_OPTIONS.find((s) => s.id === status)!
-  const canSubmit = Boolean(crewName.trim() && crewLeadId)
+  const canSubmit = Boolean(crewName.trim() && crewLeadId) && !isSubmitting
 
-  function addLaborName(rawName: string) {
-    const value = rawName.trim()
-    if (!value) return
-    setLaborNames((list) => (list.some((name) => name.toLowerCase() === value.toLowerCase()) ? list : [...list, value]))
-    setLaborInput('')
+  function toggleMember(memberId: string, memberName: string) {
+    if (selectedMemberIds.includes(memberId)) {
+      setSelectedMemberIds((list) => list.filter((id) => id !== memberId))
+      setLaborNames((list) => list.filter((name) => name !== memberName))
+    } else {
+      setSelectedMemberIds((list) => [...list, memberId])
+      setLaborNames((list) => [...list, memberName])
+    }
     setLaborError('')
   }
 
-  function removeLaborName(nameToRemove: string) {
-    setLaborNames((list) => list.filter((name) => name !== nameToRemove))
+  function removeMember(memberId: string, memberName: string) {
+    setSelectedMemberIds((list) => list.filter((id) => id !== memberId))
+    setLaborNames((list) => list.filter((name) => name !== memberName))
   }
 
   if (confirmingRemove) {
@@ -105,134 +189,224 @@ export default function CreateCrewModal({
     )
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!canSubmit) return
     if (!crewLeadId) return
-    if (laborNames.length === 0) {
-      setLaborError('At least one labor is required')
+    if (!isEdit && selectedMemberIds.length === 0 && laborNames.length === 0) {
+      setLaborError('At least one member is required')
       return
     }
     setLaborError('')
-    onSubmit({ crewName, crewLeadId: crewLeadId ?? '', laborNames, jobId, status, color, note })
+    setApiError('')
+
+    const memberPayload = selectedMemberIds.length > 0 ? selectedMemberIds : laborNames
+    const formData: CrewFormData = {
+      crewName,
+      crewLeadId,
+      members: memberPayload,
+      laborNames,
+      jobId,
+      status: status === 'un-assigned' ? 'unassigned' : 'active',
+      color,
+      note,
+    }
+
+    setIsSubmitting(true)
+    try {
+      if (!isEdit) {
+        const payload: CreateCrewPayload = {
+          name: crewName,
+          crewLead: crewLeadId,
+          members: memberPayload,
+          crewColor: color,
+        }
+        const response = await createCrew(payload)
+        onSubmit(formData, response.data, jobId)
+      } else {
+        const patchPayload: UpdateCrewPayload = {
+          name: crewName.trim(),
+          crewLead: crewLeadId,
+          ...(selectedMemberIds.length > 0 ? { members: selectedMemberIds } : {}),
+          status,
+          ...(note.trim() ? { note: note.trim() } : {}),
+        }
+        const response = await updateCrew(crew.id, patchPayload)
+        onSubmit(formData, response.data)
+      }
+    } catch (err: any) {
+      const parsed = parseApiErrors(err, `Failed to ${isEdit ? 'update' : 'create'} crew. Please try again.`)
+      setApiError(parsed.generalMessage)
+      setFieldErrors(parsed.fieldErrors)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
     <Modal onClose={onCancel} width={isEdit ? 520 : 480}>
       <h2 className="modal-title">{isEdit ? 'Edit Crew' : 'Create New Crew'}</h2>
 
+      {apiError && (
+        <div className="form-error-alert">
+          <Icon.AlertCircle width={18} height={18} />
+          <span>{apiError}</span>
+        </div>
+      )}
+
       <label className="field-label">Crew Name*</label>
-      <input className="field-input" placeholder="Enter Crew Name" value={crewName} onChange={(e) => setCrewName(e.target.value)} />
+      <input
+        className={`field-input${fieldErrors.name || fieldErrors.crewName ? ' field-input--error' : ''}`}
+        placeholder="Enter Crew Name"
+        value={crewName}
+        onChange={(e) => setCrewName(e.target.value)}
+      />
+      {(fieldErrors.name || fieldErrors.crewName) && (
+        <span className="field-error-text">{fieldErrors.name || fieldErrors.crewName}</span>
+      )}
 
       <label className="field-label">Crew Leader*</label>
+      {(fieldErrors.crewLead || fieldErrors.crewLeadId) && (
+        <span className="field-error-text" style={{ marginBottom: '4px' }}>
+          {fieldErrors.crewLead || fieldErrors.crewLeadId}
+        </span>
+      )}
       <Dropdown
         value={crewLeadId}
-        placeholder="-"
+        placeholder="Select Crew Leader"
         onChange={setCrewLeadId}
         selectedLabel={
-          selectedLead && (
+          selectedLeadName && (
             <span className="dd__avatar-label">
-              <Avatar name={selectedLead.name} src={selectedLead.avatar} size={24} />
-              {selectedLead.name} (${selectedLead.rate}/h)
+              <Avatar name={selectedLeadName} size={24} />
+              {selectedLeadName} {selectedLeadRate ? `($${selectedLeadRate}/h)` : ''}
             </span>
           )
         }
-        options={crewLeads.map((c) => ({
-          id: c.id,
-          label: (
-            <span className="dd__avatar-label">
-              <Avatar name={c.name} src={c.avatar} size={24} />
-              {c.name} (${c.rate}/h)
-            </span>
-          ),
-        }))}
+        options={availableLeads.map((c) => {
+          const name = `${c.firstName} ${c.lastName}`.trim()
+          return {
+            id: c._id,
+            label: (
+              <span className="dd__avatar-label">
+                <Avatar name={name} size={24} />
+                {name} {c.hourlyRate ? `($${c.hourlyRate}/h)` : ''}
+              </span>
+            ),
+          }
+        })}
       />
 
-      <label className="field-label">Labors*</label>
-      <div className={`crew-chip-input${laborError ? ' is-invalid' : ''}`}>
-        {laborNames.map((name) => (
-          <span key={name} className="crew-chip-input__chip">
-            {name}
-            <button type="button" className="crew-chip-input__remove" onClick={() => removeLaborName(name)} aria-label={`Remove ${name}`}>
-              ×
-            </button>
-          </span>
-        ))}
-        <input
-          className="crew-chip-input__field"
-          value={laborInput}
-          onChange={(e) => {
-            setLaborInput(e.target.value)
-            if (laborError) setLaborError('')
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ',') {
-              e.preventDefault()
-              addLaborName(laborInput)
-            }
-            if (e.key === 'Backspace' && !laborInput && laborNames.length > 0) {
-              removeLaborName(laborNames[laborNames.length - 1])
-            }
-          }}
-          onBlur={() => addLaborName(laborInput)}
-          placeholder={laborNames.length === 0 ? 'Type a name and press Enter' : ''}
-          aria-invalid={Boolean(laborError)}
-        />
-      </div>
+      <label className="field-label">{isEdit ? 'Add Members (Labors)' : 'Members (Labors)*'}</label>
+      <Dropdown
+        value={null}
+        placeholder="Select Members"
+        onChange={(id) => {
+          if (!id) return
+          const member = availableLabors.find((m) => m._id === id)
+          if (member) {
+            const name = `${member.firstName} ${member.lastName}`.trim()
+            toggleMember(member._id, name)
+          }
+        }}
+        selectedLabel="Select Members..."
+        options={availableLabors.map((m) => {
+          const name = `${m.firstName} ${m.lastName}`.trim()
+          const isSelected = selectedMemberIds.includes(m._id)
+          return {
+            id: m._id,
+            label: (
+              <span className="dd__avatar-label" style={{ justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <Avatar name={name} size={24} />
+                  {name} {m.hourlyRate ? `($${m.hourlyRate}/h)` : ''}
+                </span>
+                {isSelected && <span style={{ color: '#22c55e', fontWeight: 'bold' }}>✓</span>}
+              </span>
+            ),
+          }
+        })}
+      />
+
+      {(selectedMemberIds.length > 0 || laborNames.length > 0) && (
+        <div className="crew-chip-input" style={{ marginTop: '8px' }}>
+          {selectedMemberIds.length > 0
+            ? selectedMemberIds.map((id, index) => {
+                const memberObj = availableLabors.find((m) => m._id === id)
+                const displayName = memberObj
+                  ? `${memberObj.firstName} ${memberObj.lastName}`.trim()
+                  : laborNames[index] || `Member #${id.slice(-4)}`
+                return (
+                  <span key={id} className="crew-chip-input__chip">
+                    {displayName}
+                    <button type="button" className="crew-chip-input__remove" onClick={() => removeMember(id, displayName)} aria-label={`Remove ${displayName}`}>
+                      ×
+                    </button>
+                  </span>
+                )
+              })
+            : laborNames.map((name, index) => (
+                <span key={index} className="crew-chip-input__chip">
+                  {name}
+                </span>
+              ))}
+        </div>
+      )}
       {laborError && <p className="field-error">{laborError}</p>}
 
-      <label className="field-label">{isEdit ? 'Job Assigned' : 'Assign Job'}</label>
-      <Dropdown
-        value={jobId}
-        placeholder="-"
-        onChange={setJobId}
-        selectedLabel={selectedJob?.name}
-        options={jobs.map((j) => ({
-          id: j.id,
-          label: j.name,
-        }))}
-      />
-
-      <label className="field-label">Status</label>
-      <Dropdown
-        value={status}
-        onChange={(id) => setStatus(id as CrewStatus)}
-        selectedLabel={
-          <span className="dd__dot-label">
-            <i className="dot" style={{ background: selectedStatus.color }} />
-            {selectedStatus.label}
-          </span>
-        }
-        options={STATUS_OPTIONS.map((s) => ({
-          id: s.id,
-          label: (
-            <span className="dd__dot-label">
-              <i className="dot" style={{ background: s.color }} />
-              {s.label}
-            </span>
-          ),
-        }))}
-      />
-
-      <label className="field-label">Crew Color</label>
-      <div className="color-picker">
-        {crewColors.map((c) => (
-          <button
-            key={c}
-            type="button"
-            className={`color-swatch ${c === color ? 'is-selected' : ''}`}
-            style={{ background: c }}
-            onClick={() => setColor(c)}
+      {isEdit && (
+        <>
+          <label className="field-label">Status</label>
+          <Dropdown
+            value={status}
+            placeholder="Select Status"
+            onChange={(val) => val && setStatus(val)}
+            selectedLabel={CREW_STATUS_DROPDOWN.find((s) => s.id === status)?.label}
+            options={CREW_STATUS_DROPDOWN.map((s) => ({
+              id: s.id,
+              label: s.label,
+            }))}
           />
-        ))}
-      </div>
+        </>
+      )}
 
-      <label className="field-label">Add a note</label>
+      {!isEdit && (
+        <>
+          <label className="field-label">Assign Job</label>
+          <Dropdown
+            value={jobId}
+            placeholder="-"
+            onChange={setJobId}
+            selectedLabel={selectedJob?.name}
+            options={jobs.map((j) => ({
+              id: j.id,
+              label: j.name,
+            }))}
+          />
+
+          <label className="field-label">Crew Color</label>
+          <div className="color-picker">
+            {crewColors.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={`color-swatch ${c === color ? 'is-selected' : ''}`}
+                style={{ background: c }}
+                onClick={() => setColor(c)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      <label className="field-label">{isEdit ? 'Note' : 'Add a note'}</label>
       <textarea
         className="field-textarea"
-        placeholder="Note about the job..."
+        placeholder="Note about the crew..."
         value={note}
         onChange={(e) => setNote(e.target.value)}
       />
+
+      {apiError && <p className="field-error" style={{ marginTop: 12 }}>{apiError}</p>}
 
       <div className={`modal-actions ${isEdit ? 'modal-actions--split' : ''}`}>
         {isEdit && (
@@ -244,11 +418,11 @@ export default function CreateCrewModal({
           </button>
         )}
         <div className="modal-actions__group">
-          <button type="button" className="btn btn--outline" onClick={onCancel}>
+          <button type="button" className="btn btn--outline" disabled={isSubmitting} onClick={onCancel}>
             Cancel
           </button>
           <button type="button" className="btn btn--primary" disabled={!canSubmit} onClick={handleSubmit}>
-            {isEdit ? 'Update Crew' : 'Add Crew'}
+            {isSubmitting ? (isEdit ? 'Updating...' : 'Creating...') : isEdit ? 'Update Crew' : 'Add Crew'}
           </button>
         </div>
       </div>
