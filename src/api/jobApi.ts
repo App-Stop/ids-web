@@ -148,7 +148,7 @@ export interface CreateCrewAssignmentPayload {
   crewId: string
   startDate: string
   endDate?: string
-  excludeWeekend?: boolean
+  excludeWeekends?: boolean
   /** Passing this marks the cost as admin-overridden; omit to auto-compute. */
   laborCost?: number
   note?: string

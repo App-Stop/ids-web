@@ -248,7 +248,7 @@ export default function CreateJobModal({
               crewId: crewLeadId,
               startDate: toIsoDate(assignStartDate) || toIsoDate(startDate) || new Date().toISOString().slice(0, 10),
               endDate: toIsoDate(assignEndDate) || undefined,
-              excludeWeekend: excludeWeekends,
+              excludeWeekends: excludeWeekends,
               note: note.trim() || undefined,
             })
           } catch (assignErr: any) {
@@ -282,7 +282,7 @@ export default function CreateJobModal({
               crewId: crewLeadId,
               startDate: toIsoDate(assignStartDate) || toIsoDate(startDate) || new Date().toISOString().slice(0, 10),
               endDate: toIsoDate(assignEndDate) || undefined,
-              excludeWeekend: excludeWeekends,
+              excludeWeekends: excludeWeekends,
               note: note.trim() || undefined,
             })
           } catch (assignErr: any) {
