@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import BrandLogos from '../../components/BrandLogos'
+import logo from '../../assets/logo.png'
 import { getErrorMessage } from '../../lib/errors'
 import { useAuth } from '../../context/AuthContext'
-import { homePathForRole } from '../../components/ProtectedRoute'
-import './crew.css'
+import { homePathForRole, ADMIN_LOGIN_PATH } from '../../components/ProtectedRoute'
+import { DOMAIN } from '../../components/EmailField'
+import './crew-auth.css'
 
 /** Shared login for crew-lead and labour. Admins use /admin/login. */
 export default function CrewLogin() {
@@ -23,7 +24,7 @@ export default function CrewLogin() {
     setError('')
     setLoading(true)
     try {
-      const body = await userLogin(email, password)
+      const body = await userLogin(email + DOMAIN, password)
       navigate(homePathForRole(body.data?.user?.role ?? body.data?.admin?.role), {
         replace: true,
       })
@@ -35,55 +36,66 @@ export default function CrewLogin() {
   }
 
   return (
-    <div className="crew-login">
-      <form className="crew-login__card" onSubmit={onSubmit}>
-        <BrandLogos />
-
-        <h1 className="crew-login__title">Sign In</h1>
-        <p className="crew-login__subtitle">Crew access to your jobs and hours</p>
-
-        <div className="crew-field">
-          <label htmlFor="crew-email">Email</label>
-          <input
-            id="crew-email"
-            type="email"
-            inputMode="email"
-            className="crew-input"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="username"
-            autoCapitalize="none"
-            required
-          />
+    <div className="cauth cauth-page">
+      <form className="cauth-form" onSubmit={onSubmit}>
+        <div className="cauth-logo">
+          <img src={logo} alt="DSI Concrete Cutting · IDS Demolition" />
         </div>
 
-        <div className="crew-field">
-          <label htmlFor="crew-password">Password</label>
-          <input
-            id="crew-password"
-            type="password"
-            className="crew-input"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            required
-          />
+        <div className="cauth-heading">
+          <h1 className="cauth-title">Sign In</h1>
+          <p className="cauth-subtitle">
+            Enter your credentials to access your account
+          </p>
         </div>
 
-        {error && <p className="crew-error">{error}</p>}
+        <div className="cauth-fields">
+          <div className="cauth-field">
+            <label htmlFor="crew-email">Email address</label>
+            <div className="cauth-email">
+              <input
+                id="crew-email"
+                type="text"
+                placeholder="yourname"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
+                autoCapitalize="none"
+                required
+              />
+              <span>{DOMAIN}</span>
+            </div>
+          </div>
 
-        <button className="crew-submit" type="submit" disabled={loading}>
+          <div className="cauth-field">
+            <label htmlFor="crew-password">Password</label>
+            <input
+              id="crew-password"
+              type="password"
+              className="cauth-input"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+            <Link to="/login/forgot-password" className="cauth-forgot">
+              Forgot Password
+            </Link>
+          </div>
+        </div>
+
+        {error && <p className="cauth-error">{error}</p>}
+
+        <div className="cauth-spacer" />
+
+        <Link to={ADMIN_LOGIN_PATH} className="cauth-alt">
+          Login as Admin
+        </Link>
+
+        <button className="cauth-submit" type="submit" disabled={loading}>
           {loading ? 'Signing in…' : 'Sign In'}
         </button>
-
-        <p className="crew-login__alt">
-          <Link to="/forgot-password">Forgot password?</Link>
-        </p>
-        <p className="crew-login__alt">
-          Office staff? <Link to="/admin/login">Admin sign in</Link>
-        </p>
       </form>
     </div>
   )

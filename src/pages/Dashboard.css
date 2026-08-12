@@ -596,6 +596,12 @@
   color: var(--ink);
 }
 
+.dash__error {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--danger, #ef4444);
+}
+
 .empty-state {
   margin-top: 1rem;
   font-size: 0.85rem;

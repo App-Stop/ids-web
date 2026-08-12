@@ -66,12 +66,14 @@ export interface CrewSummaryItem {
     firstName?: string
     lastName?: string
     email?: string
+    hourlyRate?: number | null
   } | string | null
   membersCount: number
   crewColor: string
   status: string
   note: string | null
-  job: any | null
+  /** crewSummaryTransformer only projects _id + name; enrich from /jobs for the rest. */
+  job: { _id: string; name: string | null } | null
   createdAt: string
   updatedAt: string
 }
@@ -79,7 +81,8 @@ export interface CrewSummaryItem {
 export interface GetCrewsSummaryParams {
   jobId?: string
   status?: string
-  sortByName?: 'asc' | 'dec' | 'desc'
+  /** Backend enum is asc|desc — 'dec' is rejected with a 400. */
+  sortByName?: 'asc' | 'desc'
 }
 
 export interface GetCrewsSummaryResponse {
@@ -113,14 +116,26 @@ export interface UserItem {
 
 export interface GetUsersParams {
   role?: string
+  /** A crew _id, or the literal 'null' to match users with no crew. */
   assignCrew?: string
   isActive?: boolean
+  search?: string
+  page?: number
+  limit?: number
+}
+
+export interface Pagination {
+  page: number
+  limit: number
+  totalCount: number
+  totalPages: number
 }
 
 export interface GetUsersResponse {
   success: boolean
   message: string
   data: UserItem[]
+  pagination: Pagination
 }
 
 export interface UpdateCrewPayload {
@@ -202,6 +217,23 @@ export async function createUser(payload: CreateUserPayload): Promise<CreateUser
 
 export async function updateUser(id: string, payload: UpdateUserPayload): Promise<UpdateUserResponse> {
   const response = await api.patch<UpdateUserResponse>(`/users/${id}`, payload)
+  return response.data
+}
+
+export interface DeleteResponse {
+  success: boolean
+  message: string
+}
+
+/** Soft-deletes the crew and unassigns its lead + members. */
+export async function deleteCrew(id: string): Promise<DeleteResponse> {
+  const response = await api.delete<DeleteResponse>(`/crews/${id}`)
+  return response.data
+}
+
+/** There is no hard user delete — DELETE /users/:id flips isActive to false. */
+export async function deactivateUser(id: string): Promise<DeleteResponse> {
+  const response = await api.delete<DeleteResponse>(`/users/${id}`)
   return response.data
 }
 

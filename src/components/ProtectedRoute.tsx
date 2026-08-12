@@ -3,17 +3,17 @@ import { Navigate } from 'react-router-dom';
 import { type ReactNode } from 'react';
 import { useAuth, type Role } from '../context/AuthContext';
 
-export const ADMIN_LOGIN_PATH = '/admin/login';
+export const ADMIN_LOGIN_PATH = '/';
+/** Kept for the shelved crew screens, which are not routed at the moment. */
 export const CREW_LOGIN_PATH = '/login';
 
 /**
- * Where a signed-in user belongs once authenticated. Anything that isn't an
- * admin lands on the crew side — an unrecognised role must never dead-end back
- * on the login page, which just looks like a login that did nothing.
+ * Where a signed-in user belongs once authenticated. With the crew side
+ * shelved, only admins have somewhere to go; anyone else lands back on the
+ * sign-in page.
  */
 export function homePathForRole(role: Role | null | undefined) {
-  if (!role) return CREW_LOGIN_PATH;
-  return role === 'admin' ? '/dashboard' : '/crew';
+  return role === 'admin' ? '/dashboard' : ADMIN_LOGIN_PATH;
 }
 
 interface ProtectedRouteProps {

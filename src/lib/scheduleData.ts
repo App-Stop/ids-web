@@ -1,93 +1,16 @@
-export interface ScheduleJob {
-  id: string
-  jobNo: string
-  name: string
-  color: string
-  idsSuper: string
-  gcSuper: string
-  gc: string
-  contract: number
-}
-
-export interface ScheduleAssignment {
-  id: string
-  jobId: string
-  startDate: string   // was: date
-  endDate: string      // new
-  crewName: string
-  rate: number
-  workers: number
-  note?: string
-}
-
-export interface ScheduleNote {
-  id: string
-  jobId: string
-  date: string
-  text: string
-}
-
-export const scheduleJobs: ScheduleJob[] = [
-  { id: '#001', jobNo: '001', name: 'Maplewood Community Center Renovation', color: '#ea3da9', idsSuper: 'Ethan R.', gcSuper: 'Ethan K.', gc: 'John D.', contract: 50000 },
-  { id: '#002', jobNo: '002', name: 'Riverside Bridge Repair', color: '#56bd6d', idsSuper: 'Maya K.', gcSuper: 'Maya R.', gc: 'Alice M.', contract: 50000 },
-  { id: '#003', jobNo: '003', name: 'Greenfield Library Expansion', color: '#df3021', idsSuper: 'Liam J.', gcSuper: 'Liam J.', gc: 'Emily T.', contract: 50000 },
-  { id: '#004', jobNo: '004', name: 'Oakridge High School Gym Upgrade', color: '#4193f7', idsSuper: 'Noah W.', gcSuper: 'Olivia P.', gc: 'Michael B.', contract: 50000 },
-  { id: '#005', jobNo: '005', name: 'Pinecrest Water Treatment Plant Maintenance', color: '#e8752e', idsSuper: 'Olivia P.', gcSuper: 'Noah G.', gc: 'Robert S.', contract: 50000 },
-  { id: '#006', jobNo: '006', name: 'Sunset Park Playground Replacement', color: '#14b8a6', idsSuper: 'Steve P.', gcSuper: 'Mark T.', gc: 'Alice S.', contract: 50000 },
-]
-
-/** Jobs shown in Schedule / Cost pickers — full sheet roster. */
-export const sheetPickerJobs = scheduleJobs
-
-/** Weekly view assignments (week of TODAY 2026-07-20 … 2026-07-26) — one crew per job, Mon–Sat. */
-const WEEKLY_CREW_BY_JOB: Array<Omit<ScheduleAssignment, 'id' | 'startDate' | 'endDate'>> = [
-  { jobId: '#001', crewName: "Hank's Crew", rate: 35, workers: 4, note: 'Coordinate with suppliers and schedule weekly progress meetings.' },
-  { jobId: '#002', crewName: "John's Crew", rate: 32, workers: 5, note: 'Confirm crane delivery Tuesday morning.' },
-  { jobId: '#003', crewName: "Bob's Crew", rate: 28, workers: 3, note: 'Dust control required near classrooms.' },
-  { jobId: '#004', crewName: "Chris's Crew", rate: 27, workers: 4, note: 'Watch for permit delays on the west wing.' },
-  { jobId: '#005', crewName: "Noah's Crew", rate: 30, workers: 6, note: 'Full-week interior soft demo.' },
-  { jobId: '#006', crewName: "Lucas's Crew", rate: 27, workers: 5, note: 'Tear down old swing sets and prep ground.' },
-]
-
-export const weeklyScheduleAssignments: ScheduleAssignment[] = WEEKLY_CREW_BY_JOB.map((crew, index) => ({
-  ...crew,
-  id: `wa${index + 1}`,
-  startDate: '2026-07-20',
-  endDate: '2026-07-25',
-}))
-
 /**
- * Monthly Gantt — one crew per job.
- * Each week is Mon–Sat; Sundays (Jul 5, 12, 19, 26, Aug 2) stay empty.
- * July 2026 starts on Wednesday, so the first block is Wed–Sat (1–4).
+ * Date helpers for the schedule board.
+ *
+ * Two date representations are in play:
+ *  - "ISO day" strings ("2026-08-25") — what the grid keys and compares on.
+ *  - `Date` objects built from those strings at LOCAL midnight, used only for
+ *    calendar arithmetic and display. They never leave this module as dates.
+ *
+ * The API sends UTC instants ("2026-08-25T00:00:00.000Z" for a start,
+ * "...T23:59:59.999Z" for an end). `isoDay` takes the UTC date part of those,
+ * which is correct for both boundaries — never build a Date from them and read
+ * local getters, or non-UTC timezones shift the day.
  */
-const MONTHLY_MON_SAT_RANGES: Array<{ startDate: string; endDate: string }> = [
-  { startDate: '2026-07-01', endDate: '2026-07-04' }, // Wed–Sat
-  { startDate: '2026-07-06', endDate: '2026-07-11' }, // Mon–Sat
-  { startDate: '2026-07-13', endDate: '2026-07-18' }, // Mon–Sat
-  { startDate: '2026-07-20', endDate: '2026-07-25' }, // Mon–Sat
-  { startDate: '2026-07-27', endDate: '2026-08-01' }, // Mon–Sat (into next-month overflow cols)
-]
-
-export const monthlyScheduleAssignments: ScheduleAssignment[] = WEEKLY_CREW_BY_JOB.flatMap((crew, jobIndex) =>
-  MONTHLY_MON_SAT_RANGES.map((range, weekIndex) => ({
-    ...crew,
-    id: `ma${jobIndex + 1}w${weekIndex + 1}`,
-    startDate: range.startDate,
-    endDate: range.endDate,
-  })),
-)
-
-/** @deprecated use weeklyScheduleAssignments / monthlyScheduleAssignments */
-export const initialScheduleAssignments = weeklyScheduleAssignments
-
-export const initialScheduleNotes: ScheduleNote[] = [
-  { id: 'sn1', jobId: 's4706', date: '2026-07-22', text: 'The crew performed efficiently throughout the day. To maximize productivity tomorrow, we should coordinate material delivery earlier.' },
-  { id: 'sn2', jobId: 's6829', date: '2026-07-23', text: 'Job is done for this year, next phase begins in spring.' },
-  { id: 'sn3', jobId: 's8732', date: '2026-07-20', text: 'The crew performed well despite the weather delays.' },
-]
-
-export const TODAY = '2026-07-22'
 
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTH_LABELS = [
@@ -95,13 +18,31 @@ const MONTH_LABELS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
+/** Days covered by each view, matching the backend's schedule ranges. */
+export const VIEW_SPAN_DAYS = { weekly: 7, monthly: 30 } as const
+
+export type ViewMode = keyof typeof VIEW_SPAN_DAYS
+
+/** Local-midnight Date → "YYYY-MM-DD". */
 export function toISO(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+/** "YYYY-MM-DD" → Date at local midnight. */
 export function fromISO(s: string) {
   const [y, m, d] = s.split('-').map(Number)
   return new Date(y, m - 1, d)
+}
+
+/** API instant ("2026-08-25T00:00:00.000Z") → "2026-08-25". */
+export function isoDay(value: string | Date | null | undefined): string | null {
+  if (!value) return null
+  if (value instanceof Date) return value.toISOString().slice(0, 10)
+  return value.slice(0, 10)
+}
+
+export function todayISO() {
+  return toISO(new Date())
 }
 
 export function addDays(d: Date, n: number) {
@@ -118,6 +59,16 @@ export function getMonday(d: Date) {
   return copy
 }
 
+/**
+ * The exact days a view renders: `span` consecutive days from the anchor.
+ * Mirrors the backend (weekly = anchor + 6, monthly = anchor + 29), so the
+ * grid shows precisely the range the API was asked for.
+ */
+export function rangeDays(anchor: Date, view: ViewMode) {
+  const span = VIEW_SPAN_DAYS[view]
+  return Array.from({ length: span }, (_, i) => addDays(anchor, i))
+}
+
 export function weekdayShort(d: Date) {
   return WEEKDAY_SHORT[d.getDay()]
 }
@@ -130,21 +81,28 @@ export function monthLabel(d: Date) {
   return `${MONTH_LABELS[d.getMonth()]} ${d.getFullYear()}`
 }
 
-export function daysInMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+/** Label for a rolling range, e.g. "Aug 12 - Sep 10, 2026". */
+export function rangeLabel(days: Date[]) {
+  if (days.length === 0) return ''
+  const first = days[0]
+  const last = days[days.length - 1]
+  const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${fmt(first)} - ${fmt(last)}, ${last.getFullYear()}`
 }
 
-/** Full month days plus the first 2 days of the next month (Figma monthly grid). */
-export function monthGridDays(d: Date) {
-  const count = daysInMonth(d)
-  const days: Date[] = []
-  for (let i = 1; i <= count; i++) days.push(new Date(d.getFullYear(), d.getMonth(), i))
-  days.push(new Date(d.getFullYear(), d.getMonth() + 1, 1))
-  days.push(new Date(d.getFullYear(), d.getMonth() + 1, 2))
-  return days
-}
-
+/** "2026-08-25" → "08-25-2026" (display only). */
 export function formatMdy(iso: string) {
   const d = fromISO(iso)
   return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${d.getFullYear()}`
+}
+
+/** Fallback palette for crews whose `crewColor` is unset. */
+const FALLBACK_COLORS = ['#ea3da9', '#56bd6d', '#df3021', '#4193f7', '#e8752e', '#14b8a6', '#8b5cf6']
+
+export function crewColorFor(crewId: string | null | undefined, explicit?: string | null) {
+  if (explicit) return explicit
+  if (!crewId) return FALLBACK_COLORS[0]
+  let hash = 0
+  for (let i = 0; i < crewId.length; i++) hash = (hash * 31 + crewId.charCodeAt(i)) >>> 0
+  return FALLBACK_COLORS[hash % FALLBACK_COLORS.length]
 }

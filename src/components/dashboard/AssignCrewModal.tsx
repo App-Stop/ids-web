@@ -4,27 +4,40 @@ import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import { assignableCrews, type Job } from '../../lib/dashboardData'
 
+export interface AssignableCrewOption {
+  id: string
+  name: string
+  leadName: string
+  rate: number
+  color?: string
+  avatar?: string
+}
+
 export default function AssignCrewModal({
   job,
+  crews,
   onCancel,
   onAssign,
 }: {
   job: Job
+  /** Real crews from the API. Callers that omit this fall back to fixtures. */
+  crews?: AssignableCrewOption[]
   onCancel: () => void
   onAssign: (crewLeadId: string, startDate: string, endDate: string, note: string) => void
 }) {
+  const crewOptions: AssignableCrewOption[] = crews ?? assignableCrews
   const [crewId, setCrewId] = useState<string | null>(null)
   const [startDate, setStartDate] = useState(job.startDate || '')
   const [endDate, setEndDate] = useState(job.endDate || '')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const selected = assignableCrews.find((c) => c.id === crewId)
+  const selected = crewOptions.find((c) => c.id === crewId)
 
   return (
     <Modal onClose={onCancel} width={420}>
       <h2 className="modal-title">Assign Crew</h2>
       <p className="job-head__meta" style={{ marginTop: '0.15rem' }}>
-        Bid #{job.bidNo} &middot; Job #{job.jobNo}
+        {job.bidNo ? `Bid #${job.bidNo} · ` : ''}Job #{job.jobNo}
       </p>
       <p className="assign-crew__job-name">{job.name}</p>
 
@@ -44,7 +57,7 @@ export default function AssignCrewModal({
             </span>
           )
         }
-        options={assignableCrews.map((c) => ({
+        options={crewOptions.map((c) => ({
           id: c.id,
           label: (
             <span className="dd__crew-label">

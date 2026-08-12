@@ -88,6 +88,36 @@ export interface CostTrackingReportParams {
   limit?: number
 }
 
+export interface CostAdjustmentData {
+  jobId: string
+  date: string
+  laborCost: number
+  dumpsterCount: number
+  dumpsterCost: number
+  dumpsterTotalCost: number
+  totalCost: number
+}
+
+export interface GetCostAdjustmentResponse {
+  success: boolean
+  message: string
+  data: CostAdjustmentData
+}
+
+export interface AdjustCostPayload {
+  jobId: string
+  date: string
+  laborCost: number
+  dumpsterCount: number
+  dumpsterCost: number
+}
+
+export interface AdjustCostResponse {
+  success: boolean
+  message: string
+  data: CostAdjustmentData
+}
+
 export async function createDumpsterCost(
   payload: CreateDumpsterCostPayload
 ): Promise<CreateDumpsterCostResponse> {
@@ -99,6 +129,23 @@ export async function getCostTrackingReport(
   params?: CostTrackingReportParams
 ): Promise<CostTrackingReportResponse> {
   const response = await api.get<CostTrackingReportResponse>('/reports/cost-tracking', { params })
+  return response.data
+}
+
+export async function getCostAdjustment(
+  jobId: string,
+  date: string
+): Promise<GetCostAdjustmentResponse> {
+  const response = await api.get<GetCostAdjustmentResponse>('/reports/cost-tracking/adjust', {
+    params: { jobId, date },
+  })
+  return response.data
+}
+
+export async function adjustCost(
+  payload: AdjustCostPayload
+): Promise<AdjustCostResponse> {
+  const response = await api.patch<AdjustCostResponse>('/reports/cost-tracking/adjust', payload)
   return response.data
 }
 

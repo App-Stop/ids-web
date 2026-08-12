@@ -79,7 +79,6 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
               id: c._id,
               label: c.name,
               color: c.crewColor || '#3b82f6',
-              avatar: `https://i.pravatar.cc/64?img=${(c._id.charCodeAt(0) || 10) % 70}`,
               avatarName: leadName,
             }
           })

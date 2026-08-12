@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Sidebar from '../components/dashboard/Sidebar'
 import StatCard from '../components/dashboard/StatCard'
 import UnassignedCrewList from '../components/dashboard/UnassignedCrewList'
@@ -10,21 +10,47 @@ import CreateJobModal from '../components/dashboard/CreateJobModal'
 import { CaretRight, Hammer, Users, Money, WarningCircle } from '@phosphor-icons/react'
 import {
   assignableCrews,
-  initialUnassignedCrews,
+  formatMoney,
   jobs as initialJobs,
   type CrewLead,
   type Job,
   type UnassignedCrew,
 } from '../lib/dashboardData'
 import './Dashboard.css'
+import {
+  getDashboardSummary,
+  type DashboardSummaryData,
+  type UnassignedJobItem,
+} from '../api/dashboardApi'
 
 const TODAY = '13-07-2026'
 
-const UNASSIGNED_JOBS = [
-  'Maplewood Community Center Renovation',
-  'Riverside Bridge Repair',
-  'Oakridge High School Gym Upgrade',
-]
+function formatDate(iso?: string) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  return `${dd}-${mm}-${d.getFullYear()}`
+}
+
+/** Adapt an API unassigned job into the shape the modals expect. */
+function toJob(item: UnassignedJobItem): Job {
+  return {
+    id: item._id,
+    name: item.Name,
+    color: '#4193f7',
+    bidNo: String(item.jobIdNumber),
+    jobNo: String(item.jobIdNumber).padStart(3, '0'),
+    gc: item.generalContractor,
+    estimator: 'TBD',
+    startDate: formatDate(item.startDate),
+    endDate: formatDate(item.endDate),
+    contractAmount: 0,
+    laborBudgetUsed: 0,
+    laborBudgetTotal: 0,
+  }
+}
 
 type Flow =
   | { step: 'none' }
@@ -38,8 +64,46 @@ let nextJobSeq = 1054
 
 export default function Dashboard() {
   const [jobs, setJobs] = useState(initialJobs)
-  const [unassigned, setUnassigned] = useState(initialUnassignedCrews)
+  const [unassigned, setUnassigned] = useState<UnassignedCrew[]>([])
+  const [unassignedJobs, setUnassignedJobs] = useState<UnassignedJobItem[]>([])
   const [flow, setFlow] = useState<Flow>({ step: 'none' })
+
+  const [cardData, setCardData] = useState<DashboardSummaryData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const res = await getDashboardSummary()
+        const data = res.data
+        setCardData(data)
+        setUnassignedJobs(data.unassignedJobsList ?? [])
+        setUnassigned(
+          (data.unassignedCrewsList ?? []).map((crew) => ({
+            id: crew._id,
+            name: crew.name,
+            leadName: crew.name,
+            rate: 0,
+            color: crew.crewColor,
+            memberCount: crew.members?.length ?? 0,
+          })),
+        )
+      } catch (err: any) {
+        setError(err?.response?.data?.message ?? 'Failed to load dashboard')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDashboard()
+  }, [])
+
+  const overBudget = cardData?.jobsOverBudget ?? []
+  const overBudgetAmount = overBudget.reduce((sum, job) => sum + (job.overBudgetBy ?? 0), 0)
+  const percentChange = cardData?.laborCost.percentChange ?? 0
 
   return (
     <div className="dash">
@@ -50,23 +114,35 @@ export default function Dashboard() {
         <h1 className="dash__title">Dashboard</h1>
         <p className="dash__subtitle">Overview of your operations</p>
 
+        {error && <p className="dash__error">{error}</p>}
+
         <div className="stat-grid">
-          <StatCard icon={<Hammer size={18} weight="regular" />} label="Active Jobs" value="13" sub="24 Total Jobs" />
-          <StatCard icon={<Users size={18} weight="regular" />} label="Crews Assigned" value="6" sub="34 Total Crew Members" />
+          <StatCard
+            icon={<Hammer size={18} weight="regular" />}
+            label="Active Jobs"
+            value={loading ? '—' : String(cardData?.jobs.activeJobs ?? 0)}
+            sub={`${cardData?.jobs.totalJobs ?? 0} Total Jobs`}
+          />
+          <StatCard
+            icon={<Users size={18} weight="regular" />}
+            label="Crews Assigned"
+            value={loading ? '—' : String(cardData?.crews.totalCrewsAssigned ?? 0)}
+            sub={`${cardData?.crews.totalCrewMembers ?? 0} Total Crew Members`}
+          />
           <StatCard
             icon={<Money size={18} weight="regular" />}
             label="Weekly Labor Cost"
-            value="$7,695"
-            badge="▲ 13%"
-            sub="Last week: $6,983"
+            value={loading ? '—' : formatMoney(cardData?.laborCost.thisWeek ?? 0)}
+            badge={percentChange ? `${percentChange > 0 ? '▲' : '▼'} ${Math.abs(percentChange)}%` : undefined}
+            sub={`Last week: ${formatMoney(cardData?.laborCost.lastWeek ?? 0)}`}
           />
           <StatCard
             icon={<WarningCircle size={18} weight="regular" />}
             label="Jobs Over Budget"
-            value="1"
-            valueClass="text-danger"
-            sub="+$1,213"
-            subClass="text-danger"
+            value={loading ? '—' : String(overBudget.length)}
+            valueClass={overBudget.length ? 'text-danger' : ''}
+            sub={overBudgetAmount ? `+${formatMoney(overBudgetAmount)}` : 'On budget'}
+            subClass={overBudgetAmount ? 'text-danger' : ''}
           />
         </div>
 
@@ -79,30 +155,32 @@ export default function Dashboard() {
             <div className="panel__head">
               <h2>Unassigned Jobs</h2>
             </div>
-            <ul className="unassigned-list">
-              {UNASSIGNED_JOBS.map((name) => (
-                <li key={name} className="unassigned-item">
-                  <span className="unassigned-item__name">{name}</span>
-                  <CaretRight size={14} weight="bold" className="unassigned-item__chevron" />
-                  <button
-                    type="button"
-                    className="btn btn--primary btn--sm"
-                    onClick={() => {
-                      const job = jobs.find((j) => j.name === name) ?? jobs[0]
-                      if (!job) return
-                      setFlow({
-                        step: 'assignCrew',
-                        crew: unassigned[0] ?? { id: 'tmp', name: 'Unassigned', leadName: 'TBD', rate: 0 },
-                        job,
-                        note: '',
-                      })
-                    }}
-                  >
-                    Assign Crew
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {unassignedJobs.length === 0 ? (
+              <p className="empty-state">{loading ? 'Loading…' : 'All jobs are assigned.'}</p>
+            ) : (
+              <ul className="unassigned-list">
+                {unassignedJobs.map((item) => (
+                  <li key={item._id} className="unassigned-item">
+                    <span className="unassigned-item__name">{item.Name}</span>
+                    <CaretRight size={14} weight="bold" className="unassigned-item__chevron" />
+                    <button
+                      type="button"
+                      className="btn btn--primary btn--sm"
+                      onClick={() =>
+                        setFlow({
+                          step: 'assignCrew',
+                          crew: unassigned[0] ?? { id: 'tmp', name: 'Unassigned', leadName: 'TBD', rate: 0 },
+                          job: toJob(item),
+                          note: '',
+                        })
+                      }
+                    >
+                      Assign Crew
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </main>

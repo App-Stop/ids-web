@@ -55,7 +55,8 @@ export default function JobDetailsModal({
         id: fetchedJob._id,
         name: fetchedJob.name,
         color: job.color,
-        bidNo: String(1000 + (fetchedJob.jobIdNumber || 0)),
+        // The Job model has no bid number — keep whatever the caller had, if any.
+        bidNo: job.bidNo,
         jobNo: String(fetchedJob.jobIdNumber || 0),
         gc: fetchedJob.generalContractor || job.gc,
         estimator: job.estimator,
@@ -84,7 +85,7 @@ export default function JobDetailsModal({
   return (
     <Modal onClose={onDone} width={460}>
       <p className="job-head__meta">
-        Bid #{displayJob.bidNo} &middot; Job #{displayJob.jobNo}
+        {displayJob.bidNo ? `Bid #${displayJob.bidNo} · ` : ''}Job #{displayJob.jobNo}
       </p>
       <h2 className="modal-title" style={{ marginTop: '0.25rem' }}>
         {displayJob.name}

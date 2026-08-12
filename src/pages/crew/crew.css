@@ -3,60 +3,13 @@
    well in a desktop browser before it ships as a PWA. */
 
 .crew-app {
-  --crew-max: 560px;
-  --crew-topbar-h: 56px;
-  --crew-tabbar-h: 64px;
+  /* 402px artboard; the 16px gutters leave the design's 370px column. */
+  --crew-max: 402px;
+  --crew-tabbar-h: 102px;
   min-height: 100dvh;
-  background: var(--bg);
+  background: #f5f5f5;
   display: flex;
   flex-direction: column;
-}
-
-/* ---------- top bar ---------- */
-.crew-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: var(--crew-topbar-h);
-  padding: 0 16px;
-  padding-top: env(safe-area-inset-top);
-  height: calc(var(--crew-topbar-h) + env(safe-area-inset-top));
-  background: var(--card-bg);
-  border-bottom: 1px solid var(--border);
-}
-
-.crew-topbar__title {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--ink);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.crew-topbar__action {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.crew-topbar__action:active {
-  background: var(--field-bg);
 }
 
 /* ---------- content ---------- */
@@ -65,7 +18,11 @@
   width: 100%;
   max-width: var(--crew-max);
   margin: 0 auto;
-  padding: 16px 16px calc(var(--crew-tabbar-h) + env(safe-area-inset-bottom) + 24px);
+  /* Content starts 10px below the status bar in the frame (y=72 of an 62px
+     bar); the floor keeps it breathable in a desktop browser, where there
+     is no inset at all. */
+  padding: max(20px, calc(env(safe-area-inset-top, 0px) + 12px)) 16px
+    calc(var(--crew-tabbar-h) + env(safe-area-inset-bottom));
 }
 
 .crew-section-title {
@@ -119,7 +76,9 @@
   padding: 28px 8px;
 }
 
-/* ---------- bottom tab bar ---------- */
+/* ---------- floating tab bar ----------
+   A rounded pill sitting over a blurred gradient that fades the content out
+   behind it, per the Figma frames. */
 .crew-tabbar {
   position: fixed;
   left: 0;
@@ -127,145 +86,74 @@
   bottom: 0;
   z-index: 20;
   display: flex;
-  background: var(--card-bg);
-  border-top: 1px solid var(--border);
-  padding-bottom: env(safe-area-inset-bottom);
+  justify-content: center;
+  padding: 21px;
+  padding-bottom: calc(21px + env(safe-area-inset-bottom));
+  background: linear-gradient(
+    to top,
+    rgba(244, 244, 244, 0.7) 26.374%,
+    rgba(244, 244, 244, 0)
+  );
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+
+.crew-tabbar__pill {
+  pointer-events: auto;
+  width: 100%;
+  max-width: calc(var(--crew-max) - 42px);
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 1px solid #dcdcdc;
+  border-radius: 60px;
+  background: #fcfcfc;
+  box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.06);
 }
 
 .crew-tab {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  height: var(--crew-tabbar-h);
-  color: var(--muted);
+  gap: 4px;
+  padding: 6px 10px;
+  border: 0.5px solid transparent;
+  border-radius: 40px;
+  color: #6a6a6a;
   text-decoration: none;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 600;
   -webkit-tap-highlight-color: transparent;
 }
 
 .crew-tab.is-active {
-  color: var(--ink);
+  background: #f5f5f5;
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #111111;
 }
 
-.crew-tab.is-active .crew-tab__icon {
-  color: var(--yellow-dark);
-}
+/* Login and the other auth screens now live in crew-auth.css, built from
+   the Figma mobile frames. */
 
-.crew-tab__icon {
-  font-size: 22px;
-  line-height: 1;
-}
-
-@media (min-width: 640px) {
-  .crew-tabbar {
-    max-width: var(--crew-max);
-    margin: 0 auto;
-    border: 1px solid var(--border);
-    border-radius: 16px 16px 0 0;
-  }
-}
-
-/* ---------- login ---------- */
-.crew-login {
-  min-height: 100dvh;
+.crew-logout {
+  width: 100%;
+  margin-top: 12px;
+  min-height: 48px;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  padding: 32px 20px calc(32px + env(safe-area-inset-bottom));
-  background: var(--bg);
-}
-
-.crew-login__card {
-  width: 100%;
-  max-width: 400px;
-  margin: 0 auto;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
   background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 24px 20px;
-  box-shadow: var(--shadow);
-}
-
-.crew-login__title {
-  margin: 16px 0 4px;
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--ink);
-  text-align: center;
-}
-
-.crew-login__subtitle {
-  margin: 0 0 24px;
-  text-align: center;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.crew-field {
-  margin-bottom: 16px;
-}
-
-.crew-field label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 13px;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--ink);
-}
-
-.crew-input {
-  width: 100%;
-  /* 16px keeps iOS Safari from zooming the viewport on focus */
-  font: inherit;
-  font-size: 16px;
-  padding: 13px 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--field-bg);
-  color: var(--ink);
-}
-
-.crew-input:focus {
-  outline: 2px solid var(--yellow);
-  outline-offset: -1px;
-}
-
-.crew-submit {
-  width: 100%;
-  min-height: 50px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--yellow);
-  color: var(--ink);
-  font: inherit;
-  font-size: 16px;
-  font-weight: 700;
   cursor: pointer;
-}
-
-.crew-submit:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.crew-error {
-  margin: 0 0 14px;
-  color: #c0392b;
-  font-size: 14px;
-}
-
-.crew-login__alt {
-  margin: 18px 0 0;
-  text-align: center;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.crew-login__alt a {
-  color: var(--yellow-dark);
-  font-weight: 600;
 }

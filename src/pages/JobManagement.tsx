@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MagnifyingGlass, Plus, CaretDown, CaretLeft, CaretRight } from '@phosphor-icons/react'
+import { MagnifyingGlass, Plus, CaretLeft, CaretRight, PenIcon } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Topbar from '../components/dashboard/Topbar'
 import Dropdown from '../components/dashboard/Dropdown'
@@ -15,7 +15,8 @@ import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import { useAppStore } from '../lib/store'
 import { getJobs, deleteJob, type JobItem, type Pagination } from '../api/jobApi'
-import { type UserItem } from '../api/crewApi'
+import { getCrewsSummary, type CrewSummaryItem, type UserItem } from '../api/crewApi'
+import { crewColorFor } from '../lib/scheduleData'
 import { getErrorMessage } from '../lib/errors'
 import './JobsManagement.css'
 
@@ -99,6 +100,22 @@ export default function JobsManagement() {
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
   const { assignCrew } = useAppStore()
 
+  const [crewsList, setCrewsList] = useState<CrewSummaryItem[]>([])
+
+  useEffect(() => {
+    async function fetchCrews() {
+      try {
+        const res = await getCrewsSummary()
+        if (res.success && res.data) {
+          setCrewsList(res.data)
+        }
+      } catch (err) {
+        console.error('Failed to fetch crews summary:', err)
+      }
+    }
+    fetchCrews()
+  }, [])
+
   useEffect(() => {
     fetchJobsList()
   }, [page, limit, statusFilter, search, sortKey])
@@ -123,7 +140,7 @@ export default function JobsManagement() {
 
       if (res.success && Array.isArray(res.data)) {
         const mappedRows: Row[] = res.data.map((j: JobItem) => {
-          const crewObj = typeof j.assignToCrew === 'object' && j.assignToCrew !== null ? j.assignToCrew : null
+          const crewObj = typeof j.currentCrew === 'object' && j.currentCrew !== null ? j.currentCrew : null
           const crewLeadObj = crewObj && typeof crewObj.crewLead === 'object' && crewObj.crewLead !== null ? (crewObj.crewLead as UserItem) : null
           const leadName = crewLeadObj ? `${crewLeadObj.firstName || ''} ${crewLeadObj.lastName || ''}`.trim() : (crewObj?.name || 'Unassigned')
           const crewColor = crewObj?.crewColor || '#3b82f6'
@@ -238,9 +255,9 @@ export default function JobsManagement() {
             <p className="dash__subtitle">Master list of all projects</p>
           </div>
           <div className="sb-legend">
-            {assignableCrews.map((crew) => (
-              <span key={crew.id} className="sb-legend__item">
-                <i style={{ background: crew.color }} />
+            {crewsList.map((crew) => (
+              <span key={crew._id} className="sb-legend__item">
+                <i style={{ background: crewColorFor(crew._id, crew.crewColor) }} />
                 {crew.name}
               </span>
             ))}
@@ -263,17 +280,7 @@ export default function JobsManagement() {
           <span className="jm-count">{pagination.totalCount || jobs.length} Total Jobs</span>
 
           <div className="jm-toolbar__right">
-            <div className="jm-dd jm-dd--status">
-              <Dropdown
-                value={statusFilter ?? '__all'}
-                selectedLabel={statusFilter ? `${STATUS_OPTIONS.find((s) => s.id === statusFilter)?.label}` : 'All'}
-                onChange={(v) => {
-                  setStatusFilter(v === '__all' ? null : (v as JobStatus))
-                  setPage(1)
-                }}
-                options={[{ id: '__all', label: 'All' }, ...STATUS_OPTIONS.map((s) => ({ id: s.id, label: s.label }))]}
-              />
-            </div>
+
             <div className="jm-dd jm-dd--sort">
               <Dropdown
                 value={sortKey}
@@ -326,10 +333,17 @@ export default function JobsManagement() {
                 <th className="jm-center">Contract</th>
                 <th className="jm-center">Duration</th>
                 <th className="jm-center">
-                  <span className="jm-th-sort">
-                    Status
-                    <CaretDown size={12} weight="bold" />
-                  </span>
+                  <div style={{ display: 'inline-block', textAlign: 'left' }}>
+                    <Dropdown
+                      value={statusFilter ?? '__all'}
+                      selectedLabel={statusFilter ? `${STATUS_OPTIONS.find((s) => s.id === statusFilter)?.label}` : 'Status'}
+                      onChange={(v) => {
+                        setStatusFilter(v === '__all' ? null : (v as JobStatus))
+                        setPage(1)
+                      }}
+                      options={[{ id: '__all', label: 'All Statuses' }, ...STATUS_OPTIONS.map((s) => ({ id: s.id, label: s.label }))]}
+                    />
+                  </div>
                 </th>
                 <th className="jm-center">Labor Budget</th>
                 <th className="jm-center">Action</th>
@@ -441,11 +455,12 @@ export default function JobsManagement() {
                       <td className="jm-center">
                         <button
                           type="button"
-                          className="jm-action-btn"
+                          className="btn--primary btn"
                           onClick={() => setEditingId(job.id)}
-                          aria-label="Edit job"
+                          aria-label={`Edit job ${job.name}`}
                         >
-                          <Icon.Edit width={16} height={16} />
+                          <PenIcon size={20} />
+                          <p>Edit</p>
                         </button>
                       </td>
                     </tr>

@@ -4,7 +4,7 @@ import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import { Icon } from './icons'
 import { crewColors, type Job } from '../../lib/dashboardData'
-import { createJob, updateJob, getJobById, type CreateJobPayload, type UpdateJobPayload, type JobItem } from '../../api/jobApi'
+import { createJob, updateJob, getJobById, createCrewAssignment, type CreateJobPayload, type UpdateJobPayload, type JobItem } from '../../api/jobApi'
 import { getCrewsSummary, type UserItem } from '../../api/crewApi'
 import { parseApiErrors } from '../../lib/errors'
 
@@ -116,7 +116,11 @@ export default function CreateJobModal({
   const [contractAmount, setContractAmount] = useState<number | ''>(job?.contractAmount ?? '')
   const [laborBudgetTotal, setLaborBudgetTotal] = useState<number | ''>(job?.laborBudgetTotal ?? '')
   const [crewLeadId, setCrewLeadId] = useState<string | null>(null)
-  const [note, setNote] = useState('')
+  const [note, setNote] = useState<string>('')
+
+  const [assignCrewNow, setAssignCrewNow] = useState(false)
+  const [assignStartDate, setAssignStartDate] = useState<string>(toMdyDate(new Date().toISOString().slice(0, 10)))
+  const [assignEndDate, setAssignEndDate] = useState<string>('')
   const [presetId, setPresetId] = useState<string>('')
   const [availableCrews, setAvailableCrews] = useState<AvailableCrewItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -223,7 +227,6 @@ export default function CreateJobModal({
           gcSuper: gcSuper.trim() || undefined,
           idsSuper: idsSuper.trim() || undefined,
           siteAddress: siteAddress.trim(),
-          assignToCrew: crewLeadId || undefined,
           startDate: toIsoDate(startDate) || undefined,
           endDate: toIsoDate(endDate) || undefined,
           contractAmount: contractVal as any,
@@ -232,6 +235,23 @@ export default function CreateJobModal({
           status: 'awarded',
         }
         const res = await createJob(payload)
+        const createdJobId = res.data._id
+        if (assignCrewNow && crewLeadId && createdJobId) {
+          try {
+            await createCrewAssignment(createdJobId, {
+              crewId: crewLeadId,
+              startDate: toIsoDate(assignStartDate) || toIsoDate(startDate) || new Date().toISOString().slice(0, 10),
+              endDate: toIsoDate(assignEndDate) || undefined,
+              note: note.trim() || undefined,
+            })
+          } catch (assignErr: any) {
+            console.error('Failed to post crew assignment:', assignErr)
+            const parsedAssign = parseApiErrors(assignErr, 'Job was created, but crew assignment failed.')
+            setApiError(parsedAssign.generalMessage)
+            setFieldErrors(parsedAssign.fieldErrors)
+            return
+          }
+        }
         onSubmit(formData, res.data)
       } else {
         if (!job?.id) return
@@ -242,7 +262,6 @@ export default function CreateJobModal({
           gcSuper: gcSuper.trim() || null,
           idsSuper: idsSuper.trim() || null,
           siteAddress: siteAddress.trim(),
-          assignToCrew: crewLeadId || null,
           startDate: toIsoDate(startDate) || undefined,
           endDate: toIsoDate(endDate) || undefined,
           contractAmount: contractVal as any,
@@ -250,6 +269,22 @@ export default function CreateJobModal({
           note: note.trim() || undefined,
         }
         const res = await updateJob(job.id, patchPayload)
+        if (assignCrewNow && crewLeadId && job.id) {
+          try {
+            await createCrewAssignment(job.id, {
+              crewId: crewLeadId,
+              startDate: toIsoDate(assignStartDate) || toIsoDate(startDate) || new Date().toISOString().slice(0, 10),
+              endDate: toIsoDate(assignEndDate) || undefined,
+              note: note.trim() || undefined,
+            })
+          } catch (assignErr: any) {
+            console.error('Failed to post crew assignment:', assignErr)
+            const parsedAssign = parseApiErrors(assignErr, 'Job was updated, but crew assignment failed.')
+            setApiError(parsedAssign.generalMessage)
+            setFieldErrors(parsedAssign.fieldErrors)
+            return
+          }
+        }
         onSubmit(formData, res.data)
       }
     } catch (err: any) {
@@ -409,33 +444,59 @@ export default function CreateJobModal({
           </div>
 
           <div className="job-form-modal__side">
-            <label className="field-label">Assign Crew <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
-            <Dropdown
-              value={crewLeadId ?? ''}
-              placeholder="-"
-              onChange={(id) => setCrewLeadId(id || null)}
-              selectedLabel={
-                selectedCrew && (
-                  <span className="dd__avatar-label">
-                    <Avatar name={selectedCrew.name} src={selectedCrew.avatar} size={24} />
-                    {selectedCrew.name}
-                  </span>
-                )
-              }
-              options={[
-                { id: '', label: 'None' },
-                ...availableCrews.map((c) => ({
-                  id: c.id,
-                  label: (
-                    <span className="dd__crew-label">
-                      <Avatar name={c.leadName} src={c.avatar} size={24} />
-                      <span className="dd__crew-label__text">{c.name}</span>
-                      <i className="dot" style={{ background: c.color }} />
-                    </span>
-                  ),
-                })),
-              ]}
-            />
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={assignCrewNow}
+                  onChange={(e) => setAssignCrewNow(e.target.checked)}
+                />
+                <span>Assign crew now</span>
+              </label>
+            </div>
+
+            {assignCrewNow && (
+              <>
+                <label className="field-label">Assign Crew*</label>
+                <Dropdown
+                  value={crewLeadId ?? ''}
+                  placeholder="Select crew"
+                  onChange={(id) => setCrewLeadId(id || null)}
+                  selectedLabel={
+                    selectedCrew && (
+                      <span className="dd__avatar-label">
+                        <Avatar name={selectedCrew.name} src={selectedCrew.avatar} size={24} />
+                        {selectedCrew.name}
+                      </span>
+                    )
+                  }
+                  options={[
+                    { id: '', label: 'None' },
+                    ...availableCrews.map((c) => ({
+                      id: c.id,
+                      label: (
+                        <span className="dd__crew-label">
+                          <Avatar name={c.leadName} src={c.avatar} size={24} />
+                          <span className="dd__crew-label__text">{c.name}</span>
+                          <i className="dot" style={{ background: c.color }} />
+                        </span>
+                      ),
+                    })),
+                  ]}
+                />
+
+                <div className="field-row" style={{ marginTop: '12px' }}>
+                  <div>
+                    <label className="field-label">Assignment Start Date*</label>
+                    <DatePickerField value={assignStartDate} onChange={setAssignStartDate} />
+                  </div>
+                  <div>
+                    <label className="field-label">Assignment End Date</label>
+                    <DatePickerField value={assignEndDate} onChange={setAssignEndDate} />
+                  </div>
+                </div>
+              </>
+            )}
 
             <label className="field-label">Add a note <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
             <textarea

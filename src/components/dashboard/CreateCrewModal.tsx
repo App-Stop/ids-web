@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import Modal from './Modal'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
-import { crewColors, crewLeads as fallbackCrewLeads, type Job } from '../../lib/dashboardData'
+import { crewColors, type Job } from '../../lib/dashboardData'
 import { Icon } from './icons'
 import { createCrew, updateCrew, getCrewById, getUsers, type CreateCrewPayload, type UpdateCrewPayload, type CrewDataResponse, type UserItem } from '../../api/crewApi'
 import { getErrorMessage, parseApiErrors } from '../../lib/errors'
@@ -48,7 +48,11 @@ export default function CreateCrewModal({
   jobs: Job[]
   crew?: EditableCrew
   onCancel: () => void
-  onSubmit: (data: CrewFormData, apiResponse?: CrewDataResponse) => void
+  /**
+   * `assignedJobId` is the job picked in create mode — POST /crews can't attach
+   * a job, so the caller follows up with a crew assignment on that job.
+   */
+  onSubmit: (data: CrewFormData, apiResponse?: CrewDataResponse, assignedJobId?: string | null) => void
   onRemove?: () => void
 }) {
   const isEdit = !!crew
@@ -132,9 +136,8 @@ export default function CreateCrewModal({
   }, [isEdit, crew?.id])
 
   const selectedLead = availableLeads.find((c) => c._id === crewLeadId)
-  const fallbackLead = fallbackCrewLeads.find((c) => c.id === crewLeadId)
-  const selectedLeadName = selectedLead ? `${selectedLead.firstName} ${selectedLead.lastName}`.trim() : fallbackLead?.name
-  const selectedLeadRate = selectedLead ? selectedLead.hourlyRate : fallbackLead?.rate
+  const selectedLeadName = selectedLead ? `${selectedLead.firstName} ${selectedLead.lastName}`.trim() : undefined
+  const selectedLeadRate = selectedLead?.hourlyRate
 
   const selectedJob = jobs.find((j) => j.id === jobId)
   const canSubmit = Boolean(crewName.trim() && crewLeadId) && !isSubmitting
@@ -218,7 +221,7 @@ export default function CreateCrewModal({
           crewColor: color,
         }
         const response = await createCrew(payload)
-        onSubmit(formData, response.data)
+        onSubmit(formData, response.data, jobId)
       } else {
         const patchPayload: UpdateCrewPayload = {
           name: crewName.trim(),
@@ -274,35 +277,23 @@ export default function CreateCrewModal({
         selectedLabel={
           selectedLeadName && (
             <span className="dd__avatar-label">
-              <Avatar name={selectedLeadName} src={`https://i.pravatar.cc/64?img=${(crewLeadId?.charCodeAt(0) || 5) % 70}`} size={24} />
+              <Avatar name={selectedLeadName} size={24} />
               {selectedLeadName} {selectedLeadRate ? `($${selectedLeadRate}/h)` : ''}
             </span>
           )
         }
-        options={
-          availableLabors.length > 0 || availableLeads.length > 0
-            ? availableLeads.map((c) => {
-                const name = `${c.firstName} ${c.lastName}`.trim()
-                return {
-                  id: c._id,
-                  label: (
-                    <span className="dd__avatar-label">
-                      <Avatar name={name} src={`https://i.pravatar.cc/64?img=${(c._id.charCodeAt(0) || 5) % 70}`} size={24} />
-                      {name} {c.hourlyRate ? `($${c.hourlyRate}/h)` : ''}
-                    </span>
-                  ),
-                }
-              })
-            : fallbackCrewLeads.map((c) => ({
-                id: c.id,
-                label: (
-                  <span className="dd__avatar-label">
-                    <Avatar name={c.name} src={c.avatar} size={24} />
-                    {c.name} (${c.rate}/h)
-                  </span>
-                ),
-              }))
-        }
+        options={availableLeads.map((c) => {
+          const name = `${c.firstName} ${c.lastName}`.trim()
+          return {
+            id: c._id,
+            label: (
+              <span className="dd__avatar-label">
+                <Avatar name={name} size={24} />
+                {name} {c.hourlyRate ? `($${c.hourlyRate}/h)` : ''}
+              </span>
+            ),
+          }
+        })}
       />
 
       <label className="field-label">{isEdit ? 'Add Members (Labors)' : 'Members (Labors)*'}</label>
@@ -326,7 +317,7 @@ export default function CreateCrewModal({
             label: (
               <span className="dd__avatar-label" style={{ justifyContent: 'space-between', width: '100%' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                  <Avatar name={name} src={`https://i.pravatar.cc/64?img=${(m._id.charCodeAt(0) || 10) % 70}`} size={24} />
+                  <Avatar name={name} size={24} />
                   {name} {m.hourlyRate ? `($${m.hourlyRate}/h)` : ''}
                 </span>
                 {isSelected && <span style={{ color: '#22c55e', fontWeight: 'bold' }}>✓</span>}

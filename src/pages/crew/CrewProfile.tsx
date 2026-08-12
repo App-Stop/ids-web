@@ -1,7 +1,16 @@
+import { useNavigate } from 'react-router-dom'
+import { SignOut } from '@phosphor-icons/react'
 import { useAuth } from '../../context/AuthContext'
+import { CREW_LOGIN_PATH } from '../../components/ProtectedRoute'
 
 export default function CrewProfile() {
-  const { user, role } = useAuth()
+  const { user, role, logout } = useAuth()
+  const navigate = useNavigate()
+
+  function onLogout() {
+    logout()
+    navigate(CREW_LOGIN_PATH, { replace: true })
+  }
 
   return (
     <>
@@ -15,6 +24,11 @@ export default function CrewProfile() {
         </p>
         <span className="crew-role-chip">{role?.replace('-', ' ')}</span>
       </div>
+
+      <button type="button" className="crew-logout" onClick={onLogout}>
+        <SignOut size={18} />
+        Log out
+      </button>
     </>
   )
 }
