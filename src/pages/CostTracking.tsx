@@ -211,7 +211,7 @@ function getCurrentWeekRange() {
   return { start: toISO(monday), end: toISO(sunday) }
 }
 
-const DEFAULT_RANGE = getCurrentMonthRange()
+const DEFAULT_RANGE = getCurrentWeekRange()
 
 function toDetailsJob(row: JobCostRow, catalog: Job[]): Job {
   const match = catalog.find((j) => j.name === row.jobName)
@@ -237,7 +237,7 @@ function toDetailsJob(row: JobCostRow, catalog: Job[]): Job {
 export default function CostTracking() {
   const [isPhone, setIsPhone] = useState(() => window.innerWidth <= 720)
   const [tab, setTab] = useState<ViewMode>('jobs')
-  const [range, setRange] = useState<RangeMode>('Custom Range')
+  const [range, setRange] = useState<RangeMode>('Weekly')
   const [search, setSearch] = useState('')
   const [jobFilter, setJobFilter] = useState<string | null>(null)
   const [crewFilter, setCrewFilter] = useState<string | null>(null)
