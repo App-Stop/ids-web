@@ -5,8 +5,9 @@ import Avatar from './Avatar'
 import { Icon } from './icons'
 import LocationPickerInput from './LocationPickerInput'
 import { crewColors, type Job } from '../../lib/dashboardData'
-import { createJob, updateJob, getJobById, createCrewAssignment, type CreateJobPayload, type UpdateJobPayload, type JobItem } from '../../api/jobApi'
-import { getCrewsSummary, type UserItem } from '../../api/crewApi'
+import { createJob, updateJob, createCrewAssignment, type CreateJobPayload, type UpdateJobPayload, type JobItem } from '../../api/jobApi'
+import { type UserItem } from '../../api/crewApi'
+import { useCachedFetchers } from '../../hooks/useQueryHooks'
 import { parseApiErrors } from '../../lib/errors'
 
 export interface JobFormData {
@@ -129,6 +130,7 @@ export default function CreateJobModal({
   const [availableCrews, setAvailableCrews] = useState<AvailableCrewItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(true)
+  const { fetchCrewsSummary, fetchJobById } = useCachedFetchers()
   const [apiError, setApiError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const color = job?.color ?? crewColors[0]
@@ -137,7 +139,7 @@ export default function CreateJobModal({
     async function loadData() {
       setIsLoadingData(true)
       try {
-        const crewsRes = await getCrewsSummary()
+        const crewsRes = await fetchCrewsSummary()
         if (crewsRes.success && Array.isArray(crewsRes.data)) {
           const crews: AvailableCrewItem[] = crewsRes.data.map((c) => {
             const leadObj = typeof c.crewLead === 'object' && c.crewLead !== null ? (c.crewLead as UserItem) : null
@@ -155,7 +157,7 @@ export default function CreateJobModal({
         }
 
         if (isEdit && job?.id) {
-          const jobRes = await getJobById(job.id)
+          const jobRes = await fetchJobById(job.id)
           if (jobRes && jobRes.success && jobRes.data) {
             const j = jobRes.data
             if (j.jobIdNumber !== undefined && j.jobIdNumber !== null) setJobIdNumber(j.jobIdNumber)
@@ -370,7 +372,7 @@ export default function CreateJobModal({
                 <input
                   type="number"
                   className={`field-input${fieldErrors.jobIdNumber ? ' field-input--error' : ''}`}
-                  placeholder="Auto-generated"
+                  placeholder="Optional"
                   value={jobIdNumber}
                   onChange={(e) => setJobIdNumber(e.target.value === '' ? '' : Number(e.target.value))}
                 />
@@ -401,7 +403,7 @@ export default function CreateJobModal({
             />
             {fieldErrors.siteAddress && <span className="field-error-text">{fieldErrors.siteAddress}</span>}
 
-            <label className="field-label">General Contractor*</label>
+            <label className="field-label">General Contractor</label>
             <input
               className={`field-input${fieldErrors.generalContractor || fieldErrors.gc ? ' field-input--error' : ''}`}
               placeholder="Enter GC Name"
@@ -414,7 +416,7 @@ export default function CreateJobModal({
 
             <div className="field-row">
               <div style={{ flex: 1 }}>
-                <label className="field-label">GC Super <span style={{ color: '#000', fontWeight: 400 }}>*</span></label>
+                <label className="field-label">GC Super</label>
                 <input
                   className={`field-input${fieldErrors.gcSuper ? ' field-input--error' : ''}`}
                   placeholder="General Contractor Superintendent"
@@ -424,7 +426,7 @@ export default function CreateJobModal({
                 {fieldErrors.gcSuper && <span className="field-error-text">{fieldErrors.gcSuper}</span>}
               </div>
               <div style={{ flex: 1 }}>
-                <label className="field-label">IDS Super <span style={{ color: '#000', fontWeight: 400 }}>*</span></label>
+                <label className="field-label">IDS Super</label>
                 <input
                   className={`field-input${fieldErrors.idsSuper ? ' field-input--error' : ''}`}
                   placeholder="IDS Superintendent Name"
@@ -457,7 +459,15 @@ export default function CreateJobModal({
                     type="number"
                     placeholder="0"
                     value={contractAmount}
-                    onChange={(e) => setContractAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? '' : Number(e.target.value)
+                      setContractAmount(val)
+                      if (val === '') {
+                        setLaborBudgetTotal('')
+                      } else {
+                        setLaborBudgetTotal(Math.round(val * 0.4))
+                      }
+                    }}
                   />
                 </div>
                 {fieldErrors.contractAmount && <span className="field-error-text">{fieldErrors.contractAmount}</span>}

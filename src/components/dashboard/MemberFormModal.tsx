@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Icon } from './icons'
 import MenuDropdown from './MenuDropdown'
 import type { CrewMenuOption, Status } from '../../lib/crewData'
-import { createUser, updateUser, getUserById, getCrewsSummary, type CreateUserPayload, type UpdateUserPayload, type UserResponseData } from '../../api/crewApi'
+import { createUser, updateUser, type CreateUserPayload, type UpdateUserPayload, type UserResponseData } from '../../api/crewApi'
+import { useCachedFetchers } from '../../hooks/useQueryHooks'
 import { parseApiErrors } from '../../lib/errors'
 import './crew-modals.css'
 
@@ -59,14 +60,15 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
   const [customPassword, setCustomPassword] = useState('')
   const [availableCrews, setAvailableCrews] = useState<CrewMenuOption[]>(crews)
   const [isLoadingData, setIsLoadingData] = useState(true)
+  const { fetchCrewsSummary, fetchUserById } = useCachedFetchers()
 
   useEffect(() => {
     async function loadData() {
       setIsLoadingData(true)
       try {
         const [crewsRes, userRes] = await Promise.all([
-          getCrewsSummary(),
-          mode === 'edit' && initial?.memberId ? getUserById(initial.memberId).catch(() => null) : Promise.resolve(null),
+          fetchCrewsSummary(),
+          mode === 'edit' && initial?.memberId ? fetchUserById(initial.memberId).catch(() => null) : Promise.resolve(null),
         ])
 
         let loadedCrews: CrewMenuOption[] = availableCrews
@@ -260,7 +262,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
               className={`cm-input${fieldErrors.firstName ? ' field-input--error' : ''}`}
               value={form.firstName}
               onChange={(e) => update('firstName', e.target.value)}
-              placeholder="John"
+              placeholder="Enter First Name"
             />
             {fieldErrors.firstName && <span className="field-error-text">{fieldErrors.firstName}</span>}
           </label>
@@ -270,7 +272,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
               className={`cm-input${fieldErrors.lastName ? ' field-input--error' : ''}`}
               value={form.lastName}
               onChange={(e) => update('lastName', e.target.value)}
-              placeholder="Verdan"
+              placeholder="Enter Last Name"
             />
             {fieldErrors.lastName && <span className="field-error-text">{fieldErrors.lastName}</span>}
           </label>
@@ -284,7 +286,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
                 className="cm-input__bare"
                 value={form.emailLocalPart}
                 onChange={(e) => update('emailLocalPart', e.target.value)}
-                placeholder="johndoe"
+                placeholder="youremail"
               />
               <span className="cm-input__suffix">@idsdemo.com</span>
             </span>
@@ -310,7 +312,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
         </label>
 
         <label className="cm-field">
-          <span className="cm-field__label">Hourly Rate</span>
+          <span className="cm-field__label">Hourly Rate *</span>
           <span className={`cm-input cm-input--split${fieldErrors.hourlyRate || fieldErrors.rate ? ' field-input--error' : ''}`}>
             <span className="cm-input__prefix">$</span>
             <input
@@ -318,7 +320,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
               inputMode="decimal"
               value={form.rate}
               onChange={(e) => update('rate', e.target.value)}
-              placeholder="20"
+              placeholder="Enter Hourly Rate"
             />
           </span>
           {(fieldErrors.hourlyRate || fieldErrors.rate) && (

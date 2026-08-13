@@ -4,8 +4,9 @@ import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import { crewColors, type Job } from '../../lib/dashboardData'
 import { Icon } from './icons'
-import { createCrew, updateCrew, getCrewById, getCrewsSummary, removeCrewMember, type CreateCrewPayload, type UpdateCrewPayload, type CrewDataResponse, type UserItem } from '../../api/crewApi'
+import { createCrew, updateCrew, removeCrewMember, type CreateCrewPayload, type UpdateCrewPayload, type CrewDataResponse, type UserItem } from '../../api/crewApi'
 import { getErrorMessage, parseApiErrors } from '../../lib/errors'
+import { useCachedFetchers } from '../../hooks/useQueryHooks'
 
 export type CrewStatus = 'active' | 'inactive' | 'unassigned'
 
@@ -34,13 +35,13 @@ export interface EditableCrew {
 }
 
 export default function CreateCrewModal({
-  jobs,
+  jobs: _jobs,
   crew,
   onCancel,
   onSubmit,
   onRemove,
 }: {
-  jobs: Job[]
+  jobs?: Job[]
   crew?: EditableCrew
   onCancel: () => void
   /**
@@ -57,7 +58,7 @@ export default function CreateCrewModal({
   const [crewLeadId, setCrewLeadId] = useState<string | null>(crew?.crewLeadId ?? null)
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(crew?.members ?? [])
   const [laborNames, setLaborNames] = useState<string[]>(crew?.laborNames ?? [])
-  const [jobId, setJobId] = useState<string | null>(crew?.jobId ?? null)
+  const jobId = crew?.jobId ?? null
   const [status, setStatus] = useState<string>(crew?.status === 'unassigned' ? 'un-assigned' : 'assigned')
   const [color, setColor] = useState(crew?.color ?? crewColors[0])
   const [note, setNote] = useState(crew?.note ?? '')
@@ -65,6 +66,7 @@ export default function CreateCrewModal({
   const [laborError, setLaborError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(true)
+  const { fetchCrewsSummary, fetchCrewById } = useCachedFetchers()
   const [apiError, setApiError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
@@ -86,7 +88,7 @@ export default function CreateCrewModal({
     const timer = setTimeout(async () => {
       setIsLoadingData(true)
       try {
-        const usersRes = await getCrewsSummary({
+        const usersRes = await fetchCrewsSummary({
           statusEmployee: 'roster',
           status: 'active',
           search: (leadSearch || memberSearch) ? (leadSearch || memberSearch) : undefined,
@@ -143,7 +145,7 @@ export default function CreateCrewModal({
     async function loadEditData() {
       if (isEdit && crew?.id) {
         try {
-          const crewRes = await getCrewById(crew.id)
+          const crewRes = await fetchCrewById(crew.id)
           if (crewRes.success && crewRes.data) {
             const cData = crewRes.data
             setCrewName(cData.name || '')
@@ -219,7 +221,6 @@ export default function CreateCrewModal({
     }
   }
 
-  const selectedJob = jobs.find((j) => j.id === jobId)
   const canSubmit = Boolean(crewName.trim() && crewLeadId) && !isSubmitting && !isLoadingData
 
   function toggleMember(memberId: string, memberName: string) {
@@ -479,18 +480,6 @@ export default function CreateCrewModal({
 
       {!isEdit && (
         <>
-          <label className="field-label">Assign Job</label>
-          <Dropdown
-            value={jobId}
-            placeholder="-"
-            onChange={setJobId}
-            selectedLabel={selectedJob?.name}
-            options={jobs.map((j) => ({
-              id: j.id,
-              label: j.name,
-            }))}
-          />
-
           <label className="field-label">Crew Color</label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div className="color-picker" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>

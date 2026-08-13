@@ -8,7 +8,8 @@ import {
   SignOut,
 } from '@phosphor-icons/react'
 import { useAuth } from '../../context/AuthContext'
-import { getJobs, type JobItem } from '../../api/jobApi'
+import { type JobItem } from '../../api/jobApi'
+import { useJobsList } from '../../hooks/useQueryHooks'
 import {
   WEEKLY_TARGET_HOURS,
   endShift,
@@ -63,27 +64,14 @@ export default function CrewHome() {
   const [now, setNow] = useState(() => new Date())
   const [open, setOpen] = useState<OpenShift | null>(() => getOpenShift())
   const [punching, setPunching] = useState(false)
-  const [job, setJob] = useState<JobItem | null>(null)
-  const [jobError, setJobError] = useState(false)
+  const jobQuery = useJobsList({ status: 'in-progress', limit: 1 })
+  const job: JobItem | null = jobQuery.data?.[0] ?? null
+  const jobError = Boolean(jobQuery.error)
 
   // Drives the clock readout and the running hours total.
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(id)
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    getJobs({ status: 'in-progress', limit: 1 })
-      .then((res) => {
-        if (!cancelled) setJob(res.data?.[0] ?? null)
-      })
-      .catch(() => {
-        if (!cancelled) setJobError(true)
-      })
-    return () => {
-      cancelled = true
-    }
   }, [])
 
   const onPunch = useCallback(async () => {

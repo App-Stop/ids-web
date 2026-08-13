@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import SignIn from './pages/SignIn'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
-import Dashboard from './pages/Dashboard'
 import ScheduleBoard from './pages/ScheduleBoard'
 import JobsManagement from './pages/JobManagement'
 import Crew from './pages/Crew'
@@ -25,7 +24,6 @@ function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* ---- admin console ---- */}
-      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/schedule-board" element={<ProtectedRoute><ScheduleBoard /></ProtectedRoute>} />
       <Route path="/jobs-management" element={<ProtectedRoute><JobsManagement /></ProtectedRoute>} />
       <Route path="/cost-tracking" element={<ProtectedRoute><CostTracking /></ProtectedRoute>} />

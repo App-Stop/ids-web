@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import Modal from './Modal'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
-import { createCrewAssignment, getJobs, type JobItem } from '../../api/jobApi'
+import { createCrewAssignment, type JobItem } from '../../api/jobApi'
+import { useJobsList } from '../../hooks/useQueryHooks'
 import { parseApiErrors } from '../../lib/errors'
 import type { Job, UnassignedCrew } from '../../lib/dashboardData'
 
@@ -21,31 +22,19 @@ export default function AssignJobModal({
   onAssign?: (jobId: string, note: string) => void
   onSuccess?: () => void
 }) {
-  const [apiJobs, setApiJobs] = useState<{ id: string; name: string }[]>([])
-  const [loadingJobs, setLoadingJobs] = useState(!jobs || jobs.length === 0)
-  const jobOptions = (jobs && jobs.length > 0) ? jobs : apiJobs
+  const needsFetch = !jobs || jobs.length === 0
+  const { data: fetchedJobs = [], isPending } = useJobsList({ limit: 100 }, needsFetch)
+  const loadingJobs = needsFetch && isPending
 
-  useEffect(() => {
-    if (jobs && jobs.length > 0) return
-    async function fetchJobs() {
-      try {
-        const res = await getJobs({ limit: 100 })
-        if (res.success && Array.isArray(res.data)) {
-          setApiJobs(res.data.map((j: JobItem) => ({ id: j._id, name: j.name })))
-        }
-      } catch (err) {
-        console.error('Failed to fetch jobs in AssignJobModal:', err)
-      } finally {
-        setLoadingJobs(false)
-      }
-    }
-    fetchJobs()
-  }, [jobs])
+  const apiJobs = useMemo(
+    () => fetchedJobs.map((j: JobItem) => ({ id: j._id, name: j.name })),
+    [fetchedJobs],
+  )
+  const jobOptions = needsFetch ? apiJobs : jobs!
 
   const [jobId, setJobId] = useState<string | null>(null)
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState<string>('')
-  const [note, setNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -60,9 +49,8 @@ export default function AssignJobModal({
         crewId: crew.id,
         startDate,
         endDate: endDate || undefined,
-        note: note.trim() || undefined,
       })
-      onAssign?.(jobId, note)
+      onAssign?.(jobId, '')
       onSuccess?.()
       onCancel()
     } catch (err: any) {
@@ -120,14 +108,6 @@ export default function AssignJobModal({
       <p className="field-hint" style={{ marginTop: '0.35rem', fontSize: '0.75rem', opacity: 0.7 }}>
         Leave End Date empty for an open-ended assignment.
       </p>
-
-      <label className="field-label" style={{ marginTop: '1rem' }}>Add a note <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
-      <textarea
-        className="field-textarea"
-        placeholder="Note about the job..."
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
 
       {error && (
         <div style={{ color: '#ef4444', marginTop: '0.75rem', fontSize: '0.875rem' }}>

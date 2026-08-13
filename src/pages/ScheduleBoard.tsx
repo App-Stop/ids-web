@@ -30,21 +30,17 @@ import ScheduleMoveModal from '../components/dashboard/ScheduleMoveModal'
 import ScheduleExtendModal from '../components/dashboard/ScheduleExtendModal'
 import { Icon } from '../components/dashboard/icons'
 import {
-  getSchedule,
   createCrewAssignment,
   updateCrewAssignment,
   deleteCrewAssignment,
   type CrewAssignment,
+  type GetScheduleResponse,
   type ScheduleJobRow,
 } from '../api/jobApi'
-import {
-  getDayNotes,
-  createDayNote,
-  updateDayNote,
-  deleteDayNote,
-  type DayNote,
-} from '../api/noteApi'
-import { getCrewsSummary, type CrewSummaryItem } from '../api/crewApi'
+import { createDayNote, updateDayNote, deleteDayNote, type DayNote } from '../api/noteApi'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCrewsSummary, useJobsList, useScheduleData, useDayNotesData } from '../hooks/useQueryHooks'
+import { queryKeys } from '../lib/queryKeys'
 import { getErrorMessage } from '../lib/errors'
 import {
   toISO,
@@ -365,6 +361,7 @@ function DayCell({
   occupied = false,
   /** This day is inside the run the hovered drop would take over. */
   replacing = false,
+  disabled = false,
   children,
 }: {
   jobId: string
@@ -372,11 +369,13 @@ function DayCell({
   compact: boolean
   occupied?: boolean
   replacing?: boolean
+  disabled?: boolean
   children?: React.ReactNode
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${jobId}__${iso}`,
     data: { jobId, date: iso },
+    disabled,
   })
 
   // A takeover highlights the displaced crew's whole run in red; an ordinary
@@ -386,9 +385,11 @@ function DayCell({
   return (
     <td
       ref={setNodeRef}
-      className={`${compact ? 'sb-cell sb-cell--compact' : 'sb-cell'}${occupied ? ' sb-cell--occupied' : ''}${highlight}`}
+      className={`${compact ? 'sb-cell sb-cell--compact' : 'sb-cell'}${occupied ? ' sb-cell--occupied' : ''}${
+        disabled ? ' sb-cell--disabled' : ''
+      }${highlight}`}
     >
-      {children}
+      {disabled ? null : children}
     </td>
   )
 }
@@ -409,12 +410,7 @@ export default function ScheduleBoard() {
   const daysTableRef = useRef<HTMLTableElement>(null)
   const boardScrollRef = useRef<HTMLDivElement>(null)
 
-  const [rows, setRows] = useState<ScheduleJobRow[]>([])
-  const [dayNotes, setDayNotes] = useState<DayNote[]>([])
-  const [crews, setCrews] = useState<CrewSummaryItem[]>([])
-  const [pickerJobs, setPickerJobs] = useState<Array<{ id: string; label: string }>>([])
-  const [loading, setLoading] = useState(true)
-  const [banner, setBanner] = useState<string | null>(null)
+  const [actionBanner, setBanner] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
 
@@ -461,76 +457,88 @@ export default function ScheduleBoard() {
     return () => clearTimeout(id)
   }, [searchInput])
 
-  // Crew roster drives the legend, the pill colors and the assign picker.
-  useEffect(() => {
-    let cancelled = false
-    getCrewsSummary()
-      .then((res) => {
-        if (!cancelled) setCrews(res.data)
-      })
-      .catch((err) => {
-        if (!cancelled) setBanner(getErrorMessage(err, 'Could not load crews.'))
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const queryClient = useQueryClient()
+
+  // Crew roster drives the legend, the pill colors and the assign picker. It is
+  // the same cache entry every other screen reads, so paging around the board
+  // never re-requests it.
+  const { data: crews = [], error: crewsError } = useCrewsSummary()
+
+  const scheduleParams = useMemo(
+    () => ({
+      startDate: rangeStart,
+      view: viewMode,
+      ...(search ? { search } : {}),
+      ...(jobFilter ? { jobId: jobFilter } : {}),
+    }),
+    [rangeStart, viewMode, search, jobFilter],
+  )
+
+  const scheduleQuery = useScheduleData(scheduleParams)
+  const rows: ScheduleJobRow[] = useMemo(() => scheduleQuery.data?.jobs ?? [], [scheduleQuery.data])
+  const loading = scheduleQuery.isPending
 
   /**
    * Day notes currently come from /notes. Once the schedule endpoint embeds a
-   * `notes` array per job row, this whole call goes away — the response is
-   * already read preferentially below.
+   * `notes` array per job row this query switches itself off — the embedded
+   * copy is read preferentially.
    */
-  const loadDayNotes = useCallback(
-    async (jobRows: ScheduleJobRow[], from: string, to: string) => {
-      const embedded = jobRows.some((row) => row.notes !== undefined)
-      if (embedded) {
-        return jobRows.flatMap((row) =>
-          (row.notes ?? []).map((n) => ({ ...n, createdAt: '', updatedAt: '' }) as DayNote),
-        )
-      }
-      const res = await getDayNotes({ dateFrom: from, dateTo: to })
-      return res.data
+  const notesEmbedded = rows.some((row) => row.notes !== undefined)
+  const notesParams = useMemo(
+    () => ({ dateFrom: rangeStart, dateTo: rangeEnd }),
+    [rangeStart, rangeEnd],
+  )
+  const notesQuery = useDayNotesData(notesParams, scheduleQuery.isSuccess && !notesEmbedded)
+
+  const dayNotes: DayNote[] = useMemo(() => {
+    if (notesEmbedded) {
+      return rows.flatMap((row) =>
+        (row.notes ?? []).map((n) => ({ ...n, createdAt: '', updatedAt: '' }) as DayNote),
+      )
+    }
+    return notesQuery.data ?? []
+  }, [notesEmbedded, rows, notesQuery.data])
+
+  /**
+   * Optimistic write straight into the cached schedule so a dragged stint lands
+   * instantly. Rolled back by re-applying the previous rows if the write fails.
+   */
+  const patchRows = useCallback(
+    (updater: (list: ScheduleJobRow[]) => ScheduleJobRow[]) => {
+      queryClient.setQueryData<GetScheduleResponse['data']>(
+        queryKeys.schedule.list(scheduleParams),
+        (current) => (current ? { ...current, jobs: updater(current.jobs) } : current),
+      )
     },
-    [],
+    [queryClient, scheduleParams],
   )
 
+  /** Re-reads the board from the server and resolves once it has landed. */
   const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await getSchedule({
-        startDate: rangeStart,
-        view: viewMode,
-        ...(search ? { search } : {}),
-        ...(jobFilter ? { jobId: jobFilter } : {}),
-      })
-      setRows(res.data.jobs)
-      setBanner(null)
-      // Accumulate job options for the filter dropdown from fetched jobs without extra API calls
-      setPickerJobs((prev) => {
-        const map = new Map(prev.map((j) => [j.id, j]))
-        for (const j of res.data.jobs) {
-          map.set(j._id, { id: j._id, label: j.name ?? `Job ${j.jobIdNumber}` })
-        }
-        return Array.from(map.values())
-      })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.schedule.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.dayNotes.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSummary }),
+    ])
+  }, [queryClient])
 
-      try {
-        setDayNotes(await loadDayNotes(res.data.jobs, rangeStart, rangeEnd))
-      } catch {
-        setDayNotes([])
-      }
-    } catch (err) {
-      setBanner(getErrorMessage(err, 'Could not load the schedule.'))
-      setRows([])
-    } finally {
-      setLoading(false)
-    }
-  }, [rangeStart, rangeEnd, viewMode, search, jobFilter, loadDayNotes])
+  // A failed load speaks through the same banner as a failed write, but it is
+  // derived rather than stored — the query owns that state.
+  const loadError = scheduleQuery.error ?? crewsError
+  const banner =
+    actionBanner ?? (loadError ? getErrorMessage(loadError, 'Could not load the schedule.') : null)
 
-  useEffect(() => {
-    void load()
-  }, [load])
+  /**
+   * The job filter reads the shared jobs cache the other screens fill, so it
+   * lists every job rather than only the ones whose range happens to have been
+   * visited — and normally costs no request.
+   */
+  const { data: allJobs = [] } = useJobsList({ limit: 100 })
+  const pickerJobs = useMemo(
+    () => allJobs.map((j) => ({ id: j._id, label: j.name ?? `Job ${j.jobIdNumber}` })),
+    [allJobs],
+  )
 
   useEffect(() => {
     if (viewMode !== 'weekly') return
@@ -616,6 +624,7 @@ export default function ScheduleBoard() {
       startDate: draft.startDate,
       // Omitting endDate leaves the stint open-ended.
       ...(draft.endDate ? { endDate: draft.endDate } : {}),
+      ...(draft.excludeWeekends !== undefined ? { excludeWeekends: draft.excludeWeekends } : {}),
       ...(draft.note ? { note: draft.note } : {}),
     }
   }
@@ -780,7 +789,7 @@ export default function ScheduleBoard() {
     const recreate = needsRecreate(source, newEnd, targetJobId)
 
     const previous = rows
-    setRows((list) =>
+    patchRows((list) =>
       list.map((row) => {
         if (row._id === targetJobId) {
           const kept = row.assignments.filter(
@@ -834,7 +843,7 @@ export default function ScheduleBoard() {
       return true
     } catch (err) {
       await restoreAssignments(targetJobId, removed)
-      setRows(previous)
+      patchRows(() => previous)
       // Reported in the confirm modal, which stays open so the move can be
       // retried or abandoned.
       setModalError(getErrorMessage(err, 'Could not move that assignment.'))
@@ -847,14 +856,9 @@ export default function ScheduleBoard() {
     const existing = noteByJobDay.get(`${jobId}__${date}`)
     try {
       if (existing) {
-        const res = await updateDayNote(existing._id, { note: text })
-        const updatedNote = res.data ?? { ...existing, note: text }
-        setDayNotes((prev) => prev.map((n) => (n._id === existing._id ? updatedNote : n)))
+        await updateDayNote(existing._id, { note: text })
       } else {
-        const res = await createDayNote({ jobId, date, note: text })
-        if (res.data) {
-          setDayNotes((prev) => [...prev, res.data])
-        }
+        await createDayNote({ jobId, date, note: text })
       }
       setFlow({ type: 'none' })
       await load()
@@ -871,7 +875,6 @@ export default function ScheduleBoard() {
     }
     try {
       await deleteDayNote(existing._id)
-      setDayNotes((prev) => prev.filter((n) => n._id !== existing._id))
       setFlow({ type: 'none' })
       await load()
     } catch (err) {
@@ -1034,7 +1037,7 @@ export default function ScheduleBoard() {
                   </colgroup>
                   <thead>
                     <tr>
-                      <th className="sb-col-jobno">Job #</th>
+                      <th className="sb-col-jobno">Job ID</th>
                       <th className="sb-col-job">Job</th>
                       {metaVisible && (
                         <>
@@ -1174,76 +1177,81 @@ export default function ScheduleBoard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row) => (
-                      <tr key={row._id} className="sb-row">
-                        {visibleDays.map((d, dayIndex) => {
-                          const iso = toISO(d)
-                          const assignment = row.assignments.find((a) => coversDay(a, iso, rangeEnd))
-                          const replacing =
-                            !!replacePreview &&
-                            replacePreview.jobId === row._id &&
-                            iso >= replacePreview.start &&
-                            iso <= replacePreview.end
+                    {rows.map((row) => {
+                      const jobStartIso = row.startDate ? (isoDay(row.startDate) ?? row.startDate.slice(0, 10)) : null
+                      return (
+                        <tr key={row._id} className="sb-row">
+                          {visibleDays.map((d, dayIndex) => {
+                            const iso = toISO(d)
+                            const isBeforeJobStart = Boolean(jobStartIso && iso < jobStartIso)
+                            const assignment = row.assignments.find((a) => coversDay(a, iso, rangeEnd))
+                            const replacing =
+                              !!replacePreview &&
+                              replacePreview.jobId === row._id &&
+                              iso >= replacePreview.start &&
+                              iso <= replacePreview.end
 
-                          if (!assignment) {
-                            // Any free day can start a new stint — a job's timeline
-                            // is a sequence of crews, not a single one.
+                            if (!assignment) {
+                              // Any free day can start a new stint — a job's timeline
+                              // is a sequence of crews, not a single one.
+                              return (
+                                <DayCell
+                                  key={iso}
+                                  jobId={row._id}
+                                  iso={iso}
+                                  compact={compact}
+                                  replacing={replacing}
+                                  disabled={isBeforeJobStart}
+                                >
+                                  {compact ? (
+                                    <button
+                                      type="button"
+                                      className="sb-empty"
+                                      onClick={() => {
+                                        setModalError(null)
+                                        setFlow({ type: 'assignCrew', jobId: row._id, date: iso })
+                                      }}
+                                    />
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="sb-add"
+                                      onClick={() => {
+                                        setModalError(null)
+                                        setFlow({ type: 'assignCrew', jobId: row._id, date: iso })
+                                      }}
+                                    >
+                                      <Icon.Plus width={14} height={14} />
+                                      Add
+                                    </button>
+                                  )}
+                                </DayCell>
+                              )
+                            }
+
+                            const prevIso = dayIndex > 0 ? toISO(visibleDays[dayIndex - 1]) : null
+                            const isSpanStart = !prevIso || !coversDay(assignment, prevIso, rangeEnd)
+
+                            let span = 1
+                            if (isSpanStart) {
+                              while (
+                                dayIndex + span < visibleDays.length &&
+                                coversDay(assignment, toISO(visibleDays[dayIndex + span]), rangeEnd)
+                              ) {
+                                span++
+                              }
+                            }
+
                             return (
                               <DayCell
                                 key={iso}
                                 jobId={row._id}
                                 iso={iso}
                                 compact={compact}
+                                occupied
                                 replacing={replacing}
+                                disabled={isBeforeJobStart}
                               >
-                                {compact ? (
-                                  <button
-                                    type="button"
-                                    className="sb-empty"
-                                    onClick={() => {
-                                      setModalError(null)
-                                      setFlow({ type: 'assignCrew', jobId: row._id, date: iso })
-                                    }}
-                                  />
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="sb-add"
-                                    onClick={() => {
-                                      setModalError(null)
-                                      setFlow({ type: 'assignCrew', jobId: row._id, date: iso })
-                                    }}
-                                  >
-                                    <Icon.Plus width={14} height={14} />
-                                    Add
-                                  </button>
-                                )}
-                              </DayCell>
-                            )
-                          }
-
-                          const prevIso = dayIndex > 0 ? toISO(visibleDays[dayIndex - 1]) : null
-                          const isSpanStart = !prevIso || !coversDay(assignment, prevIso, rangeEnd)
-
-                          let span = 1
-                          if (isSpanStart) {
-                            while (
-                              dayIndex + span < visibleDays.length &&
-                              coversDay(assignment, toISO(visibleDays[dayIndex + span]), rangeEnd)
-                            ) {
-                              span++
-                            }
-                          }
-
-                          return (
-                            <DayCell
-                              key={iso}
-                              jobId={row._id}
-                              iso={iso}
-                              compact={compact}
-                              occupied
-                              replacing={replacing}
-                            >
                               {isSpanStart ? (
                                 <AssignmentPill
                                   assignment={assignment}
@@ -1267,7 +1275,7 @@ export default function ScheduleBoard() {
                           )
                         })}
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>

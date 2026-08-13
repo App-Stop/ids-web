@@ -49,7 +49,7 @@ export default function NoteModal({
           <button type="button" className="btn btn--danger" onClick={() => setConfirmingDelete(true)}>
             Delete
           </button>
-          <div className="modal-actions">
+          <div className="modal-actions__group">
             <button type="button" className="btn btn--outline" onClick={() => setMode('edit')}>
               Edit
             </button>

@@ -11,13 +11,14 @@ import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import { useSidebarCollapsed } from '../hooks/useSidebarCollapsed'
 import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import { AddDailyDumpsterCountModal, EditCostAdjustmentModal } from '../components/dashboard/CostTrackingModals'
-import { getJobs, type JobItem } from '../api/jobApi'
-import { getCrewsSummary, type CrewSummaryItem } from '../api/crewApi'
 import {
-  getCostTrackingReport,
-  type CostTrackingReportData,
-  type CostTrackingReportParams,
-} from '../api/dumpsterCostApi'
+  useCrewsSummary,
+  useJobsList,
+  useCostTrackingReport,
+  useInvalidateServerState,
+} from '../hooks/useQueryHooks'
+import { getErrorMessage } from '../lib/errors'
+import type { CostTrackingReportData, CostTrackingReportParams } from '../api/dumpsterCostApi'
 import { crewColorFor } from '../lib/scheduleData'
 import {
   assignableCrews,
@@ -245,39 +246,15 @@ export default function CostTracking() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [extraDays, setExtraDays] = useState(0)
   const [jobs] = useState<Job[]>([])
-  const [jobRows, setJobRows] = useState<JobCostRow[]>([])
-  const [crewRows, setCrewRows] = useState<CrewCostRow[]>([])
-  const [crewsList, setCrewsList] = useState<CrewSummaryItem[]>([])
   const [startDate, setStartDate] = useState(DEFAULT_RANGE.start)
   const [endDate, setEndDate] = useState(DEFAULT_RANGE.end)
 
-  const [jobsList, setJobsList] = useState<JobItem[]>([])
+  // Both dropdowns read the shared crew/job caches the other screens fill.
+  const { data: crewsList = [] } = useCrewsSummary()
+  const { data: jobsList = [] } = useJobsList({ limit: 100 })
+  const { invalidateAll } = useInvalidateServerState()
 
-  useEffect(() => {
-    async function fetchInitialData() {
-      try {
-        const [crewsRes, jobsRes] = await Promise.all([getCrewsSummary(), getJobs({ limit: 100 })])
-        if (crewsRes.success && crewsRes.data) setCrewsList(crewsRes.data)
-        if (jobsRes.success && jobsRes.data) setJobsList(jobsRes.data)
-      } catch (err) {
-        console.error('Failed to fetch initial dropdown data:', err)
-      }
-    }
-    fetchInitialData()
-  }, [])
-
-  const [reportData, setReportData] = useState<CostTrackingReportData | null>(null)
-  const [loadingReport, setLoadingReport] = useState(false)
-  const [reportError, setReportError] = useState<string>('')
-  const [refreshTrigger, setRefreshTrigger] = useState(0)
-
-  useEffect(() => {
-    let isMounted = true
-
-    async function fetchReport() {
-      setLoadingReport(true)
-      setReportError('')
-
+  const reportParams = useMemo<CostTrackingReportParams>(() => {
       let dateFilterParam: 'allTime' | 'custom' | 'weekly' | 'monthly' = 'allTime'
       if (range === 'Weekly') dateFilterParam = 'weekly'
       else if (range === 'Monthly') dateFilterParam = 'monthly'
@@ -306,13 +283,21 @@ export default function CostTracking() {
         params.crewId = crewFilter
       }
 
-      try {
-        const response = await getCostTrackingReport(params)
-        if (isMounted && response.success) {
-          setReportData(response.data)
+      return params
+  }, [range, startDate, endDate, tab, search, jobFilter, crewFilter])
 
-          if (params.groupBy === 'jobs') {
-            const mappedJobRows: JobCostRow[] = response.data.groups.map((grp, index) => {
+  const reportQuery = useCostTrackingReport(reportParams)
+  const reportData: CostTrackingReportData | null = reportQuery.data?.success
+    ? reportQuery.data.data
+    : null
+  const loadingReport = reportQuery.isPending
+  const reportError = reportQuery.error
+    ? getErrorMessage(reportQuery.error, 'Failed to load report data.')
+    : ''
+
+  const jobRows: JobCostRow[] = useMemo(() => {
+    if (!reportData || reportParams.groupBy !== 'jobs') return []
+    return reportData.groups.map((grp, index) => {
               const dailyCosts: Record<string, number | null> = {}
               grp.costByDate.forEach((c) => {
                 dailyCosts[c.date] = c.totalCost
@@ -349,10 +334,12 @@ export default function CostTracking() {
                 weeklyCosts: [],
                 dailyCosts,
               }
-            })
-            setJobRows(mappedJobRows)
-          } else {
-            const mappedCrewRows: CrewCostRow[] = response.data.groups.map((grp, index) => {
+    })
+  }, [reportData, reportParams.groupBy])
+
+  const crewRows: CrewCostRow[] = useMemo(() => {
+    if (!reportData || reportParams.groupBy !== 'crews') return []
+    return reportData.groups.map((grp, index) => {
               const dates = grp.costByDate.map((c) => c.date)
               const crewKey = grp.crewId ?? `crew-${index}`
               const crewDisplayId = grp.crewId ? grp.crewId.slice(-4) : String(8742 + index)
@@ -374,26 +361,8 @@ export default function CostTracking() {
                 dumpsterUnitCost: 0,
                 totalCost: grp.totalLaborCost,
               }
-            })
-            setCrewRows(mappedCrewRows)
-          }
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          console.error('Failed to fetch cost tracking report:', err)
-          setReportError(err.response?.data?.message || err.message || 'Failed to load report data.')
-        }
-      } finally {
-        if (isMounted) setLoadingReport(false)
-      }
-    }
-
-    fetchReport()
-
-    return () => {
-      isMounted = false
-    }
-  }, [range, startDate, endDate, tab, search, jobFilter, crewFilter, refreshTrigger])
+    })
+  }, [reportData, reportParams.groupBy])
 
   const [prevRange, setPrevRange] = useState(range)
   const [prevStart, setPrevStart] = useState(startDate)
@@ -879,6 +848,18 @@ export default function CostTracking() {
                     {weekDays.map((day) => {
                       const dayStr = toISO(day)
                       const value = row.dailyCosts ? row.dailyCosts[dayStr] : null
+                      const jobStartIso = row.date ? row.date.slice(0, 10) : null
+                      const isBeforeJobStart = Boolean(jobStartIso && dayStr < jobStartIso)
+
+                      if (isBeforeJobStart) {
+                        return (
+                          <td
+                            key={day.toISOString()}
+                            className="ct-grid-cell ct-grid-cell--disabled"
+                          />
+                        )
+                      }
+
                       return (
                         <td key={day.toISOString()} className="ct-grid-cell">
                           {value != null ? (
@@ -897,9 +878,6 @@ export default function CostTracking() {
             <table className="ct-table ct-table--crew">
               <thead>
                 <tr>
-                  <th className="ct-col-check">
-                    <input type="checkbox" />
-                  </th>
                   <th>Crew ID</th>
                   <th>Crew Name</th>
                   <th>Date</th>
@@ -910,9 +888,6 @@ export default function CostTracking() {
               <tbody>
                 {filteredCrewRows.map((row) => (
                   <tr key={row.id}>
-                    <td className="ct-col-check">
-                      <input type="checkbox" />
-                    </td>
                     <td className="ct-id-cell">#{row.crewId}</td>
                     <td className="ct-crew-name-cell">
                       <span
@@ -965,7 +940,7 @@ export default function CostTracking() {
         <AddDailyDumpsterCountModal
           onCancel={closeModal}
           onSuccess={() => {
-            setRefreshTrigger((prev) => prev + 1)
+            invalidateAll()
           }}
         />
       )}
@@ -978,7 +953,7 @@ export default function CostTracking() {
           date={selectedDate || activeRecord.date}
           onCancel={closeModal}
           onSuccess={() => {
-            setRefreshTrigger((prev) => prev + 1)
+            invalidateAll()
           }}
         />
       )}
@@ -1017,9 +992,9 @@ export default function CostTracking() {
             if (note) {
               setJobNotes((prev) => ({ ...prev, [detailsJob.id]: note }))
             }
-            setJobRows((list) =>
-              list.map((row) => (row.jobId === detailsJob.id || row.id === detailsJob.id ? { ...row, color: crew.color } : row)),
-            )
+            // Rows come from the cost report now; re-read it rather than
+            // recolouring a local copy.
+            invalidateAll()
             setJobFlow({ type: 'details', jobId: detailsJob.id })
           }}
         />

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import Modal from './Modal'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import { createCrewAssignment } from '../../api/jobApi'
-import { getCrewsSummary, type UserItem } from '../../api/crewApi'
+import { type UserItem } from '../../api/crewApi'
+import { useCrewsSummary } from '../../hooks/useQueryHooks'
 import { parseApiErrors } from '../../lib/errors'
 import type { Job } from '../../lib/dashboardData'
 
@@ -36,42 +37,31 @@ export default function AssignCrewModal({
   const jobNameStr = job?.name || ''
   const jobNoStr = job?.jobNo || ''
 
-  const [apiCrews, setApiCrews] = useState<AssignableCrewOption[]>([])
-  const [loadingCrews, setLoadingCrews] = useState(!crews)
-  const crewOptions: AssignableCrewOption[] = crews ?? apiCrews
+  // Shares the ['crews', null] cache entry with the pages behind this modal, so
+  // opening it is normally free.
+  const { data: fetchedCrews = [], isPending } = useCrewsSummary(undefined, !crews)
+  const loadingCrews = !crews && isPending
 
-  useEffect(() => {
-    if (crews) return
-    async function loadCrews() {
-      try {
-        const res = await getCrewsSummary()
-        if (res.success && Array.isArray(res.data)) {
-          const mapped: AssignableCrewOption[] = res.data.map((c) => {
-            const leadObj = typeof c.crewLead === 'object' && c.crewLead !== null ? (c.crewLead as UserItem) : null
-            const leadName = leadObj ? `${leadObj.firstName || ''} ${leadObj.lastName || ''}`.trim() : c.name
-            return {
-              id: c._id,
-              name: c.name,
-              leadName: leadName || c.name,
-              rate: leadObj?.hourlyRate ?? 0,
-              color: c.crewColor || '#3b82f6',
-            }
-          })
-          setApiCrews(mapped)
+  const apiCrews: AssignableCrewOption[] = useMemo(
+    () =>
+      fetchedCrews.map((c) => {
+        const leadObj = typeof c.crewLead === 'object' && c.crewLead !== null ? (c.crewLead as UserItem) : null
+        const leadName = leadObj ? `${leadObj.firstName || ''} ${leadObj.lastName || ''}`.trim() : c.name
+        return {
+          id: c._id,
+          name: c.name,
+          leadName: leadName || c.name,
+          rate: leadObj?.hourlyRate ?? 0,
+          color: c.crewColor || '#3b82f6',
         }
-      } catch (err) {
-        console.error('Failed to fetch crews summary in AssignCrewModal:', err)
-      } finally {
-        setLoadingCrews(false)
-      }
-    }
-    loadCrews()
-  }, [crews])
+      }),
+    [fetchedCrews],
+  )
+  const crewOptions: AssignableCrewOption[] = crews ?? apiCrews
 
   const [crewId, setCrewId] = useState<string | null>(null)
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState<string>('')
-  const [note, setNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -87,9 +77,8 @@ export default function AssignCrewModal({
         crewId,
         startDate,
         endDate: endDate || undefined,
-        note: note.trim() || undefined,
       })
-      onAssign?.(crewId, startDate, endDate, note)
+      onAssign?.(crewId, startDate, endDate, '')
       onSuccess?.()
       onCancel()
     } catch (err: any) {
@@ -158,14 +147,6 @@ export default function AssignCrewModal({
       <p className="field-hint" style={{ marginTop: '0.35rem', fontSize: '0.75rem', opacity: 0.7 }}>
         Leave End Date empty for an open-ended assignment.
       </p>
-
-      <label className="field-label" style={{ marginTop: '1rem' }}>Add a note <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
-      <textarea
-        className="field-textarea"
-        placeholder="Note about the assignment..."
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
 
       {error && (
         <div style={{ color: '#ef4444', marginTop: '0.75rem', fontSize: '0.875rem' }}>

@@ -13,7 +13,7 @@ export const CREW_LOGIN_PATH = '/login';
  * sign-in page.
  */
 export function homePathForRole(role: Role | null | undefined) {
-  return role === 'admin' ? '/dashboard' : ADMIN_LOGIN_PATH;
+  return role === 'admin' ? '/schedule-board' : ADMIN_LOGIN_PATH;
 }
 
 interface ProtectedRouteProps {

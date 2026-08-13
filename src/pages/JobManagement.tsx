@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MagnifyingGlass, Plus, CaretLeft, CaretRight, PenIcon } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Topbar from '../components/dashboard/Topbar'
@@ -14,11 +14,11 @@ import { STATUS_COLORS, STATUS_LABELS, type JobStatus, type ManagedJob } from '.
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import { useAppStore } from '../lib/store'
-import { getJobs, deleteJob, updateJob, type JobItem, type Pagination } from '../api/jobApi'
-import { type CrewSummaryItem, type UserItem } from '../api/crewApi'
+import { type JobItem } from '../api/jobApi'
+import { type UserItem } from '../api/crewApi'
 import { crewColorFor } from '../lib/scheduleData'
 import { getErrorMessage } from '../lib/errors'
-import { useCrewsSummary } from '../hooks/useQueryHooks'
+import { useCrewsSummary, useJobsPaged, useJobMutations } from '../hooks/useQueryHooks'
 import './JobsManagement.css'
 
 type SortKey = 'newest' | 'oldest' | 'rateLowHigh' | 'rateHighLow' | 'workers' | 'ascending' | 'descending'
@@ -75,165 +75,147 @@ function toCrew(row: Row): UnassignedCrew | null {
   }
 }
 
+/** Flattens a JobItem (with its populated crew) into the sheet's row shape. */
+function toRow(j: JobItem): Row {
+  const crewObj = typeof j.currentCrew === 'object' && j.currentCrew !== null ? j.currentCrew : null
+  const crewLeadObj =
+    crewObj && typeof crewObj.crewLead === 'object' && crewObj.crewLead !== null
+      ? (crewObj.crewLead as UserItem)
+      : null
+  const leadName = crewLeadObj
+    ? `${crewLeadObj.firstName || ''} ${crewLeadObj.lastName || ''}`.trim()
+    : crewObj?.name || 'Unassigned'
+  const crewColor = crewObj?.crewColor || '#3b82f6'
+
+  const numStr = String(j.jobIdNumber || 0).padStart(3, '0')
+  const formattedStart = j.startDate ? new Date(j.startDate).toISOString().slice(0, 10) : ''
+  const formattedEnd = j.endDate ? new Date(j.endDate).toISOString().slice(0, 10) : ''
+
+  let normalizedStatus: JobStatus = 'awarded'
+  if (j.status === 'in-progress' || j.status === 'completed' || j.status === 'awarded') {
+    normalizedStatus = j.status
+  }
+
+  const gcSuperVal = j.gcSuper || '-'
+  let idsSuperVal = '-'
+  if (j.idsSuper) {
+    if (typeof j.idsSuper === 'object' && j.idsSuper !== null) {
+      idsSuperVal = `${j.idsSuper.firstName || ''} ${j.idsSuper.lastName || ''}`.trim() || '-'
+    } else if (typeof j.idsSuper === 'string') {
+      idsSuperVal = j.idsSuper
+    }
+  } else if (leadName !== 'Unassigned') {
+    idsSuperVal = leadName
+  }
+
+  return {
+    id: `#${numStr}`,
+    rawId: j._id,
+    name: j.name,
+    color: crewColor,
+    crewName: crewObj ? crewObj.name : 'Unassigned',
+    gc: j.generalContractor || '-',
+    gcSuper: gcSuperVal,
+    idsSuper: idsSuperVal,
+    contract: j.contractAmount || 0,
+    startDate: formattedStart,
+    endDate: formattedEnd,
+    status: normalizedStatus,
+    laborBudgetUsed: j.laborBudgetUsed ?? 0,
+    laborBudgetTotal: j.laborBudget || 0,
+    crewRate: crewLeadObj?.hourlyRate || 0,
+    workers: Array.isArray(crewObj?.members) ? crewObj.members.length : 1,
+    note: j.note || undefined,
+  }
+}
+
 export default function JobsManagement() {
-  const [jobs, setJobs] = useState<Row[]>([])
-  const [loading, setLoading] = useState(true)
-  const [apiError, setApiError] = useState('')
+  const [actionError, setActionError] = useState('')
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<JobStatus | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('newest')
-  const [selected, setSelected] = useState<string[]>([])
   const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(20)
-  const [pagination, setPagination] = useState<Pagination>({
-    page: 1,
-    limit: 20,
-    totalCount: 0,
-    totalPages: 1,
-  })
 
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
   const { assignCrew } = useAppStore()
-  const [crewsList, setCrewsList] = useState<CrewSummaryItem[]>([])
 
-  const { data: cachedCrews } = useCrewsSummary()
+  const { data: crewsList = [] } = useCrewsSummary()
 
+  // Debounce so a query key isn't swapped (and a request fired) per keystroke.
   useEffect(() => {
-    if (cachedCrews) {
-      setCrewsList(cachedCrews)
-    }
-  }, [cachedCrews])
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350)
+    return () => clearTimeout(timer)
+  }, [search])
 
-  useEffect(() => {
-    fetchJobsList()
-  }, [page, limit, statusFilter, search, sortKey])
+  const sortByParam =
+    sortKey === 'newest'
+      ? 'newest'
+      : sortKey === 'oldest'
+        ? 'oldest'
+        : sortKey === 'ascending'
+          ? 'nameAsc'
+          : sortKey === 'descending'
+            ? 'nameDesc'
+            : undefined
 
-  async function fetchJobsList() {
-    setLoading(true)
-    setApiError('')
-    try {
-      let sortByParam: string | undefined = undefined
-      if (sortKey === 'newest') sortByParam = 'newest'
-      else if (sortKey === 'oldest') sortByParam = 'oldest'
-      else if (sortKey === 'ascending') sortByParam = 'nameAsc'
-      else if (sortKey === 'descending') sortByParam = 'nameDesc'
+  const jobsQuery = useJobsPaged({
+    page,
+    limit,
+    search: debouncedSearch || undefined,
+    status: statusFilter || undefined,
+    sortBy: sortByParam,
+  })
 
-      const res = await getJobs({
-        page,
-        limit,
-        search: search.trim() || undefined,
-        status: statusFilter || undefined,
-        sortBy: sortByParam,
-      })
+  const jobs = useMemo(() => (jobsQuery.data?.items ?? []).map(toRow), [jobsQuery.data])
+  const pagination = jobsQuery.data?.pagination ?? { page, limit, totalCount: 0, totalPages: 1 }
+  const loading = jobsQuery.isPending
+  const apiError =
+    actionError || (jobsQuery.error ? getErrorMessage(jobsQuery.error, 'Failed to fetch jobs listing.') : '')
 
-      if (res.success && Array.isArray(res.data)) {
-        const mappedRows: Row[] = res.data.map((j: JobItem) => {
-          const crewObj = typeof j.currentCrew === 'object' && j.currentCrew !== null ? j.currentCrew : null
-          const crewLeadObj = crewObj && typeof crewObj.crewLead === 'object' && crewObj.crewLead !== null ? (crewObj.crewLead as UserItem) : null
-          const leadName = crewLeadObj ? `${crewLeadObj.firstName || ''} ${crewLeadObj.lastName || ''}`.trim() : (crewObj?.name || 'Unassigned')
-          const crewColor = crewObj?.crewColor || '#3b82f6'
+  const { updateJobMutation, deleteJobMutation, invalidateAll } = useJobMutations()
 
-          const numStr = String(j.jobIdNumber || 0).padStart(3, '0')
-          const formattedStart = j.startDate ? new Date(j.startDate).toISOString().slice(0, 10) : ''
-          const formattedEnd = j.endDate ? new Date(j.endDate).toISOString().slice(0, 10) : ''
 
-          let normalizedStatus: JobStatus = 'awarded'
-          if (j.status === 'in-progress' || j.status === 'completed' || j.status === 'awarded') {
-            normalizedStatus = j.status
-          }
-
-          const gcSuperVal = j.gcSuper || '-'
-          let idsSuperVal = '-'
-          if (j.idsSuper) {
-            if (typeof j.idsSuper === 'object' && j.idsSuper !== null) {
-              idsSuperVal = `${j.idsSuper.firstName || ''} ${j.idsSuper.lastName || ''}`.trim() || '-'
-            } else if (typeof j.idsSuper === 'string') {
-              idsSuperVal = j.idsSuper
-            }
-          } else if (leadName !== 'Unassigned') {
-            idsSuperVal = leadName
-          }
-
-          return {
-            id: `#${numStr}`,
-            rawId: j._id,
-            name: j.name,
-            color: crewColor,
-            crewName: crewObj ? crewObj.name : 'Unassigned',
-            gc: j.generalContractor || '-',
-            gcSuper: gcSuperVal,
-            idsSuper: idsSuperVal,
-            contract: j.contractAmount || 0,
-            startDate: formattedStart,
-            endDate: formattedEnd,
-            status: normalizedStatus,
-            laborBudgetUsed: 0,
-            laborBudgetTotal: j.laborBudget || 0,
-            crewRate: crewLeadObj?.hourlyRate || 0,
-            workers: Array.isArray(crewObj?.members) ? crewObj.members.length : 1,
-            note: j.note || undefined,
-          }
-        })
-        setJobs(mappedRows)
-        if (res.pagination) {
-          setPagination(res.pagination)
-        }
-      }
-    } catch (err: any) {
-      setApiError(getErrorMessage(err, 'Failed to fetch jobs listing.'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const allSelected = jobs.length > 0 && jobs.every((j) => selected.includes(j.id))
   const editingJob = editingId ? jobs.find((j) => j.id === editingId) : undefined
   const activeRow = flow.type !== 'none' ? jobs.find((j) => j.rawId === flow.jobId || j.id === flow.jobId) : undefined
-
-  function toggleAll() {
-    setSelected(allSelected ? [] : jobs.map((j) => j.id))
-  }
-
-  function toggleOne(id: string) {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
-  }
 
   function handleCreate(_data: JobFormData, createdJob?: JobItem) {
     setShowCreate(false)
     if (createdJob) {
-      fetchJobsList()
+      invalidateAll()
     }
   }
 
   function handleUpdate(_data: JobFormData, updatedJob?: JobItem) {
     setEditingId(null)
     if (updatedJob) {
-      fetchJobsList()
+      invalidateAll()
     }
   }
 
   async function handleStatusChange(jobId: string, newStatus: JobStatus) {
+    setActionError('')
     try {
-      await updateJob(jobId, { status: newStatus })
-      fetchJobsList()
+      await updateJobMutation.mutateAsync({ id: jobId, payload: { status: newStatus } })
     } catch (err: any) {
-      alert(getErrorMessage(err, 'Failed to update job status.'))
+      setActionError(getErrorMessage(err, 'Failed to update job status.'))
     }
   }
 
   async function handleDeleteJob(jobId: string) {
+    setActionError('')
     try {
-      await deleteJob(jobId)
+      await deleteJobMutation.mutateAsync(jobId)
       setFlow({ type: 'none' })
-      fetchJobsList()
     } catch (err: any) {
-      alert(getErrorMessage(err, 'Failed to delete job.'))
+      setActionError(getErrorMessage(err, 'Failed to delete job.'))
     }
   }
 
@@ -324,7 +306,6 @@ export default function JobsManagement() {
               <tr>
                 <th className="jm-sticky jm-sticky--id">
                   <div className="jm-id-cell">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} />
                     <span>Job ID</span>
                   </div>
                 </th>
@@ -380,12 +361,6 @@ export default function JobsManagement() {
                     <tr key={job.rawId || job.id} className="jm-row">
                       <td className="jm-sticky jm-sticky--id">
                         <div className="jm-id-cell">
-                          <input
-                            type="checkbox"
-                            checked={selected.includes(job.id)}
-                            onChange={() => toggleOne(job.id)}
-                            onClick={(e) => e.stopPropagation()}
-                          />
                           <span className="jm-id">{job.id}</span>
                         </div>
                         <span
@@ -557,9 +532,11 @@ export default function JobsManagement() {
           note={activeRow.note ?? ''}
           onDone={() => setFlow({ type: 'none' })}
           onChangeCrew={() => setFlow({ type: 'assignCrew', jobId: activeRow.rawId || activeRow.id })}
-          onSaveNote={(text: string) =>
-            setJobs((prev) => prev.map((j) => (j.id === activeRow.id ? { ...j, note: text || undefined } : j)))
-          }
+          onSaveNote={(text: string) => {
+            updateJobMutation
+              .mutateAsync({ id: activeRow.rawId || activeRow.id, payload: { note: text } })
+              .catch((err) => setActionError(getErrorMessage(err, 'Failed to save note.')))
+          }}
           onDeleteJob={() => handleDeleteJob(activeRow.rawId || activeRow.id)}
         />
       )}
@@ -574,14 +551,11 @@ export default function JobsManagement() {
             
             // This will throw if there's an overlap
             assignCrew(activeRow.id, crewId, startDate, endDate, note)
-            
-            setJobs((prev) =>
-              prev.map((j) =>
-                j.id === activeRow.id
-                  ? { ...j, crewName: crew.name, crewRate: crew.rate, color: crew.color, note: note || j.note }
-                  : j,
-              ),
-            )
+
+            // NOTE: `assignableCrews` is still local demo data, so this path has
+            // no server write to invalidate against yet — see Crew.tsx for the
+            // real createCrewAssignment + assignToCrew pair.
+            invalidateAll()
             setFlow({ type: 'details', jobId: activeRow.rawId || activeRow.id })
           }}
         />
