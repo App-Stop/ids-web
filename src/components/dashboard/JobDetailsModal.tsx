@@ -86,7 +86,7 @@ export default function JobDetailsModal({
         message="This action is irreversible"
         confirmLabel="Yes, Delete"
         onCancel={() => setConfirmingDelete(false)}
-        onConfirm={handleDelete}
+        onConfirm={() => handleDelete?.()}
       />
     )
   }
