@@ -351,7 +351,7 @@ export default function JobsManagement() {
                   const overBudget = job.laborBudgetUsed > job.laborBudgetTotal
                   const pct = Math.min(100, Math.round((job.laborBudgetUsed / Math.max(1, job.laborBudgetTotal)) * 100))
                   const barColor = overBudget ? '#ef4444' : job.status === 'awarded' ? '#f97316' : '#22c55e'
-                  const barPct = overBudget ? 100 : Math.max(8, pct)
+                  const barPct = overBudget ? 100 : job.laborBudgetUsed <= 0 ? 0 : Math.max(1, pct)
                   const stripeColor = job.color
                   return (
                     <tr key={job.rawId || job.id} className="jm-row">
@@ -414,11 +414,10 @@ export default function JobsManagement() {
                                 className="jm-status"
                                 style={{
                                   color: STATUS_COLORS[job.status] || '#16a34a',
-                                  backgroundColor: `${STATUS_COLORS[job.status] || '#16a34a'}18`,
                                 }}
                               >
-                                {STATUS_LABELS[job.status] || job.status}
-                                <CaretDown size={12} weight="bold" style={{ opacity: 0.8 }} />
+                                <span>{STATUS_LABELS[job.status] || job.status}</span>
+                                <CaretDown size={13} weight="bold" style={{ color: '#6b7280' }} />
                               </span>
                             }
                             onChange={(v) => handleStatusChange(job.rawId || job.id, v as JobStatus)}
