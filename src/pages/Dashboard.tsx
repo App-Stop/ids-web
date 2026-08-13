@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import Sidebar from '../components/dashboard/Sidebar'
 import StatCard from '../components/dashboard/StatCard'
 import UnassignedCrewList from '../components/dashboard/UnassignedCrewList'
@@ -9,6 +10,8 @@ import CreateJobModal from '../components/dashboard/CreateJobModal'
 import { Hammer, Users, Money, WarningCircle } from '@phosphor-icons/react'
 import {
   formatMoney,
+  jobs as initialJobs,
+  type CrewLead,
   type Job,
   type UnassignedCrew,
 } from '../lib/dashboardData'
@@ -211,7 +214,7 @@ export default function Dashboard() {
           onSubmit={(data) => {
             if (flow.job) {
               const updated = { ...flow.job, ...data, laborBudgetTotal: data.laborBudgetTotal }
-              setJobs((list) => list.map((j) => (j.id === flow.job!.id ? updated : j)))
+              setJobs((list: Job[]) => list.map((j: Job) => (j.id === flow.job!.id ? updated : j)))
             } else {
               const seq = nextJobSeq++
               const newJob: Job = {
@@ -228,7 +231,7 @@ export default function Dashboard() {
                 laborBudgetUsed: 0,
                 laborBudgetTotal: data.laborBudgetTotal,
               }
-              setJobs((list) => [...list, newJob])
+              setJobs((list: Job[]) => [...list, newJob])
             }
             setFlow({ step: 'none' })
           }}
