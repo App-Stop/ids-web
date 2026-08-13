@@ -897,9 +897,16 @@
 }
 
 .ct-grid-cell--disabled {
-  background-color: #f1f5f9 !important;
+  background-color: #cbd5e1 !important;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(0, 0, 0, 0.03),
+    rgba(0, 0, 0, 0.03) 6px,
+    transparent 6px,
+    transparent 12px
+  ) !important;
   cursor: not-allowed !important;
-  opacity: 0.6;
+  opacity: 0.85;
 }
 
 .ct-grid-cell--disabled * {
