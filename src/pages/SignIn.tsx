@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import BrandLogos from '../components/BrandLogos'
 import EmailField, { DOMAIN } from '../components/EmailField'
@@ -54,9 +54,6 @@ export default function SignIn() {
             autoComplete="current-password"
             required
           />
-          <Link to="/forgot-password" className="auth-forgot">
-            Forgot Password?
-          </Link>
         </div>
 
         {error && <p className="auth-error">{error}</p>}
