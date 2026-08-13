@@ -151,7 +151,7 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
           email: `${form.emailLocalPart.trim()}@idsdemo.com`,
-          role: form.role === 'Crew Lead' ? 'crew-lead' : 'labor',
+          role: 'labor',
           hourlyRate: Number(form.rate) || undefined,
           assignCrew: form.crewId && form.crewId !== 'none' ? form.crewId : undefined,
           password: useCustomPassword && customPassword.trim() ? customPassword.trim() : undefined,
@@ -294,19 +294,6 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
             {fieldErrors.email && <span className="field-error-text">{fieldErrors.email}</span>}
           </label>
         )}
-
-        <label className="cm-field">
-          <span className="cm-field__label">Role</span>
-          <MenuDropdown
-            options={ROLE_OPTIONS}
-            value={form.role}
-            onChange={(id) => update('role', (id as MemberFormData['role']) ?? 'Labor')}
-            placeholder="Select role"
-            showDot={false}
-            className="cm-field__dropdown"
-          />
-          {fieldErrors.role && <span className="field-error-text">{fieldErrors.role}</span>}
-        </label>
 
         <label className="cm-field">
           <span className="cm-field__label">Assign Crew</span>

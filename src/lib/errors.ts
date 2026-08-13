@@ -29,7 +29,9 @@ export function parseApiErrors(err: unknown, fallback = 'Something went wrong. P
       if (Array.isArray(data.error) && data.error.length > 0) {
         data.error.forEach((e) => {
           if (e.path) {
-            const rawField = e.path.replace(/^(body|query|params)\./, '')
+            const rawField = e.path
+              .replace(/^(body|query|params)\./, '')
+              .replace(/^crewAssignment\./, 'crewAssignment.')
             fieldErrors[rawField] = e.message
           } else if (e.message && !generalMessage) {
             generalMessage = e.message

@@ -27,6 +27,14 @@ export interface Pagination {
   totalPages: number
 }
 
+export interface CrewAssignmentPayloadItem {
+  crewId: string
+  startDate?: string
+  endDate?: string
+  excludeWeekends?: boolean
+  note?: string
+}
+
 export interface CreateJobPayload {
   jobIdNumber?: number
   name?: string
@@ -41,6 +49,7 @@ export interface CreateJobPayload {
   laborBudget: number
   note?: string
   status?: string
+  crewAssignment?: CrewAssignmentPayloadItem
 }
 
 export type UpdateJobPayload = Partial<CreateJobPayload>

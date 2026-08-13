@@ -6,7 +6,7 @@ import Dropdown from '../components/dashboard/Dropdown'
 import Avatar from '../components/dashboard/Avatar'
 import { Icon } from '../components/dashboard/icons'
 import { type RosterRow } from '../lib/crewData'
-import { getUsers } from '../api/crewApi'
+import { getCrewsSummary } from '../api/crewApi'
 import {
   createTimesheetLog,
   deleteTimeEntry,
@@ -758,16 +758,15 @@ export default function Timesheet() {
 
     async function fetchMembers() {
       try {
-        const res = await getUsers()
+        const res = await getCrewsSummary({ statusEmployee: 'roster', limit: 100 })
         if (cancelled || !res.success || !Array.isArray(res.data)) return
         setMembers(
           res.data
-            .filter((user) => user.role === 'labor' || user.role === 'crew-lead')
             .map((user) => ({
               id: user._id,
-              rosterId: user._id.slice(-4),
-              name: `${user.firstName} ${user.lastName}`.trim(),
-              avatar: `https://i.pravatar.cc/64?img=${(user._id.charCodeAt(0) || 15) % 70}`,
+              rosterId: user._id ? user._id.slice(-4) : '',
+              name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Member',
+              avatar: `https://i.pravatar.cc/64?img=${((user._id || '').charCodeAt(0) || 15) % 70}`,
               crewName: user.assignCrew?.name ?? null,
               crewColor: user.assignCrew?.crewColor ?? '#808080',
               role: user.role === 'crew-lead' ? 'Crew Lead' : 'Labor',

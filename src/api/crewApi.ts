@@ -79,16 +79,22 @@ export interface CrewSummaryItem {
 }
 
 export interface GetCrewsSummaryParams {
-  jobId?: string
+  statusEmployee?: 'crew' | 'roster'
   status?: string
-  /** Backend enum is asc|desc — 'dec' is rejected with a 400. */
+  search?: string
+  jobId?: string
+  crewId?: string
+  sortBy?: 'nameAsc' | 'nameDesc' | 'rateAsc' | 'rateDesc' | string
+  page?: number
+  limit?: number
   sortByName?: 'asc' | 'desc'
 }
 
 export interface GetCrewsSummaryResponse {
   success: boolean
   message: string
-  data: CrewSummaryItem[]
+  data: any[]
+  pagination?: Pagination
 }
 
 export interface UserItem {
@@ -97,7 +103,18 @@ export interface UserItem {
   lastName: string
   email: string
   role: string
-  assignCrew: {
+  assignCrew?: {
+    _id: string
+    name: string
+    crewLead?: string
+    members?: string[]
+    crewColor?: string
+    status?: string
+    isDeleted?: boolean
+    createdAt?: string
+    updatedAt?: string
+  } | null
+  crew?: {
     _id: string
     name: string
     crewLead?: string
@@ -257,6 +274,48 @@ export async function deleteCrew(id: string): Promise<DeleteResponse> {
 /** There is no hard user delete — DELETE /users/:id flips isActive to false. */
 export async function deactivateUser(id: string): Promise<DeleteResponse> {
   const response = await api.delete<DeleteResponse>(`/users/${id}`)
+  return response.data
+}
+
+/**
+ * Stronger than deactivateUser: sets isDeleted (and isActive false) regardless
+ * of current state, pulls the user out of any crew they lead or belong to, and
+ * force-clocks them out of an open shift. Use for "remove this person", and
+ * deactivateUser only for a reversible active/inactive toggle.
+ */
+export async function softDeleteUser(id: string): Promise<DeleteResponse> {
+  const response = await api.delete<DeleteResponse>(`/users/${id}/soft-delete`)
+  return response.data
+}
+
+/** Detaches one member from a crew and clears their assignCrew. */
+export async function removeCrewMember(
+  crewId: string,
+  memberId: string,
+): Promise<GetCrewResponse> {
+  const response = await api.delete<GetCrewResponse>(`/crews/${crewId}/members/${memberId}`)
+  return response.data
+}
+
+export interface RemoveCrewLeadOrMemberPayload {
+  memberId?: string
+  removeCrewLead?: boolean
+}
+
+/**
+ * Same member removal as removeCrewMember, plus the only way to clear a crew's
+ * lead. The backend requires exactly one of memberId / removeCrewLead.
+ * Note: unlike changing the lead via PATCH /crews/:id, this does NOT demote the
+ * user back to 'labor' — they keep role 'crew-lead' with no crew, which makes
+ * them unselectable in the crew modal's dropdowns until their role is changed.
+ */
+export async function removeCrewLeadOrMember(
+  crewId: string,
+  payload: RemoveCrewLeadOrMemberPayload,
+): Promise<GetCrewResponse> {
+  const response = await api.delete<GetCrewResponse>(`/crews/${crewId}/lead-or-member`, {
+    data: payload,
+  })
   return response.data
 }
 

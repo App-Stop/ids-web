@@ -18,6 +18,7 @@ import { getJobs, deleteJob, updateJob, type JobItem, type Pagination } from '..
 import { getCrewsSummary, type CrewSummaryItem, type UserItem } from '../api/crewApi'
 import { crewColorFor } from '../lib/scheduleData'
 import { getErrorMessage } from '../lib/errors'
+import { useCrewsSummary, useJobsList } from '../hooks/useQueryHooks'
 import './JobsManagement.css'
 
 type SortKey = 'newest' | 'oldest' | 'rateLowHigh' | 'rateHighLow' | 'workers' | 'ascending' | 'descending'
@@ -99,22 +100,15 @@ export default function JobsManagement() {
   useClickDragScroll(tableWrapRef)
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
   const { assignCrew } = useAppStore()
-
   const [crewsList, setCrewsList] = useState<CrewSummaryItem[]>([])
 
+  const { data: cachedCrews } = useCrewsSummary()
+
   useEffect(() => {
-    async function fetchCrews() {
-      try {
-        const res = await getCrewsSummary()
-        if (res.success && res.data) {
-          setCrewsList(res.data)
-        }
-      } catch (err) {
-        console.error('Failed to fetch crews summary:', err)
-      }
+    if (cachedCrews) {
+      setCrewsList(cachedCrews)
     }
-    fetchCrews()
-  }, [])
+  }, [cachedCrews])
 
   useEffect(() => {
     fetchJobsList()
@@ -342,17 +336,21 @@ export default function JobsManagement() {
                 <th className="jm-center">Contract</th>
                 <th className="jm-center">Duration</th>
                 <th className="jm-center">
-                  <div style={{ display: 'inline-block', textAlign: 'left' }}>
-                    <Dropdown
-                      value={statusFilter ?? '__all'}
-                      selectedLabel={statusFilter ? `${STATUS_OPTIONS.find((s) => s.id === statusFilter)?.label}` : 'Status'}
-                      onChange={(v) => {
-                        setStatusFilter(v === '__all' ? null : (v as JobStatus))
-                        setPage(1)
-                      }}
-                      options={[{ id: '__all', label: 'All Statuses' }, ...STATUS_OPTIONS.map((s) => ({ id: s.id, label: s.label }))]}
-                    />
-                  </div>
+                  {(pagination.totalCount || jobs.length > 0 || statusFilter !== null) ? (
+                    <div style={{ display: 'inline-block', textAlign: 'left' }}>
+                      <Dropdown
+                        value={statusFilter ?? '__all'}
+                        selectedLabel={statusFilter ? `${STATUS_OPTIONS.find((s) => s.id === statusFilter)?.label}` : 'Status'}
+                        onChange={(v) => {
+                          setStatusFilter(v === '__all' ? null : (v as JobStatus))
+                          setPage(1)
+                        }}
+                        options={[{ id: '__all', label: 'All Statuses' }, ...STATUS_OPTIONS.map((s) => ({ id: s.id, label: s.label }))]}
+                      />
+                    </div>
+                  ) : (
+                    'Status'
+                  )}
                 </th>
                 <th className="jm-center">Labor Budget</th>
                 <th className="jm-center">Action</th>
@@ -562,7 +560,7 @@ export default function JobsManagement() {
           onSaveNote={(text: string) =>
             setJobs((prev) => prev.map((j) => (j.id === activeRow.id ? { ...j, note: text || undefined } : j)))
           }
-          onRemoveCrew={() => handleDeleteJob(activeRow.rawId || activeRow.id)}
+          onDeleteJob={() => handleDeleteJob(activeRow.rawId || activeRow.id)}
         />
       )}
 

@@ -12,15 +12,15 @@ import AssignJobModal from '../components/dashboard/AssignJobModal'
 import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCrewsSummary } from '../hooks/useQueryHooks'
 import {
-  deactivateUser,
   deleteCrew,
+  softDeleteUser,
   getCrewById,
   getCrewsSummary,
-  getUsers,
   type CrewSummaryItem,
   type Pagination,
-  type UserItem,
 } from '../api/crewApi'
 import {
   createCrewAssignment,
@@ -147,15 +147,16 @@ function toCrewRow(item: CrewSummaryItem, jobsById: Map<string, JobItem>): CrewR
   }
 }
 
-function toRosterRow(user: UserItem): RosterRow {
+function toRosterRow(user: any): RosterRow {
+  const crewObj = user.crew ?? user.assignCrew
   return {
     id: user._id,
-    rosterId: user._id.slice(-4),
-    name: `${user.firstName} ${user.lastName}`.trim(),
-    crewName: user.assignCrew?.name ?? null,
-    crewColor: user.assignCrew?.crewColor ?? '#94a3b8',
+    rosterId: user._id ? user._id.slice(-4) : '',
+    name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Member',
+    crewName: crewObj?.name ?? null,
+    crewColor: crewObj?.crewColor ?? '#94a3b8',
     role: user.role === 'crew-lead' ? 'Crew Lead' : 'Labor',
-    rate: user.hourlyRate ?? 0,
+    rate: user.rate ?? user.hourlyRate ?? 0,
     status: user.isActive ? 'Active' : 'Inactive',
   }
 }
@@ -219,28 +220,36 @@ export default function Crew() {
       .catch((err) => console.error('Failed to load jobs:', err))
   }, [])
 
-  // An unfiltered crew list for the Roster tab's crew filter and the member
-  // modal — those must be populated even if the Crew tab was never opened.
-  const loadAllCrews = useCallback(async () => {
-    try {
-      const res = await getCrewsSummary()
-      if (res.success && Array.isArray(res.data)) setAllCrews(res.data)
-    } catch (err) {
-      console.error('Failed to load crews:', err)
-    }
-  }, [])
+  const queryClient = useQueryClient()
+  const { data: cachedCrews } = useCrewsSummary()
 
   useEffect(() => {
-    loadAllCrews()
-  }, [loadAllCrews])
+    if (cachedCrews && Array.isArray(cachedCrews)) {
+      setAllCrews(cachedCrews)
+    }
+  }, [cachedCrews])
+
+  // `allCrews` is owned by the ['crews'] query now, so refreshing it after a
+  // mutation means invalidating that key rather than re-fetching by hand.
+  const loadAllCrews = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['crews'] }),
+    [queryClient],
+  )
 
   const loadCrews = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
+      let sortByParam: string | undefined = undefined
+      if (sort === 'name-asc') sortByParam = 'nameAsc'
+      else if (sort === 'name-desc') sortByParam = 'nameDesc'
+
       const res = await getCrewsSummary({
+        statusEmployee: 'crew',
         jobId: jobFilter ?? undefined,
         status: status ?? undefined,
+        search: debouncedSearch || undefined,
+        sortBy: sortByParam,
         sortByName: sort === 'name-asc' ? 'asc' : sort === 'name-desc' ? 'desc' : undefined,
       })
       setCrewRows(res.success && Array.isArray(res.data) ? res.data.map((item) => toCrewRow(item, jobsById)) : [])
@@ -250,16 +259,24 @@ export default function Crew() {
     } finally {
       setLoading(false)
     }
-  }, [jobFilter, status, sort, jobsById])
+  }, [jobFilter, status, sort, debouncedSearch, jobsById])
 
   const loadRoster = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await getUsers({
-        assignCrew: crewFilter ?? undefined,
-        isActive: status === 'active' ? true : status === 'inactive' ? false : undefined,
+      let sortByParam: string | undefined = undefined
+      if (sort === 'name-asc') sortByParam = 'nameAsc'
+      else if (sort === 'name-desc') sortByParam = 'nameDesc'
+      else if (sort === 'rate-asc') sortByParam = 'rateAsc'
+      else if (sort === 'rate-desc') sortByParam = 'rateDesc'
+
+      const res = await getCrewsSummary({
+        statusEmployee: 'roster',
+        crewId: crewFilter ?? undefined,
+        status: status ?? undefined,
         search: debouncedSearch || undefined,
+        sortBy: sortByParam,
         page: rosterPage,
         limit: rosterLimit,
       })
@@ -272,7 +289,7 @@ export default function Crew() {
     } finally {
       setLoading(false)
     }
-  }, [crewFilter, status, debouncedSearch, rosterPage, rosterLimit])
+  }, [crewFilter, status, debouncedSearch, sort, rosterPage, rosterLimit])
 
   useEffect(() => {
     if (tab === 'crew') loadCrews()
@@ -346,35 +363,16 @@ export default function Crew() {
       }
     : null
 
-  // /crews/summary has no `search` param, so the Crew tab filters the fetched
-  // page locally. Roster search is server-side (GET /users?search=).
+  // GET /crews/summary accepts search & sortBy params for server-side filtering.
   const visibleCrewRows = useMemo(() => {
-    const q = debouncedSearch.toLowerCase()
-    const rows = q
-      ? crewRows.filter(
-          (row) =>
-            row.name.toLowerCase().includes(q) ||
-            row.crewId.toLowerCase().includes(q) ||
-            row.leadName.toLowerCase().includes(q) ||
-            row.jobs.some((j) => j.jobName.toLowerCase().includes(q)),
-        )
-      : crewRows
-    if (sort !== 'rate-asc' && sort !== 'rate-desc') return rows
-    return [...rows].sort((a, b) =>
+    if (sort !== 'rate-asc' && sort !== 'rate-desc') return crewRows
+    return [...crewRows].sort((a, b) =>
       sort === 'rate-desc' ? (b.rate ?? 0) - (a.rate ?? 0) : (a.rate ?? 0) - (b.rate ?? 0),
     )
-  }, [crewRows, debouncedSearch, sort])
+  }, [crewRows, sort])
 
-  // GET /users has no sort param — this orders the current page only.
-  const visibleRosterRows = useMemo(() => {
-    if (!sort) return rosterRows
-    return [...rosterRows].sort((a, b) => {
-      if (sort === 'name-asc') return a.name.localeCompare(b.name)
-      if (sort === 'name-desc') return b.name.localeCompare(a.name)
-      if (sort === 'rate-desc') return b.rate - a.rate
-      return a.rate - b.rate
-    })
-  }, [rosterRows, sort])
+  // GET /crews/summary with statusEmployee=roster supports server-side sorting (sortBy=nameAsc|nameDesc|rateAsc|rateDesc).
+  const visibleRosterRows = rosterRows
 
   async function handleRemoveCrew() {
     if (flow.type !== 'editCrew') return
@@ -390,9 +388,11 @@ export default function Crew() {
   async function handleRemoveMember() {
     if (flow.type !== 'editMember') return
     try {
-      await deactivateUser(flow.member.id)
+      await softDeleteUser(flow.member.id)
       setFlow({ type: 'none' })
-      await loadRoster()
+      // Soft delete also pulls the user off their crew, so the crew lists are
+      // stale too, not just the roster.
+      await Promise.all([loadRoster(), loadAllCrews()])
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to remove member.'))
     }
