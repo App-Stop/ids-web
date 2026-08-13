@@ -54,9 +54,6 @@ export default function SignIn() {
             autoComplete="current-password"
             required
           />
-          <Link to="/forgot-password" className="auth-forgot">
-            Forgot Password?
-          </Link>
         </div>
 
         {error && <p className="auth-error">{error}</p>}
