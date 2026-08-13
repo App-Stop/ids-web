@@ -16,6 +16,7 @@ import {
   type UnassignedCrew,
 } from '../lib/dashboardData'
 import './Dashboard.css'
+import { useDashboardSummary } from '../hooks/useQueryHooks'
 import {
   getDashboardSummary,
   type DashboardSummaryData,
@@ -63,42 +64,20 @@ let nextJobSeq = 1054
 
 export default function Dashboard() {
   const [jobs, setJobs] = useState(initialJobs)
-  const [unassigned, setUnassigned] = useState<UnassignedCrew[]>([])
-  const [unassignedJobs, setUnassignedJobs] = useState<UnassignedJobItem[]>([])
   const [flow, setFlow] = useState<Flow>({ step: 'none' })
 
-  const [cardData, setCardData] = useState<DashboardSummaryData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data: cardData, isLoading: loading, error: queryErr, refetch: fetchDashboardData } = useDashboardSummary()
+  const error = queryErr ? (queryErr as any)?.response?.data?.message ?? 'Failed to load dashboard' : null
 
-  async function fetchDashboardData() {
-    try {
-      setLoading(true)
-      setError(null)
-      const res = await getDashboardSummary()
-      const data = res.data
-      setCardData(data)
-      setUnassignedJobs(data.unassignedJobsList ?? [])
-      setUnassigned(
-        (data.unassignedCrewsList ?? []).map((crew) => ({
-          id: crew._id,
-          name: crew.name,
-          leadName: crew.name,
-          rate: 0,
-          color: crew.crewColor,
-          memberCount: crew.members?.length ?? 0,
-        })),
-      )
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to load dashboard')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
+  const unassignedJobs = cardData?.unassignedJobsList ?? []
+  const unassigned: UnassignedCrew[] = (cardData?.unassignedCrewsList ?? []).map((crew) => ({
+    id: crew._id,
+    name: crew.name,
+    leadName: crew.name,
+    rate: 0,
+    color: crew.crewColor,
+    memberCount: crew.members?.length ?? 0,
+  }))
 
   const overBudget = cardData?.jobsOverBudget ?? []
   const overBudgetAmount = overBudget.reduce((sum, job) => sum + (job.overBudgetBy ?? 0), 0)

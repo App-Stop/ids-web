@@ -15,7 +15,7 @@ import logo from "../../assets/sidebar logo.png";
 import { useSidebarCollapsed } from "../../hooks/useSidebarCollapsed";
 
 const OPERATIONS = [
-  { label: "Dashboard", icon: SquaresFour, path: "/dashboard" },
+  // { label: "Dashboard", icon: SquaresFour, path: "/dashboard" },
   { label: "Schedule Board", icon: CalendarBlank, path: "/schedule-board" },
   { label: "Jobs Management", icon: Hammer, path: "/jobs-management" },
   {

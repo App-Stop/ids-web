@@ -20,6 +20,7 @@ export interface JobFormData {
   crewLeadId: string | null
   note: string
   color: string
+  status: string
 }
 
 /** Job dates are stored as MM-DD-YYYY; native date inputs use YYYY-MM-DD. */
@@ -118,6 +119,7 @@ export default function CreateJobModal({
   const [laborBudgetTotal, setLaborBudgetTotal] = useState<number | ''>(job?.laborBudgetTotal ?? '')
   const [crewLeadId, setCrewLeadId] = useState<string | null>(null)
   const [note, setNote] = useState<string>('')
+  const [status, setStatus] = useState<string>(job?.status || 'awarded')
 
   const [assignCrewNow, setAssignCrewNow] = useState(false)
   const [excludeWeekends, setExcludeWeekends] = useState(false)
@@ -173,6 +175,7 @@ export default function CreateJobModal({
             setContractAmount(j.contractAmount !== undefined && j.contractAmount !== null ? j.contractAmount : '')
             setLaborBudgetTotal(j.laborBudget !== undefined && j.laborBudget !== null ? j.laborBudget : '')
             if (j.note) setNote(j.note)
+            if (j.status) setStatus(j.status)
             const assignedCrew = j.assignToCrew ? (typeof j.assignToCrew === 'object' ? j.assignToCrew._id : j.assignToCrew) : null
             setCrewLeadId(assignedCrew)
           }
@@ -201,6 +204,7 @@ export default function CreateJobModal({
     setContractAmount(preset.contractAmount)
     setLaborBudgetTotal(preset.laborBudgetTotal)
     setSiteAddress(preset.name)
+    if (preset.status) setStatus(preset.status)
   }
 
   async function handleSubmit() {
@@ -222,6 +226,7 @@ export default function CreateJobModal({
       crewLeadId,
       note,
       color: selectedCrew?.color ?? color,
+      status,
     }
 
     try {
@@ -238,27 +243,20 @@ export default function CreateJobModal({
           contractAmount: contractVal as any,
           laborBudget: laborVal as any,
           note: note.trim() || undefined,
-          status: 'awarded',
+          status: status,
+          ...(assignCrewNow && crewLeadId
+            ? {
+                crewAssignment: {
+                  crewId: crewLeadId,
+                  startDate: toIsoDate(assignStartDate) || toIsoDate(startDate) || new Date().toISOString().slice(0, 10),
+                  endDate: toIsoDate(assignEndDate) || undefined,
+                  excludeWeekends: excludeWeekends,
+                  note: note.trim() || undefined,
+                },
+              }
+            : {}),
         }
         const res = await createJob(payload)
-        const createdJobId = res.data._id
-        if (assignCrewNow && crewLeadId && createdJobId) {
-          try {
-            await createCrewAssignment(createdJobId, {
-              crewId: crewLeadId,
-              startDate: toIsoDate(assignStartDate) || toIsoDate(startDate) || new Date().toISOString().slice(0, 10),
-              endDate: toIsoDate(assignEndDate) || undefined,
-              excludeWeekends: excludeWeekends,
-              note: note.trim() || undefined,
-            })
-          } catch (assignErr: any) {
-            console.error('Failed to post crew assignment:', assignErr)
-            const parsedAssign = parseApiErrors(assignErr, 'Job was created, but crew assignment failed.')
-            setApiError(parsedAssign.generalMessage)
-            setFieldErrors(parsedAssign.fieldErrors)
-            return
-          }
-        }
         onSubmit(formData, res.data)
       } else {
         if (!job?.id) return
@@ -274,6 +272,7 @@ export default function CreateJobModal({
           contractAmount: contractVal as any,
           laborBudget: laborVal as any,
           note: note.trim() || undefined,
+          status: status,
         }
         const res = await updateJob(job.id, patchPayload)
         if (assignCrewNow && crewLeadId && job.id) {
@@ -349,15 +348,35 @@ export default function CreateJobModal({
             )}
 
             <div className="field-row">
-              <div style={{ flex: '0 0 140px' }}>
-                <label className="field-label">Job ID Number <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
+              <div style={{ flex: '0 0 160px' }}>
+                <label className="field-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  Job ID Number
+                  <span
+                    title="Auto-generated if left empty"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      color: '#6366f1',
+                      fontWeight: 500,
+                      fontSize: '0.75rem',
+                      cursor: 'help'
+                    }}
+                  >
+                    <Icon.Sparkles width={12} height={12} />
+                    Auto
+                  </span>
+                </label>
                 <input
                   type="number"
                   className={`field-input${fieldErrors.jobIdNumber ? ' field-input--error' : ''}`}
-                  placeholder="Enter Job ID"
+                  placeholder="Auto-generated"
                   value={jobIdNumber}
                   onChange={(e) => setJobIdNumber(e.target.value === '' ? '' : Number(e.target.value))}
                 />
+                <span style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '3px', display: 'block', lineHeight: 1.2 }}>
+                  Auto-generated if left empty
+                </span>
                 {fieldErrors.jobIdNumber && <span className="field-error-text">{fieldErrors.jobIdNumber}</span>}
               </div>
               <div style={{ flex: 1 }}>
@@ -457,6 +476,30 @@ export default function CreateJobModal({
                 {fieldErrors.laborBudget && <span className="field-error-text">{fieldErrors.laborBudget}</span>}
               </div>
             </div>
+
+            <div style={{ marginTop: '0.85rem' }}>
+              <label className="field-label">Status*</label>
+              <Dropdown
+                value={status}
+                placeholder="Select status"
+                onChange={(id) => setStatus(id)}
+                selectedLabel={
+                  status === 'in-progress'
+                    ? 'In Progress'
+                    : status === 'completed'
+                    ? 'Complete'
+                    : status === 'awarded'
+                    ? 'Awarded'
+                    : 'Select status'
+                }
+                options={[
+                  { id: 'awarded', label: 'Awarded' },
+                  { id: 'in-progress', label: 'In Progress' },
+                  { id: 'completed', label: 'Complete' },
+                ]}
+              />
+              {fieldErrors.status && <span className="field-error-text">{fieldErrors.status}</span>}
+            </div>
           </div>
 
           <div className="job-form-modal__side">
@@ -465,7 +508,14 @@ export default function CreateJobModal({
                 <input
                   type="checkbox"
                   checked={assignCrewNow}
-                  onChange={(e) => setAssignCrewNow(e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    setAssignCrewNow(checked)
+                    if (checked) {
+                      if (startDate) setAssignStartDate(startDate)
+                      if (endDate) setAssignEndDate(endDate)
+                    }
+                  }}
                 />
                 <span>Assign crew now</span>
               </label>
@@ -511,27 +561,29 @@ export default function CreateJobModal({
                     })),
                   ]}
                 />
+                {fieldErrors['crewAssignment.crewId'] && (
+                  <span className="field-error-text">{fieldErrors['crewAssignment.crewId']}</span>
+                )}
 
                 <div className="field-row" style={{ marginTop: '12px' }}>
-                  <div>
+                  <div className={fieldErrors['crewAssignment.startDate'] ? 'field-date--error' : ''}>
                     <label className="field-label">Assignment Start Date*</label>
                     <DatePickerField value={assignStartDate} onChange={setAssignStartDate} />
+                    {fieldErrors['crewAssignment.startDate'] && (
+                      <span className="field-error-text">{fieldErrors['crewAssignment.startDate']}</span>
+                    )}
                   </div>
-                  <div>
+                  <div className={fieldErrors['crewAssignment.endDate'] ? 'field-date--error' : ''}>
                     <label className="field-label">Assignment End Date</label>
                     <DatePickerField value={assignEndDate} onChange={setAssignEndDate} />
+                    {fieldErrors['crewAssignment.endDate'] && (
+                      <span className="field-error-text">{fieldErrors['crewAssignment.endDate']}</span>
+                    )}
                   </div>
                 </div>
               </>
             )}
 
-            <label className="field-label">Add a note <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
-            <textarea
-              className="field-textarea field-textarea--tall job-form-modal__note"
-              placeholder="Note about the job..."
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
           </div>
         </div>
 

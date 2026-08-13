@@ -1,4 +1,4 @@
-const DOMAIN = '@ids-demo.com'
+const DOMAIN = '@ids.com'
 
 export default function EmailField({
   value,

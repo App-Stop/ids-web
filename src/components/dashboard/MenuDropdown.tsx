@@ -67,6 +67,12 @@ export default function MenuDropdown({
     )
   }
 
+  const [search, setSearch] = useState('')
+
+  const filteredOptions = search.trim()
+    ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
+    : options
+
   return (
     <div className={`md-wrap ${open ? 'is-open' : ''} ${className}`} onBlur={handleBlur} tabIndex={-1}>
       <button type="button" className="btn btn--outline md-trigger" onClick={() => setOpen((o) => !o)}>
@@ -83,6 +89,26 @@ export default function MenuDropdown({
       {open && (
         <div className={`md-floating ${align === 'right' ? 'md-floating--right' : ''}`} onMouseDown={cancelBlur}>
           <div className="md-panel">
+            {options.length > 4 && (
+              <div style={{ padding: '6px 8px', borderBottom: '1px solid #f3f4f6' }}>
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    outline: 'none',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            )}
             {includeAll && (
               <button
                 type="button"
@@ -90,6 +116,7 @@ export default function MenuDropdown({
                 onClick={() => {
                   onChange(null)
                   setOpen(false)
+                  setSearch('')
                 }}
               >
                 <span className="md-option__main">
@@ -98,7 +125,7 @@ export default function MenuDropdown({
                 {value === null && <Icon.Check width={14} height={14} />}
               </button>
             )}
-            {options.map((opt) => (
+            {filteredOptions.map((opt) => (
               <button
                 key={opt.id}
                 type="button"
@@ -106,6 +133,7 @@ export default function MenuDropdown({
                 onClick={() => {
                   onChange(opt.id)
                   setOpen(false)
+                  setSearch('')
                 }}
               >
                 <span className="md-option__main">
@@ -118,6 +146,11 @@ export default function MenuDropdown({
                 {value === opt.id && <Icon.Check width={14} height={14} />}
               </button>
             ))}
+            {filteredOptions.length === 0 && (
+              <div style={{ padding: '8px 12px', fontSize: '12px', color: '#9ca3af', textAlign: 'center' }}>
+                No results
+              </div>
+            )}
           </div>
         </div>
       )}

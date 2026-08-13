@@ -13,6 +13,7 @@ export default function JobDetailsModal({
   onDone,
   onChangeCrew,
   onRemoveCrew,
+  onDeleteJob,
   onSaveNote,
 }: {
   job: Job
@@ -20,11 +21,12 @@ export default function JobDetailsModal({
   note: string
   onDone: () => void
   onChangeCrew: () => void
-  onRemoveCrew: () => void
+  onRemoveCrew?: () => void
+  onDeleteJob?: () => void
   /** When provided, the note section becomes editable inside the modal. */
   onSaveNote?: (text: string) => void
 }) {
-  const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [editingNote, setEditingNote] = useState(false)
   const [noteDraft, setNoteDraft] = useState(note)
   const [fetchedJob, setFetchedJob] = useState<JobItem | null>(null)
@@ -75,14 +77,16 @@ export default function JobDetailsModal({
 
   const displayNote = fetchedJob?.note ?? note
 
-  if (confirmingRemove) {
+  const handleDelete = onDeleteJob || onRemoveCrew
+
+  if (confirmingDelete) {
     return (
       <ConfirmModal
-        title="Are you sure you want to remove this crew?"
+        title="Are you sure you want to delete this job?"
         message="This action is irreversible"
-        confirmLabel="Yes Remove"
-        onCancel={() => setConfirmingRemove(false)}
-        onConfirm={onRemoveCrew}
+        confirmLabel="Yes, Delete"
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={handleDelete}
       />
     )
   }
@@ -203,10 +207,10 @@ export default function JobDetailsModal({
       )}
 
       <div className="modal-actions modal-actions--split">
-        {crew ? (
-          <button type="button" className="btn btn--danger" onClick={() => setConfirmingRemove(true)}>
+        {handleDelete ? (
+          <button type="button" className="btn btn--danger" onClick={() => setConfirmingDelete(true)}>
             <Icon.Trash width={16} height={16} />
-            Remove Crew
+            Delete Job
           </button>
         ) : (
           <span />
