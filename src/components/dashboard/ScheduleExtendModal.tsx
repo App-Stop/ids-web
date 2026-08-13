@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import Modal from './Modal'
 import { Icon } from './icons'
 import { formatMdy } from '../../lib/scheduleData'
@@ -33,6 +34,7 @@ export default function ScheduleExtendModal({
   edge,
   from,
   to,
+  defaultExcludeWeekends = false,
   saving = false,
   error,
   onCancel,
@@ -45,11 +47,13 @@ export default function ScheduleExtendModal({
   edge: 'start' | 'end'
   from: { start: string; end: string | null }
   to: { start: string; end: string | null }
+  defaultExcludeWeekends?: boolean
   saving?: boolean
   error?: string | null
   onCancel: () => void
-  onConfirm: () => void
+  onConfirm: (excludeWeekends: boolean) => void
 }) {
+  const [excludeWeekends, setExcludeWeekends] = useState(defaultExcludeWeekends)
   const wasSpan = dayCount(from.start, from.end)
   const isSpan = dayCount(to.start, to.end)
   const isExtension =
@@ -89,6 +93,26 @@ export default function ScheduleExtendModal({
         </div>
       </div>
 
+      <label
+        className="checkbox-label"
+        style={{
+          marginTop: '1.25rem',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          cursor: 'pointer',
+          fontSize: '0.9rem',
+          userSelect: 'none',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={excludeWeekends}
+          onChange={(e) => setExcludeWeekends(e.target.checked)}
+        />
+        <span>Exclude Weekends From Schedule</span>
+      </label>
+
       {error && <div className="sb-move__error" style={{ marginTop: '1rem' }}>{error}</div>}
 
       <div className="modal-actions" style={{ marginTop: '1.5rem' }}>
@@ -98,7 +122,7 @@ export default function ScheduleExtendModal({
         <button
           type="button"
           className="btn btn--primary"
-          onClick={onConfirm}
+          onClick={() => onConfirm(excludeWeekends)}
           disabled={saving}
         >
           {saving ? 'Updating…' : 'Confirm'}
