@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MagnifyingGlass, Plus, CaretLeft, CaretRight, PenIcon } from '@phosphor-icons/react'
+import { MagnifyingGlass, Plus, CaretLeft, CaretRight, CaretDown, PenIcon } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Topbar from '../components/dashboard/Topbar'
 import Dropdown from '../components/dashboard/Dropdown'
@@ -8,7 +8,6 @@ import ZoomControl from '../components/dashboard/ZoomControl'
 import CreateJobModal, { type JobFormData } from '../components/dashboard/CreateJobModal'
 import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
-import { Icon } from '../components/dashboard/icons'
 import { assignableCrews, formatMoney, type Job, type UnassignedCrew } from '../lib/dashboardData'
 import { STATUS_COLORS, STATUS_LABELS, type JobStatus, type ManagedJob } from '../lib/jobsManagementData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
@@ -19,6 +18,7 @@ import { type UserItem } from '../api/crewApi'
 import { crewColorFor } from '../lib/scheduleData'
 import { getErrorMessage } from '../lib/errors'
 import { useCrewsSummary, useJobsPaged, useJobMutations } from '../hooks/useQueryHooks'
+import { TableRowSkeleton } from '../components/common/Shimmer'
 import './JobsManagement.css'
 
 type SortKey = 'newest' | 'oldest' | 'rateLowHigh' | 'rateHighLow' | 'workers' | 'ascending' | 'descending'
@@ -339,11 +339,7 @@ export default function JobsManagement() {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={11} className="crew-empty-cell" style={{ textAlign: 'center', padding: '32px 0' }}>
-                    Loading jobs...
-                  </td>
-                </tr>
+                <TableRowSkeleton cols={11} rows={6} height="22px" />
               ) : jobs.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="crew-empty-cell" style={{ textAlign: 'center', padding: '32px 0' }}>
@@ -410,19 +406,19 @@ export default function JobsManagement() {
                         <div>{job.endDate}</div>
                       </td>
                       <td className="jm-center">
-                        <div style={{ display: 'inline-block', textAlign: 'left' }}>
+                        <div className="jm-status-dropdown" style={{ display: 'inline-block', textAlign: 'left' }}>
                           <Dropdown
                             value={job.status}
                             selectedLabel={
                               <span
                                 className="jm-status"
                                 style={{
-                                  color: STATUS_COLORS[job.status],
-                                  borderColor: STATUS_COLORS[job.status],
+                                  color: STATUS_COLORS[job.status] || '#16a34a',
+                                  backgroundColor: `${STATUS_COLORS[job.status] || '#16a34a'}18`,
                                 }}
                               >
-                                {STATUS_LABELS[job.status]}
-                                <Icon.ChevronDown width={12} height={12} style={{ opacity: 0.7 }} />
+                                {STATUS_LABELS[job.status] || job.status}
+                                <CaretDown size={12} weight="bold" style={{ opacity: 0.8 }} />
                               </span>
                             }
                             onChange={(v) => handleStatusChange(job.rawId || job.id, v as JobStatus)}
@@ -469,6 +465,7 @@ export default function JobsManagement() {
           <div className="jm-pagination-limit">
             <span>Show:</span>
             <Dropdown
+              direction="up"
               value={String(limit)}
               onChange={(v) => {
                 setLimit(Number(v))
@@ -529,14 +526,8 @@ export default function JobsManagement() {
         <JobDetailsModal
           job={toJob(activeRow)}
           crew={toCrew(activeRow)}
-          note={activeRow.note ?? ''}
           onDone={() => setFlow({ type: 'none' })}
           onChangeCrew={() => setFlow({ type: 'assignCrew', jobId: activeRow.rawId || activeRow.id })}
-          onSaveNote={(text: string) => {
-            updateJobMutation
-              .mutateAsync({ id: activeRow.rawId || activeRow.id, payload: { note: text } })
-              .catch((err) => setActionError(getErrorMessage(err, 'Failed to save note.')))
-          }}
           onDeleteJob={() => handleDeleteJob(activeRow.rawId || activeRow.id)}
         />
       )}

@@ -5,7 +5,16 @@ import { Icon } from './icons'
 export interface DropdownOption {
   id: string
   label: ReactNode
+  /**
+   * Text to match against when filtering. Required whenever `label` is JSX —
+   * otherwise there is nothing readable to search and the option can only be
+   * matched by its raw id.
+   */
+  searchText?: string
 }
+
+/** Below this many options, scanning the list beats typing — no search box. */
+const SEARCH_THRESHOLD = 6
 
 export default function Dropdown({
   value,
@@ -16,6 +25,8 @@ export default function Dropdown({
   staticLabel,
   onSearchChange,
   searchValue,
+  searchable,
+  direction = 'auto',
 }: {
   value: string | null
   options: DropdownOption[]
@@ -26,9 +37,23 @@ export default function Dropdown({
   staticLabel?: string
   onSearchChange?: (val: string) => void
   searchValue?: string
+  /** Force the search box on or off; defaults to showing it only for long lists. */
+  searchable?: boolean
+  /** Force dropdown direction to 'up', 'down', or 'auto' (opens up if near bottom). */
+  direction?: 'up' | 'down' | 'auto'
 }) {
   const [open, setOpen] = useState(false)
-  const [coords, setCoords] = useState<{ top: number; left: number; minWidth: number }>({ top: 0, left: 0, minWidth: 120 })
+  const [coords, setCoords] = useState<{
+    top?: number
+    bottom?: number
+    left: number
+    minWidth: number
+    placement: 'up' | 'down'
+  }>({
+    left: 0,
+    minWidth: 120,
+    placement: 'down',
+  })
   const ref = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
@@ -50,11 +75,32 @@ export default function Dropdown({
   function toggleOpen() {
     if (!open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
-      setCoords({
-        top: rect.bottom + 6,
-        left: rect.left,
-        minWidth: Math.max(120, rect.width),
-      })
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+      const placement =
+        direction === 'up'
+          ? 'up'
+          : direction === 'down'
+          ? 'down'
+          : spaceBelow < 220 && spaceAbove > spaceBelow
+          ? 'up'
+          : 'down'
+
+      if (placement === 'up') {
+        setCoords({
+          bottom: window.innerHeight - rect.top + 6,
+          left: rect.left,
+          minWidth: Math.max(120, rect.width),
+          placement: 'up',
+        })
+      } else {
+        setCoords({
+          top: rect.bottom + 6,
+          left: rect.left,
+          minWidth: Math.max(120, rect.width),
+          placement: 'down',
+        })
+      }
     }
     setOpen((o) => !o)
   }
@@ -70,17 +116,20 @@ export default function Dropdown({
     }
   }
 
+  // Server-driven search (onSearchChange) always gets a box; otherwise only
+  // lists long enough to be worth filtering do.
+  const showSearch = searchable ?? (onSearchChange !== undefined || options.length > SEARCH_THRESHOLD)
+
   const filteredOptions = onSearchChange
     ? options
     : search.trim()
-    ? options.filter((o) => {
-        if (typeof o.label === 'string') {
-          return o.label.toLowerCase().includes(search.toLowerCase())
-        }
-        const textContent = (o as any).searchText ?? String(o.id)
-        return textContent.toLowerCase().includes(search.toLowerCase())
-      })
-    : options
+      ? options.filter((o) => {
+          // Prefer explicit searchText: a JSX label has no readable text to
+          // match, so falling back to the id would only ever match a pasted id.
+          const haystack = o.searchText ?? (typeof o.label === 'string' ? o.label : String(o.id))
+          return haystack.toLowerCase().includes(search.toLowerCase())
+        })
+      : options
 
   return (
     <div className="dd" ref={ref}>
@@ -100,7 +149,9 @@ export default function Dropdown({
             className="dd__menu-wrap"
             style={{
               position: 'fixed',
-              top: `${coords.top}px`,
+              ...(coords.placement === 'up'
+                ? { bottom: `${coords.bottom}px` }
+                : { top: `${coords.top}px` }),
               left: `${coords.left}px`,
               minWidth: `${coords.minWidth}px`,
               zIndex: 99999,
@@ -111,24 +162,26 @@ export default function Dropdown({
               overflow: 'hidden',
             }}
           >
-            <div style={{ padding: '6px 8px', borderBottom: '1px solid #f3f4f6' }}>
-              <input
-                type="text"
-                placeholder="Search..."
-                value={search}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                autoFocus
-                style={{
-                  width: '100%',
-                  padding: '4px 8px',
-                  fontSize: '12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  outline: 'none',
-                }}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
+            {showSearch && (
+              <div style={{ padding: '6px 8px', borderBottom: '1px solid #f3f4f6' }}>
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={search}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    outline: 'none',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            )}
             {/* .dd__menu is absolutely positioned for the old inline markup;
                 inside the portal wrap that takes it out of flow and the wrap's
                 overflow:hidden clips it away, so force it back into flow. The

@@ -15,6 +15,7 @@ import {
 import { useCrewsSummary, useTimeEntries, useInvalidateServerState } from '../hooks/useQueryHooks'
 import { getErrorMessage } from '../lib/errors'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
+import { TableRowSkeleton } from '../components/common/Shimmer'
 import './Dashboard.css'
 import '../components/dashboard/crew-modals.css'
 import './Timesheet.css'
@@ -1205,13 +1206,15 @@ export default function Timesheet() {
                 </tr>
               </thead>
               <tbody>
-                {summaries.length === 0 && (
+                {loading ? (
+                  <TableRowSkeleton cols={gridColSpan} rows={6} height="20px" />
+                ) : summaries.length === 0 ? (
                   <tr>
                     <td colSpan={gridColSpan} className="ts-empty">
                       {emptyMessage}
                     </td>
                   </tr>
-                )}
+                ) : null}
                 {summaries.map((summary) => {
                   const isOpen = expanded.includes(summary.memberId)
                   const peak = Math.max(...summary.buckets, 1)

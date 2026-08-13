@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import BrandLogos from '../components/BrandLogos'
 import { resetPassword } from '../lib/auth'
+import PasswordInput from '../components/PasswordInput'
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('')
@@ -38,9 +39,8 @@ export default function ResetPassword() {
 
         <div className="auth-field">
           <label htmlFor="new-password">New Password</label>
-          <input
+          <PasswordInput
             id="new-password"
-            type="password"
             className="auth-input"
             placeholder="Enter your password"
             value={password}
@@ -52,9 +52,8 @@ export default function ResetPassword() {
 
         <div className="auth-field">
           <label htmlFor="confirm-password">Confirm New Password</label>
-          <input
+          <PasswordInput
             id="confirm-password"
-            type="password"
             className="auth-input"
             placeholder="Re-enter your password"
             value={confirm}

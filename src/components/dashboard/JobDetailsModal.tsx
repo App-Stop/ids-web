@@ -9,26 +9,19 @@ import { getJobById, type JobItem } from '../../api/jobApi'
 export default function JobDetailsModal({
   job,
   crew,
-  note,
   onDone,
   onChangeCrew,
   onRemoveCrew,
   onDeleteJob,
-  onSaveNote,
 }: {
   job: Job
   crew: UnassignedCrew | null
-  note: string
   onDone: () => void
   onChangeCrew: () => void
   onRemoveCrew?: () => void
   onDeleteJob?: () => void
-  /** When provided, the note section becomes editable inside the modal. */
-  onSaveNote?: (text: string) => void
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [editingNote, setEditingNote] = useState(false)
-  const [noteDraft, setNoteDraft] = useState(note)
   const [fetchedJob, setFetchedJob] = useState<JobItem | null>(null)
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(Boolean(job.id && !job.id.startsWith('#tmp')))
 
@@ -43,9 +36,6 @@ export default function JobDetailsModal({
         const res = await getJobById(job.id)
         if (res.success && res.data) {
           setFetchedJob(res.data)
-          if (res.data.note) {
-            setNoteDraft(res.data.note)
-          }
         }
       } catch (err) {
         console.error('Failed to fetch job details:', err)
@@ -75,8 +65,6 @@ export default function JobDetailsModal({
       }
     : job
 
-  const displayNote = fetchedJob?.note ?? note
-
   const handleDelete = onDeleteJob || onRemoveCrew
 
   if (confirmingDelete) {
@@ -100,7 +88,7 @@ export default function JobDetailsModal({
       )}
       <div style={isLoadingDetails ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
         <p className="job-head__meta">
-          {displayJob.bidNo ? `Bid #${displayJob.bidNo} · ` : ''}Job #{displayJob.jobNo}
+          Job #{displayJob.jobNo}
         </p>
       <h2 className="modal-title" style={{ marginTop: '0.25rem' }}>
         {displayJob.name}
@@ -153,57 +141,6 @@ export default function JobDetailsModal({
         </div>
       ) : (
         <p className="crew-row__empty">No crew assigned</p>
-      )}
-
-      {(displayNote || onSaveNote) && (
-        <>
-          <div className="note-section__head">
-            <span className="detail-label" style={{marginTop:20}}>Note</span>
-            {onSaveNote && !editingNote && (
-              <button
-                type="button"
-                className="note-section__action"
-                onClick={() => {
-                  setNoteDraft(displayNote)
-                  setEditingNote(true)
-                }}
-              >
-                {displayNote ? 'Edit' : 'Add Note'}
-              </button>
-            )}
-          </div>
-
-          {editingNote ? (
-            <>
-              <textarea
-                className="field-textarea"
-                placeholder="Note about the job..."
-                value={noteDraft}
-                onChange={(e) => setNoteDraft(e.target.value)}
-                autoFocus
-              />
-              <div className="modal-actions note-section__actions">
-                <button type="button" className="btn btn--outline" onClick={() => setEditingNote(false)}>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  onClick={() => {
-                    onSaveNote?.(noteDraft.trim())
-                    setEditingNote(false)
-                  }}
-                >
-                  Save
-                </button>
-              </div>
-            </>
-          ) : displayNote ? (
-            <div className="note-box">{displayNote}</div>
-          ) : (
-            <p className="crew-row__empty">No note added</p>
-          )}
-        </>
       )}
 
       <div className="modal-actions modal-actions--split">

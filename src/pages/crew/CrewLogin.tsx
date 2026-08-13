@@ -7,6 +7,8 @@ import { homePathForRole, ADMIN_LOGIN_PATH } from '../../components/ProtectedRou
 import { DOMAIN } from '../../components/EmailField'
 import './crew-auth.css'
 
+import PasswordInput from '../../components/PasswordInput'
+
 /** Shared login for crew-lead and labour. Admins use /admin/login. */
 export default function CrewLogin() {
   const [email, setEmail] = useState('')
@@ -70,9 +72,8 @@ export default function CrewLogin() {
 
           <div className="cauth-field">
             <label htmlFor="crew-password">Password</label>
-            <input
+            <PasswordInput
               id="crew-password"
-              type="password"
               className="cauth-input"
               placeholder="Enter your password"
               value={password}

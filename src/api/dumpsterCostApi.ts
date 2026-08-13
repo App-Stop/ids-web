@@ -39,6 +39,8 @@ export interface CostTrackingGroup {
   jobId?: string
   jobName?: string
   jobIdNumber?: number
+  jobStartDate?: string
+  startDate?: string
   crewId?: string
   crewName?: string
   hourlyRate?: number

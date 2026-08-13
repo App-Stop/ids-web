@@ -23,6 +23,7 @@ import {
   useJobMutations,
 } from '../hooks/useQueryHooks'
 import { queryKeys } from '../lib/queryKeys'
+import { TableRowSkeleton } from '../components/common/Shimmer'
 import { getCrewById, type CrewSummaryItem } from '../api/crewApi'
 import { getCrewAssignments, type JobItem } from '../api/jobApi'
 import { getErrorMessage } from '../lib/errors'
@@ -305,7 +306,7 @@ export default function Crew() {
   )
 
   const jobMenuOptions = useMemo(
-    () => jobList.map((j) => ({ id: j._id, label: j.name || `Job #${j.jobIdNumber}` })),
+    () => jobList.map((j) => ({ id: j._id, label: j.name || `Job ID${j.jobIdNumber}` })),
     [jobList],
   )
 
@@ -589,11 +590,7 @@ export default function Crew() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr>
-                    <td colSpan={5} className="crew-empty-cell">
-                      Loading crew data...
-                    </td>
-                  </tr>
+                  <TableRowSkeleton cols={5} rows={6} height="22px" />
                 ) : visibleCrewRows.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="crew-empty-cell">
@@ -644,7 +641,7 @@ export default function Crew() {
                               {row.jobs.length > 1 && (
                                 <span className="crew-job-cell__more">+{row.jobs.length - 1}</span>
                               )}
-                              <Icon.ChevronRight width={14} height={14} />
+                              
                             </span>
                           </button>
                         )}
@@ -703,11 +700,7 @@ export default function Crew() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr>
-                    <td colSpan={6} className="crew-empty-cell">
-                      Loading roster data...
-                    </td>
-                  </tr>
+                  <TableRowSkeleton cols={6} rows={6} height="22px" />
                 ) : visibleRosterRows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="crew-empty-cell">
@@ -775,6 +768,7 @@ export default function Crew() {
           <div className="jm-pagination-bar">
             <div className="jm-pagination-limit">
               <MenuDropdown
+                direction="up"
                 className="crew-dd"
                 options={LIMIT_OPTIONS}
                 value={String(rosterLimit)}
@@ -940,7 +934,6 @@ export default function Crew() {
         <JobDetailsModal
           job={activeJob}
           crew={activeCrewLead}
-          note=""
           onDone={() => setFlow({ type: 'none' })}
           onChangeCrew={() => setFlow({ type: 'assignCrew', crewId: activeCrew.id, jobIndex: flow.jobIndex })}
           onRemoveCrew={() => handleRemoveCrewFromJob(activeJob.id, activeCrew.id)}

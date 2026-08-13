@@ -18,7 +18,6 @@ export function AddDailyDumpsterCountModal({ onCancel, onSuccess }: DumpsterCost
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10))
   const [dumpsterCount, setDumpsterCount] = useState<string>('0')
   const [dumpsterCost, setDumpsterCost] = useState<string>('600')
-  const [note, setNote] = useState<string>('')
 
   const [submitting, setSubmitting] = useState(false)
   const [apiError, setApiError] = useState<string>('')
@@ -42,7 +41,6 @@ export function AddDailyDumpsterCountModal({ onCancel, onSuccess }: DumpsterCost
         date,
         dumpsterCount: parsedCount,
         dumpsterCost: parsedCost,
-        ...(note.trim() ? { note: note.trim() } : {}),
       }
 
       const response = await createDumpsterCost(payload)
@@ -139,14 +137,6 @@ export function AddDailyDumpsterCountModal({ onCancel, onSuccess }: DumpsterCost
           </div>
         </div>
       </div>
-
-      <label className="field-label">Add a note</label>
-      <textarea
-        className="field-textarea field-textarea--tall"
-        placeholder="30 yard, fuel, etc"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
 
       <div className="jm-total-row">
         <span>Total Cost</span>

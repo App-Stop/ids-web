@@ -5,7 +5,7 @@ export default function JobSummaryChip({ job }: { job: Job }) {
     <div className="job-chip">
       <div className="job-chip__body">
         <span className="job-head__meta">
-          Bid #{job.bidNo} &middot; Job #{job.jobNo}
+         Job #{job.jobNo}
         </span>
         <strong>{job.name}</strong>
         <span className="job-chip__sub">
