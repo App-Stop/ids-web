@@ -159,6 +159,7 @@ export interface UpdateCrewPayload {
   name?: string
   crewLead?: string
   members?: string[]
+  crewColor?: string
   status?: string
   note?: string
 }

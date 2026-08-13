@@ -1,0 +1,27 @@
+@keyframes shimmerAnim {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-block {
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    #f1f5f9 25%,
+    #e2e8f0 37%,
+    #f1f5f9 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmerAnim 1.4s infinite ease-in-out;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+.shimmer-row td {
+  border-bottom: 1px solid #ececec;
+  background: #ffffff;
+}

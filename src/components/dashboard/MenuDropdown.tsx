@@ -22,6 +22,7 @@ interface MenuDropdownProps {
   showAvatar?: boolean
   panelTitle?: string
   align?: 'left' | 'right'
+  direction?: 'up' | 'down' | 'auto'
   className?: string
 }
 
@@ -39,9 +40,12 @@ export default function MenuDropdown({
   showDot = false,
   showAvatar = false,
   align = 'left',
+  direction = 'auto',
   className = '',
 }: MenuDropdownProps) {
   const [open, setOpen] = useState(false)
+  const [placement, setPlacement] = useState<'up' | 'down'>('down')
+  const wrapRef = useRef<HTMLDivElement>(null)
   const closeTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const selected = options.find((o) => o.id === value)
@@ -53,6 +57,22 @@ export default function MenuDropdown({
   }
   function cancelBlur() {
     if (closeTimeout.current) clearTimeout(closeTimeout.current)
+  }
+
+  function handleToggle() {
+    if (!open && wrapRef.current) {
+      if (direction === 'up') {
+        setPlacement('up')
+      } else if (direction === 'down') {
+        setPlacement('down')
+      } else {
+        const rect = wrapRef.current.getBoundingClientRect()
+        const spaceBelow = window.innerHeight - rect.bottom
+        const spaceAbove = rect.top
+        setPlacement(spaceBelow < 220 && spaceAbove > spaceBelow ? 'up' : 'down')
+      }
+    }
+    setOpen((o) => !o)
   }
 
   function renderCrewChrome(opt: MenuDropdownOption, withLabel: boolean) {
@@ -74,8 +94,8 @@ export default function MenuDropdown({
     : options
 
   return (
-    <div className={`md-wrap ${open ? 'is-open' : ''} ${className}`} onBlur={handleBlur} tabIndex={-1}>
-      <button type="button" className="btn btn--outline md-trigger" onClick={() => setOpen((o) => !o)}>
+    <div ref={wrapRef} className={`md-wrap ${open ? 'is-open' : ''} ${className}`} onBlur={handleBlur} tabIndex={-1}>
+      <button type="button" className="btn btn--outline md-trigger" onClick={handleToggle}>
         <span className="md-trigger__label">
           {useCrewItems && selected && value !== null ? (
             renderCrewChrome(selected, true)
@@ -87,7 +107,7 @@ export default function MenuDropdown({
       </button>
 
       {open && (
-        <div className={`md-floating ${align === 'right' ? 'md-floating--right' : ''}`} onMouseDown={cancelBlur}>
+        <div className={`md-floating ${align === 'right' ? 'md-floating--right' : ''} ${placement === 'up' ? 'md-floating--up' : ''}`} onMouseDown={cancelBlur}>
           <div className="md-panel">
             {options.length > 4 && (
               <div style={{ padding: '6px 8px', borderBottom: '1px solid #f3f4f6' }}>

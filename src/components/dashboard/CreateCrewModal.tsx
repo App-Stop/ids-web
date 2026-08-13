@@ -10,6 +10,17 @@ import { useCachedFetchers } from '../../hooks/useQueryHooks'
 
 export type CrewStatus = 'active' | 'inactive' | 'unassigned'
 
+/** Preset swatches; anything outside this set counts as a custom colour. */
+const CREW_COLOR_PALETTE = [
+  '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
+  '#ec4899', '#f43f5e', '#ef4444', '#f97316', '#f59e0b',
+  '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6',
+  '#06b6d4', '#0284c7', '#64748b',
+]
+
+const CUSTOM_SWATCH_GRADIENT =
+  'conic-gradient(from 0deg, #ef4444, #f97316, #eab308, #22c55e, #06b6d4, #3b82f6, #a855f7, #ef4444)'
+
 export interface CrewFormData {
   crewName: string
   crewLeadId: string
@@ -61,6 +72,7 @@ export default function CreateCrewModal({
   const jobId = crew?.jobId ?? null
   const [status, setStatus] = useState<string>(crew?.status === 'unassigned' ? 'un-assigned' : 'assigned')
   const [color, setColor] = useState(crew?.color ?? crewColors[0])
+  const isCustomColor = !CREW_COLOR_PALETTE.some((c) => c.toLowerCase() === color.toLowerCase())
   const [note, setNote] = useState(crew?.note ?? '')
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [laborError, setLaborError] = useState('')
@@ -329,6 +341,7 @@ export default function CreateCrewModal({
           name: crewName.trim(),
           crewLead: crewLeadId,
           ...(selectedMemberIds.length > 0 ? { members: selectedMemberIds } : {}),
+          crewColor: color,
           status,
           ...(note.trim() ? { note: note.trim() } : {}),
         }
@@ -478,87 +491,68 @@ export default function CreateCrewModal({
 
 
 
-      {!isEdit && (
-        <>
-          <label className="field-label">Crew Color</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div className="color-picker" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-              {[
-                '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
-                '#ec4899', '#f43f5e', '#ef4444', '#f97316', '#f59e0b',
-                '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6',
-                '#06b6d4', '#0284c7', '#64748b'
-              ].map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`color-swatch ${c.toLowerCase() === color.toLowerCase() ? 'is-selected' : ''}`}
-                  style={{ background: c }}
-                  onClick={() => setColor(c)}
-                />
-              ))}
+      <label className="field-label">Crew Color</label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div className="color-picker" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+          {CREW_COLOR_PALETTE.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`color-swatch ${c.toLowerCase() === color.toLowerCase() ? 'is-selected' : ''}`}
+              style={{ background: c }}
+              onClick={() => setColor(c)}
+            />
+          ))}
 
-              <label
-                title="Choose custom color"
-                className={`color-swatch ${![
-                  '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
-                  '#ec4899', '#f43f5e', '#ef4444', '#f97316', '#f59e0b',
-                  '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6',
-                  '#06b6d4', '#0284c7', '#64748b'
-                ].some(c => c.toLowerCase() === color.toLowerCase()) ? 'is-selected' : ''}`}
-                style={{
-                  position: 'relative',
-                  background: ![
-                    '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
-                    '#ec4899', '#f43f5e', '#ef4444', '#f97316', '#f59e0b',
-                    '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6',
-                    '#06b6d4', '#0284c7', '#64748b'
-                  ].some(c => c.toLowerCase() === color.toLowerCase())
-                    ? color
-                    : 'conic-gradient(from 0deg, #ef4444, #f97316, #eab308, #22c55e, #06b6d4, #3b82f6, #a855f7, #ef4444)',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#fff',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
-                }}
-              >
-                <input
-                  type="color"
-                  value={color.startsWith('#') && color.length === 7 ? color : '#3b82f6'}
-                  onChange={(e) => setColor(e.target.value)}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    opacity: 0,
-                    cursor: 'pointer'
-                  }}
-                />
-                +
-              </label>
-            </div>
+          <label
+            title="Choose custom color"
+            className={`color-swatch ${isCustomColor ? 'is-selected' : ''}`}
+            style={{
+              position: 'relative',
+              // Shows the picked colour once it's off-palette, and the rainbow
+              // wheel while one of the swatches is still the active choice.
+              background: isCustomColor ? color : CUSTOM_SWATCH_GRADIENT,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
+            }}
+          >
+            <input
+              type="color"
+              value={color.startsWith('#') && color.length === 7 ? color : '#3b82f6'}
+              onChange={(e) => setColor(e.target.value)}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                opacity: 0,
+                cursor: 'pointer'
+              }}
+            />
+            +
+          </label>
+        </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-              <span style={{ fontSize: '0.78rem', color: '#6b7280', fontWeight: 500 }}>Hex Code:</span>
-              <input
-                type="text"
-                className="field-input"
-                style={{ width: '100px', height: '30px', fontSize: '0.82rem', fontFamily: 'monospace', padding: '0 8px' }}
-                value={color}
-                placeholder="#3b82f6"
-                onChange={(e) => setColor(e.target.value)}
-              />
-              <span style={{ width: 22, height: 22, borderRadius: 4, background: color, border: '1px solid #d1d5db', display: 'inline-block' }} />
-            </div>
-          </div>
-        </>
-      )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+          <span style={{ fontSize: '0.78rem', color: '#6b7280', fontWeight: 500 }}>Hex Code:</span>
+          <input
+            type="text"
+            className="field-input"
+            style={{ width: '100px', height: '30px', fontSize: '0.82rem', fontFamily: 'monospace', padding: '0 8px' }}
+            value={color}
+            placeholder="#3b82f6"
+            onChange={(e) => setColor(e.target.value)}
+          />
+          <span style={{ width: 22, height: 22, borderRadius: 4, background: color, border: '1px solid #d1d5db', display: 'inline-block' }} />
+        </div>
+      </div>
 
       {apiError && <p className="field-error" style={{ marginTop: 12 }}>{apiError}</p>}
 

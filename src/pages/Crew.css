@@ -498,6 +498,9 @@
    renders as a full-height strip down the left edge of the screen. */
 .crew-table--roster .crew-assigned-td {
   position: relative;
+  /* Clears the 4px bar at left:0 plus a gap, so the crew name isn't flush
+     against it. Needs !important to beat the nth-child(2) padding rule. */
+  padding-left: 1rem !important;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -544,6 +547,7 @@
 }
 
 .crew-assigned-name {
+  padding-left: 10px;
   font-weight: 600;
   color: var(--ink);
 }

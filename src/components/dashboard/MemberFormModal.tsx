@@ -5,6 +5,7 @@ import type { CrewMenuOption, Status } from '../../lib/crewData'
 import { createUser, updateUser, type CreateUserPayload, type UpdateUserPayload, type UserResponseData } from '../../api/crewApi'
 import { useCachedFetchers } from '../../hooks/useQueryHooks'
 import { parseApiErrors } from '../../lib/errors'
+import PasswordInput from '../PasswordInput'
 import './crew-modals.css'
 
 export interface MemberFormData {
@@ -356,10 +357,9 @@ export default function MemberFormModal({ mode, crews, initial, onCancel, onSubm
               Set custom password
             </label>
             {useCustomPassword ? (
-              <input
-                type="password"
+              <PasswordInput
                 className="cm-input"
-                style={{ marginTop: '8px' }}
+                containerStyle={{ marginTop: '8px' }}
                 value={customPassword}
                 onChange={(e) => setCustomPassword(e.target.value)}
                 placeholder="Enter custom password"

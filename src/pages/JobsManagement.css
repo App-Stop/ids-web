@@ -408,16 +408,32 @@
   color: var(--ink);
 }
 
+.jm-status-dropdown,
+.jm-status-dropdown .dd,
+.jm-status-dropdown .dd__trigger {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  outline: none !important;
+  width: auto !important;
+}
+
+.jm-status-dropdown .dd__chevron {
+  display: none !important;
+}
+
 .jm-status {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
-  padding: 0.28rem 0.7rem;
+  padding: 0.3rem 0.75rem;
   border-radius: 999px;
-  border: 1.5px solid;
+  border: none !important;
   font-size: 0.78rem;
   font-weight: 700;
-  background: transparent;
   cursor: pointer;
   user-select: none;
   transition: all 0.15s ease;
@@ -425,7 +441,6 @@
 
 .jm-status:hover {
   opacity: 0.85;
-  transform: translateY(-1px);
 }
 
 .jm-labor {

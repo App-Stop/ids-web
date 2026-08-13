@@ -20,6 +20,7 @@ import {
 import { getErrorMessage } from '../lib/errors'
 import type { CostTrackingReportData, CostTrackingReportParams } from '../api/dumpsterCostApi'
 import { crewColorFor } from '../lib/scheduleData'
+import { TableRowSkeleton } from '../components/common/Shimmer'
 import {
   assignableCrews,
   formatMoney,
@@ -319,7 +320,11 @@ export default function CostTracking() {
                 color,
                 currentCrewName: crewName,
                 currentCrewId: crewId ?? undefined,
-                date: grp.costByDate[0]?.date || new Date().toISOString().slice(0, 10),
+                date: grp.jobStartDate
+                  ? grp.jobStartDate.slice(0, 10)
+                  : grp.startDate
+                  ? grp.startDate.slice(0, 10)
+                  : grp.costByDate[0]?.date || new Date().toISOString().slice(0, 10),
                 endDate: grp.costByDate[grp.costByDate.length - 1]?.date || new Date().toISOString().slice(0, 10),
                 contract: (grp as any).contractAmount ?? 0,
                 laborBudgetTotal: (grp as any).laborBudget ?? 0,
@@ -381,14 +386,12 @@ export default function CostTracking() {
   useClickDragScroll(tableWrapRef)
   const [jobFlow, setJobFlow] = useState<JobFlow>({ type: 'none' })
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
-  const [jobNotes, setJobNotes] = useState<Record<string, string>>({})
   const [jobCrews, setJobCrews] = useState<Record<string, UnassignedCrew | null>>({})
 
   const detailsRow =
     jobFlow.type !== 'none' ? jobRows.find((row) => row.jobId === jobFlow.jobId || row.id === jobFlow.jobId) : undefined
   const detailsJob = detailsRow ? toDetailsJob(detailsRow, jobs) : undefined
   const detailsCrew = detailsRow ? (jobCrews[detailsRow.jobId] ?? jobCrews[detailsRow.id] ?? null) : null
-  const detailsNote = detailsRow ? (jobNotes[detailsRow.jobId] ?? jobNotes[detailsRow.id] ?? '') : ''
 
   function openJobDetails(row: JobCostRow) {
     setJobFlow({ type: 'details', jobId: row.jobId })
@@ -670,7 +673,7 @@ export default function CostTracking() {
         <div className="stat-grid ct-stats-grid">
           <div className="stat-card">
             <div className="stat-card__head">
-              <span className="stat-card__label">Total Labor</span>
+              <span className="stat-card__label">Total Labor Cost</span>
               <Icon.ChevronRight width={14} height={14} />
             </div>
             <div className="stat-card__value">{formatMoney(reportData?.totalLaborCost ?? 0)}</div>
@@ -707,9 +710,11 @@ export default function CostTracking() {
         <div className={`ct-table-wrap${isTableEmpty ? ' ct-table-wrap--empty' : ''}`} ref={tableWrapRef}>
           <div className="ct-table-zoom" style={sheetZoomStyle(zoom)}>
           {loadingReport ? (
-            <div className="ct-empty" style={{ padding: '40px' }}>
-              <p className="ct-empty__text">Loading cost tracking data...</p>
-            </div>
+            <table className={`ct-table ct-table--grid${metaVisible ? ' ct-table--meta' : ''}`}>
+              <tbody>
+                <TableRowSkeleton cols={metaVisible ? 15 : 9} rows={6} height="22px" />
+              </tbody>
+            </table>
           ) : isTableEmpty ? (
             <div className="ct-empty">
               <span className="ct-empty__icon" aria-hidden>
@@ -765,7 +770,7 @@ export default function CostTracking() {
               </colgroup>
               <thead>
                 <tr>
-                  <th className="ct-sticky ct-sticky--id">Job #</th>
+                  <th className="ct-sticky ct-sticky--id">Job ID</th>
                   <th className="ct-sticky ct-sticky--job">Job</th>
                   {metaVisible && <th>Total Contract</th>}
                   {metaVisible && <th>Labor Budget per Proposal</th>}
@@ -962,7 +967,6 @@ export default function CostTracking() {
         <JobDetailsModal
           job={detailsJob}
           crew={detailsCrew}
-          note={detailsNote}
           onDone={() => setJobFlow({ type: 'none' })}
           onChangeCrew={() => setJobFlow({ type: 'assignCrew', jobId: detailsJob.id })}
           onRemoveCrew={() => {
@@ -976,7 +980,7 @@ export default function CostTracking() {
         <AssignCrewModal
           job={detailsJob}
           onCancel={() => setJobFlow({ type: 'details', jobId: detailsJob.id })}
-          onAssign={(crewId, note) => {
+          onAssign={(crewId) => {
             const crew = assignableCrews.find((c) => c.id === crewId)
             if (!crew) return
             setJobCrews((prev) => ({
@@ -989,9 +993,6 @@ export default function CostTracking() {
                 avatar: crew.avatar,
               },
             }))
-            if (note) {
-              setJobNotes((prev) => ({ ...prev, [detailsJob.id]: note }))
-            }
             // Rows come from the cost report now; re-read it rather than
             // recolouring a local copy.
             invalidateAll()

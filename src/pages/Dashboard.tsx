@@ -53,9 +53,9 @@ function toJob(item: UnassignedJobItem): Job {
 type Flow =
   | { step: 'none' }
   | { step: 'assignJob'; crew: UnassignedCrew }
-  | { step: 'jobDetails'; crew: UnassignedCrew; job: Job; note: string }
-  | { step: 'assignCrew'; crew: UnassignedCrew; job: Job; note: string }
-  | { step: 'crewDetails'; job: Job; crewLead: CrewLead; note: string }
+  | { step: 'jobDetails'; crew: UnassignedCrew; job: Job }
+  | { step: 'assignCrew'; crew: UnassignedCrew; job: Job }
+  | { step: 'crewDetails'; job: Job; crewLead: CrewLead }
   | { step: 'jobForm'; job?: Job }
 
 let nextJobSeq = 1054
@@ -146,7 +146,6 @@ export default function Dashboard() {
                           step: 'assignCrew',
                           crew: unassigned[0] ?? { id: 'tmp', name: 'Unassigned', leadName: 'TBD', rate: 0 },
                           job: toJob(item),
-                          note: '',
                         })
                       }
                     >
@@ -176,9 +175,8 @@ export default function Dashboard() {
         <JobDetailsModal
           job={flow.job}
           crew={flow.crew}
-          note={flow.note}
           onDone={() => setFlow({ step: 'none' })}
-          onChangeCrew={() => setFlow({ step: 'assignCrew', crew: flow.crew, job: flow.job, note: flow.note })}
+          onChangeCrew={() => setFlow({ step: 'assignCrew', crew: flow.crew, job: flow.job })}
           onRemoveCrew={() => {
             setFlow({ step: 'none' })
           }}
@@ -201,7 +199,6 @@ export default function Dashboard() {
         <CrewDetailsModal
           job={flow.job}
           crewLead={flow.crewLead}
-          note={flow.note}
           onDone={() => setFlow({ step: 'none' })}
           onEditJob={() => setFlow({ step: 'jobForm', job: flow.job })}
         />

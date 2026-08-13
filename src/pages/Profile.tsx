@@ -10,6 +10,7 @@ import { useAuth } from "../context/AuthContext";
 import api from "../api/axiosInstance";
 import { changeAdminPassword } from "../api/crewApi";
 import { parseApiErrors } from "../lib/errors";
+import PasswordInput from "../components/PasswordInput";
 
 type Tab = "settings" | "team" | "notifications";
 type MemberRole = "Super Admin" | "Controller" | "Ops Manager";
@@ -451,27 +452,24 @@ export default function Profile() {
               <div className="profile-password__grid">
                 <label className="profile-field profile-field--full">
                   <span>Current Password*</span>
-                  <input
+                  <PasswordInput
                     placeholder="Enter your current password"
-                    type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                   />
                 </label>
                 <label className="profile-field profile-field--full">
                   <span>New Password*</span>
-                  <input
+                  <PasswordInput
                     placeholder="Enter new password"
-                    type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                   />
                 </label>
                 <label className="profile-field profile-field--full">
                   <span>Confirm New Password*</span>
-                  <input
+                  <PasswordInput
                     placeholder="Re-enter new password"
-                    type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                   />

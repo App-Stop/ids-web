@@ -28,6 +28,7 @@ import NoteModal from '../components/dashboard/NoteModal'
 import ScheduleAssignModal, { type StintDraft } from '../components/dashboard/ScheduleAssignModal'
 import ScheduleMoveModal from '../components/dashboard/ScheduleMoveModal'
 import ScheduleExtendModal from '../components/dashboard/ScheduleExtendModal'
+import { Shimmer } from '../components/common/Shimmer'
 import { Icon } from '../components/dashboard/icons'
 import {
   createCrewAssignment,
@@ -1020,7 +1021,11 @@ export default function ScheduleBoard() {
               draggingAssignment ? ' is-dragging' : ''
             }`}
           >
-            {loading && <div className="sb-board__loading">Loading schedule…</div>}
+            {loading && (
+              <div className="sb-board__loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+                <Shimmer width="180px" height="18px" />
+              </div>
+            )}
             {!loading && rows.length === 0 && (
               <div className="sb-board__empty">No jobs match this range.</div>
             )}

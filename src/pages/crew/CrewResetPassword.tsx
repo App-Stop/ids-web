@@ -5,6 +5,8 @@ import { resetPassword } from '../../lib/auth'
 import { CREW_LOGIN_PATH } from '../../components/ProtectedRoute'
 import './crew-auth.css'
 
+import PasswordInput from '../../components/PasswordInput'
+
 /** Crew new-password screen. Admins use /reset-password. */
 export default function CrewResetPassword() {
   const [password, setPassword] = useState('')
@@ -46,9 +48,8 @@ export default function CrewResetPassword() {
         <div className="cauth-fields">
           <div className="cauth-field">
             <label htmlFor="crew-new-password">New Password</label>
-            <input
+            <PasswordInput
               id="crew-new-password"
-              type="password"
               className="cauth-input"
               placeholder="Enter your password"
               value={password}
@@ -60,9 +61,8 @@ export default function CrewResetPassword() {
 
           <div className="cauth-field">
             <label htmlFor="crew-confirm-password">Confirm New Password</label>
-            <input
+            <PasswordInput
               id="crew-confirm-password"
-              type="password"
               className="cauth-input"
               placeholder="Re-enter your password"
               value={confirm}

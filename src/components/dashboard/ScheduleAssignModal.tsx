@@ -101,8 +101,12 @@ export default function ScheduleAssignModal({
             </span>
           )
         }
+        searchable
         options={crews.map((c) => ({
           id: c._id,
+          // The label is JSX, so searching needs the plain text spelled out —
+          // crew name and lead name both, since either is what you'd type.
+          searchText: `${c.name ?? ''} ${crewLeadName(c) ?? ''}`.trim(),
           label: (
             <span className="dd__crew-label">
               <Avatar name={crewLeadName(c) || c.name || ''} size={24} />

@@ -7,6 +7,8 @@ import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import { homePathForRole } from '../components/ProtectedRoute'
 
+import PasswordInput from '../components/PasswordInput'
+
 /** Admin-only sign in. Crew-lead / labour use /login. */
 export default function SignIn() {
   const [email, setEmail] = useState('')
@@ -44,9 +46,8 @@ export default function SignIn() {
 
         <div className="auth-field">
           <label htmlFor="password">Password</label>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             className="auth-input"
             placeholder="Enter your password"
             value={password}

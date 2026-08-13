@@ -522,6 +522,11 @@
   right: 0;
 }
 
+.md-floating--up {
+  top: auto;
+  bottom: calc(100% - 1px);
+}
+
 .md-floating__title {
   display: none;
 }

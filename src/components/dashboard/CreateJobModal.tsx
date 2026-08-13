@@ -312,7 +312,7 @@ export default function CreateJobModal({
           <h2 className="modal-title">{isEdit ? 'Edit Job' : 'Create Job'}</h2>
           {isEdit && (
             <span className="job-head__meta job-form-modal__meta">
-              Bid #{job!.bidNo} &middot; Job #{job!.jobNo}
+               Job #{job!.jobNo}
             </span>
           )}
         </div>
