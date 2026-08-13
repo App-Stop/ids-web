@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import Sidebar from '../components/dashboard/Sidebar'
 import StatCard from '../components/dashboard/StatCard'
 import UnassignedCrewList from '../components/dashboard/UnassignedCrewList'
@@ -10,16 +9,12 @@ import CreateJobModal from '../components/dashboard/CreateJobModal'
 import { Hammer, Users, Money, WarningCircle } from '@phosphor-icons/react'
 import {
   formatMoney,
-  jobs as initialJobs,
-  type CrewLead,
   type Job,
   type UnassignedCrew,
 } from '../lib/dashboardData'
 import './Dashboard.css'
 import { useDashboardSummary } from '../hooks/useQueryHooks'
 import {
-  getDashboardSummary,
-  type DashboardSummaryData,
   type UnassignedJobItem,
 } from '../api/dashboardApi'
 
@@ -182,7 +177,6 @@ export default function Dashboard() {
           onDone={() => setFlow({ step: 'none' })}
           onChangeCrew={() => setFlow({ step: 'assignCrew', crew: flow.crew, job: flow.job, note: flow.note })}
           onRemoveCrew={() => {
-            setUnassigned((list) => [...list, flow.crew])
             setFlow({ step: 'none' })
           }}
         />

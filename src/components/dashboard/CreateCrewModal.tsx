@@ -201,6 +201,24 @@ export default function CreateCrewModal({
   const selectedLeadRate =
     (selectedLead as any)?.rate ?? selectedLead?.hourlyRate ?? fallbackLead?.rate
 
+  /**
+   * The leader is drawn from the same pool of unassigned labors as the members,
+   * so drop whoever holds that slot — the backend strips the lead out of
+   * `members` on create anyway, and offering them twice just reads as a bug.
+   */
+  const memberOptions = availableLabors.filter((m) => m._id !== crewLeadId)
+
+  /** Promoting someone already picked as a member moves them out of that list. */
+  function selectCrewLead(id: string) {
+    setCrewLeadId(id)
+    if (selectedMemberIds.includes(id)) {
+      const name = availableLabors.find((m) => m._id === id)
+      const displayName = name ? `${name.firstName || ''} ${name.lastName || ''}`.trim() : ''
+      setSelectedMemberIds((list) => list.filter((memberId) => memberId !== id))
+      setLaborNames((list) => list.filter((n) => n !== displayName))
+    }
+  }
+
   const selectedJob = jobs.find((j) => j.id === jobId)
   const canSubmit = Boolean(crewName.trim() && crewLeadId) && !isSubmitting && !isLoadingData
 
@@ -364,7 +382,7 @@ export default function CreateCrewModal({
       <Dropdown
         value={crewLeadId}
         placeholder="Select Crew Leader"
-        onChange={setCrewLeadId}
+        onChange={selectCrewLead}
         onSearchChange={setLeadSearch}
         searchValue={leadSearch}
         selectedLabel={
@@ -405,7 +423,7 @@ export default function CreateCrewModal({
         onSearchChange={setMemberSearch}
         searchValue={memberSearch}
         selectedLabel="Select Members..."
-        options={availableLabors.map((m: any) => {
+        options={memberOptions.map((m: any) => {
           const name = `${m.firstName || ''} ${m.lastName || ''}`.trim() || 'Member'
           const rateVal = m.rate ?? m.hourlyRate
           const isSelected = selectedMemberIds.includes(m._id)

@@ -11,6 +11,7 @@ export interface Job {
   contractAmount: number
   laborBudgetUsed: number
   laborBudgetTotal: number
+  status?: string
 }
 
 export interface CrewLead {

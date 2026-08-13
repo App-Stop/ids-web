@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import {
-  SquaresFour,
   CalendarBlank,
   Hammer,
   CurrencyCircleDollar,

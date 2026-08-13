@@ -26,10 +26,7 @@ interface MemberFormModalProps {
   onRemove?: () => void
 }
 
-const ROLE_OPTIONS = [
-  { id: 'Labor', label: 'Labor' },
-  { id: 'Crew Lead', label: 'Crew Lead' },
-]
+
 
 const STATUS_OPTIONS = [
   { id: 'Active', label: 'Active' },
