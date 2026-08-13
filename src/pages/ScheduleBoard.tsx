@@ -1420,13 +1420,18 @@ export default function ScheduleBoard() {
             edge={plan.edge}
             from={{ start: plan.oldStart, end: plan.oldEnd }}
             to={{ start: plan.newStart, end: plan.newEnd }}
+            defaultExcludeWeekends={plan.source.excludeWeekends ?? false}
             saving={saving}
             error={modalError}
             onCancel={() => setFlow({ type: 'none' })}
-            onConfirm={() => {
+            onConfirm={(excludeWeekends) => {
               void (async () => {
+                const patch = {
+                  ...plan.patch,
+                  excludeWeekends,
+                }
                 const ok = await runMutation(
-                  () => updateCrewAssignment(String(plan.source.jobId), plan.source._id, plan.patch),
+                  () => updateCrewAssignment(String(plan.source.jobId), plan.source._id, patch),
                   'Could not update that assignment.',
                 )
                 if (ok) setFlow({ type: 'none' })
