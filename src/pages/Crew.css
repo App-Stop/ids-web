@@ -248,91 +248,33 @@
   height: 16px;
 }
 
-.crew-table--leads .crew-id-cell {
-  width: auto;
-  max-width: none;
-  padding-left: 0.75rem !important;
-  padding-right: 0.55rem !important;
+.crew-table--leads th:nth-child(1),
+.crew-table--leads td:nth-child(1) {
+  padding-left: 1rem !important;
+  padding-right: 0.5rem !important;
   white-space: nowrap;
 }
 
 .crew-table--leads th:nth-child(2),
 .crew-table--leads td:nth-child(2) {
-  width: auto;
-  max-width: none;
-  padding-right: 0.55rem !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.75rem !important;
+  text-align: left !important;
 }
 
 .crew-table--leads th:nth-child(3),
-.crew-table--leads td:nth-child(3) {
-  padding-left: 0.55rem !important;
-  padding-right: 0.75rem !important;
-  text-align: left !important;
-}
-
-.crew-table--leads td:nth-child(3) .crew-name-cell {
-  justify-content: flex-start;
-  gap: 0.5rem;
-}
-
+.crew-table--leads td:nth-child(3),
 .crew-table--leads th:nth-child(4),
 .crew-table--leads td:nth-child(4) {
-  padding-left: 0.75rem !important;
-  padding-right: 0.75rem !important;
-}
-
-.crew-table--leads .crew-avatar {
-  width: 28px;
-  height: 28px;
-}
-
-.crew-table--leads .crew-job-cell {
-  font-size: inherit;
-  gap: 0.45rem;
-  justify-content: flex-start;
-}
-
-.crew-table--leads .crew-job-cell__name {
-  flex: 0 1 auto;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  max-width: 100%;
-}
-
-.crew-table--leads .crew-job-cell__tail {
-  margin-left: 0;
-}
-
-.crew-table--leads .crew-assign-link {
-  font-size: inherit;
-  margin-left: 0.45rem;
-}
-
-.crew-table--leads .crew-status {
-  min-width: 84px;
-  padding: 0.22rem 0.65rem;
-  font-size: 0.78rem;
-}
-
-.crew-table--leads .crew-edit-btn {
-  width: 30px;
-  height: 30px;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
 }
 
 .crew-table--leads th:nth-child(5),
-.crew-table--leads td:nth-child(5),
-.crew-table--leads th:nth-child(6),
-.crew-table--leads td:nth-child(6) {
-  padding-left: 0.65rem;
-  padding-right: 0.65rem;
-}
-
-.crew-table--leads th:nth-child(7),
-.crew-table--leads td:nth-child(7) {
-  padding-left: 0.35rem;
-  padding-right: 0.65rem;
-  text-align: left !important;
+.crew-table--leads td:nth-child(5) {
+  padding-left: 0.5rem !important;
+  padding-right: 1rem !important;
+  text-align: center !important;
 }
 
 .crew-table td:nth-child(3) {
@@ -535,75 +477,49 @@
   height: 16px;
 }
 
-.crew-table--roster .crew-id-cell--roster,
-.crew-table--roster th:nth-child(2) {
+.crew-table--roster th:nth-child(1),
+.crew-table--roster td:nth-child(1) {
   white-space: nowrap;
+  padding-left: 1rem !important;
+  padding-right: 0.5rem !important;
+}
+
+.crew-table--roster th:nth-child(2),
+.crew-table--roster td:nth-child(2) {
+  text-align: left !important;
   padding-left: 0.5rem !important;
-  padding-right: 0.35rem !important;
+  padding-right: 0.75rem !important;
+}
+
+/* The colour bar inside this cell is absolutely positioned, so the cell has to
+   be its containing block — without this the bar escapes to the viewport and
+   renders as a full-height strip down the left edge of the screen. */
+.crew-table--roster .crew-assigned-td {
+  position: relative;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .crew-table--roster th:nth-child(3),
-.crew-table--roster td:nth-child(3) {
-  text-align: left !important;
-  padding-left: 0.35rem !important;
-  padding-right: 0.65rem !important;
-}
-
-.crew-table--roster td:nth-child(3) .crew-name-cell {
-  justify-content: flex-start;
-  gap: 0.5rem;
-  width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
+.crew-table--roster td:nth-child(3),
 .crew-table--roster th:nth-child(4),
-.crew-table--roster td:nth-child(4) {
-  text-align: left !important;
-  padding-left: 0.75rem !important;
-  padding-right: 1.25rem !important;
-}
-
-.crew-table--roster .crew-assigned-td {
-  position: relative;
-  padding-left: 1rem !important;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.crew-table--roster td:nth-child(4),
+.crew-table--roster th:nth-child(5),
+.crew-table--roster td:nth-child(5) {
+  text-align: center !important;
+  vertical-align: middle;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
   white-space: nowrap;
 }
 
-.crew-table--roster .crew-assigned-td--empty {
-  padding-left: 1rem !important;
-}
-
-.crew-table--roster .crew-avatar {
-  width: 28px;
-  height: 28px;
-}
-
-.crew-table--roster .crew-status {
-  min-width: 84px;
-  padding: 0.22rem 0.65rem;
-  font-size: 0.78rem;
-}
-
-.crew-table--roster .crew-edit-btn {
-  width: 30px;
-  height: 30px;
-}
-
-.crew-table--roster th:nth-child(5),
-.crew-table--roster td:nth-child(5),
 .crew-table--roster th:nth-child(6),
-.crew-table--roster td:nth-child(6),
-.crew-table--roster th:nth-child(7),
-.crew-table--roster td:nth-child(7),
-.crew-table--roster th:nth-child(8),
-.crew-table--roster td:nth-child(8) {
+.crew-table--roster td:nth-child(6) {
   text-align: center !important;
   vertical-align: middle;
-  padding-left: 0.65rem;
-  padding-right: 0.65rem;
+  padding-left: 0.5rem !important;
+  padding-right: 1rem !important;
   white-space: nowrap;
 }
 
@@ -662,6 +578,21 @@
   padding: 0.35rem;
   border-radius: 6px;
   display: inline-flex;
+}
+
+.crew-edit-action-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  height: 32px;
+  padding: 0 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 8px;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .crew-edit-btn:hover {

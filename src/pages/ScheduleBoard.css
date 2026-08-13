@@ -732,6 +732,16 @@ td.sb-col-divider {
   z-index: 5;
 }
 
+.sb-cell--disabled {
+  background-color: #f1f5f9 !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+}
+
+.sb-cell--disabled * {
+  pointer-events: none !important;
+}
+
 .sb-cell--compact {
   --sb-cell-inset: 8px;
   z-index: 1;

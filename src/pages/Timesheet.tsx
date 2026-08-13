@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { MagnifyingGlass, PenIcon } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Modal from '../components/dashboard/Modal'
@@ -6,14 +6,13 @@ import Dropdown from '../components/dashboard/Dropdown'
 import Avatar from '../components/dashboard/Avatar'
 import { Icon } from '../components/dashboard/icons'
 import { type RosterRow } from '../lib/crewData'
-import { getCrewsSummary } from '../api/crewApi'
 import {
   createTimesheetLog,
   deleteTimeEntry,
-  getTimeEntries,
   updateTimeEntry,
   type TimeEntryItem,
 } from '../api/timeEntryApi'
+import { useCrewsSummary, useTimeEntries, useInvalidateServerState } from '../hooks/useQueryHooks'
 import { getErrorMessage } from '../lib/errors'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import './Dashboard.css'
@@ -733,10 +732,6 @@ export default function Timesheet() {
   const [memberFilter, setMemberFilter] = useState<string[]>([])
   const [viewMode, setViewMode] = useState<ViewMode>('summary')
   const [expanded, setExpanded] = useState<string[]>([])
-  const [entries, setEntries] = useState<TimeEntryItem[]>([])
-  const [members, setMembers] = useState<RosterRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
   const [modalMode, setModalMode] = useState<ModalMode>('none')
   const [activeRow, setActiveRow] = useState<AttendanceRow | undefined>()
   const [modalError, setModalError] = useState('')
@@ -746,44 +741,26 @@ export default function Timesheet() {
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
 
-  /** Roster members, keyed by user id — the source of names/roles for a log. */
-  const memberMap = useMemo(() => new Map(members.map((member) => [member.id, member])), [members])
-  const rows = useMemo(
-    () => entries.map((entry) => toAttendanceRow(entry, memberMap)),
-    [entries, memberMap],
+  const { data: rosterUsers = [] } = useCrewsSummary({ statusEmployee: 'roster', limit: 100 })
+
+  const members: RosterRow[] = useMemo(
+    () =>
+      rosterUsers.map((user: any) => ({
+        id: user._id,
+        rosterId: user._id ? user._id.slice(-4) : '',
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Member',
+        avatar: `https://i.pravatar.cc/64?img=${((user._id || '').charCodeAt(0) || 15) % 70}`,
+        crewName: user.assignCrew?.name ?? null,
+        crewColor: user.assignCrew?.crewColor ?? '#808080',
+        role: user.role === 'crew-lead' ? 'Crew Lead' : 'Labor',
+        rate: user.hourlyRate ?? 0,
+        status: user.isActive ? 'Active' : 'Inactive',
+      })),
+    [rosterUsers],
   )
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function fetchMembers() {
-      try {
-        const res = await getCrewsSummary({ statusEmployee: 'roster', limit: 100 })
-        if (cancelled || !res.success || !Array.isArray(res.data)) return
-        setMembers(
-          res.data
-            .map((user) => ({
-              id: user._id,
-              rosterId: user._id ? user._id.slice(-4) : '',
-              name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Member',
-              avatar: `https://i.pravatar.cc/64?img=${((user._id || '').charCodeAt(0) || 15) % 70}`,
-              crewName: user.assignCrew?.name ?? null,
-              crewColor: user.assignCrew?.crewColor ?? '#808080',
-              role: user.role === 'crew-lead' ? 'Crew Lead' : 'Labor',
-              rate: user.hourlyRate ?? 0,
-              status: user.isActive ? 'Active' : 'Inactive',
-            })),
-        )
-      } catch (err) {
-        console.error('Failed to fetch roster members:', err)
-      }
-    }
-
-    fetchMembers()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  /** Roster members, keyed by user id — the source of names/roles for a log. */
+  const memberMap = useMemo(() => new Map(members.map((member) => [member.id, member])), [members])
 
   useEffect(() => {
     if (!flashId) return
@@ -811,24 +788,20 @@ export default function Timesheet() {
    * navigator in particular needs the full span of logged dates to build its
    * list of selectable weeks/months.
    */
-  const loadEntries = useCallback(async () => {
-    setLoading(true)
-    setLoadError('')
-    try {
-      const res = await getTimeEntries()
-      setEntries(res.success && Array.isArray(res.data) ? res.data : [])
-    } catch (err) {
-      console.error('Failed to fetch time entries:', err)
-      setLoadError(getErrorMessage(err, 'Could not load attendance logs.'))
-      setEntries([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const entriesQuery = useTimeEntries()
+  const entries: TimeEntryItem[] = useMemo(() => entriesQuery.data ?? [], [entriesQuery.data])
+  const loading = entriesQuery.isPending
+  const loadError = entriesQuery.error
+    ? getErrorMessage(entriesQuery.error, 'Could not load attendance logs.')
+    : ''
 
-  useEffect(() => {
-    loadEntries()
-  }, [loadEntries])
+  const rows = useMemo(
+    () => entries.map((entry) => toAttendanceRow(entry, memberMap)),
+    [entries, memberMap],
+  )
+
+  const { invalidateAll } = useInvalidateServerState()
+  const loadEntries = invalidateAll
 
   /** Span of every logged date, so navigation stops where the data does. */
   const dataSpan = useMemo(() => {
@@ -1122,7 +1095,7 @@ export default function Timesheet() {
     }
   }
 
-  const detailColSpan = 9
+  const detailColSpan = 8
   const gridColSpan = buckets.length + 4
   const emptyMessage = loading
     ? 'Loading attendance…'
@@ -1343,9 +1316,6 @@ export default function Timesheet() {
             <table className="ts-table">
               <thead>
                 <tr>
-                  <th className="ts-col-check">
-                    <input type="checkbox" />
-                  </th>
                   <th>Name</th>
                   <th>Role</th>
                   <th>Date</th>
@@ -1365,9 +1335,6 @@ export default function Timesheet() {
                 )}
                 {sortedRows.map((row) => (
                   <tr key={row.id} className={flashId === row.id ? 'is-new' : ''}>
-                    <td className="ts-col-check">
-                      <input type="checkbox" />
-                    </td>
                     <td>
                       <div className="ts-member-cell">
                         <Avatar name={row.name} size={26} />

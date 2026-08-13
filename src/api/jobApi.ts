@@ -14,6 +14,7 @@ export interface JobItem {
   endDate: string
   contractAmount: number
   laborBudget: number
+  laborBudgetUsed?: number
   note: string | null
   status: 'awarded' | 'in-progress' | 'completed' | string
   createdAt: string
@@ -148,6 +149,7 @@ export interface CrewAssignment {
   status: 'scheduled' | 'cancelled'
   /** True when this stint's date range covers today. */
   isCurrent: boolean
+  excludeWeekends?: boolean
   note: string | null
   createdAt: string
   updatedAt: string

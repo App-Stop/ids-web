@@ -896,6 +896,16 @@
   text-align: center;
 }
 
+.ct-grid-cell--disabled {
+  background-color: #f1f5f9 !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+}
+
+.ct-grid-cell--disabled * {
+  pointer-events: none !important;
+}
+
 .ct-grid-cell__value {
   display: inline-block;
   min-width: 64px;

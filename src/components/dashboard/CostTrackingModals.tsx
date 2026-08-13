@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal'
 import MenuDropdown from './MenuDropdown'
-import { getJobs, type JobItem } from '../../api/jobApi'
+import { type JobItem } from '../../api/jobApi'
+import { useJobsList } from '../../hooks/useQueryHooks'
 import { createDumpsterCost, getCostAdjustment, adjustCost, type DumpsterCostItem } from '../../api/dumpsterCostApi'
 import { parseApiErrors } from '../../lib/errors'
 
@@ -11,47 +12,23 @@ export interface DumpsterCostModalProps {
 }
 
 export function AddDailyDumpsterCountModal({ onCancel, onSuccess }: DumpsterCostModalProps) {
-  const [jobs, setJobs] = useState<JobItem[]>([])
-  const [loadingJobs, setLoadingJobs] = useState(true)
+  const { data: jobs = [], isPending: loadingJobs } = useJobsList({ limit: 100 })
 
   const [jobId, setJobId] = useState<string | null>(null)
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10))
-  const [dumpsterCount, setDumpsterCount] = useState<string>('1')
-  const [dumpsterCost, setDumpsterCost] = useState<string>('')
+  const [dumpsterCount, setDumpsterCount] = useState<string>('0')
+  const [dumpsterCost, setDumpsterCost] = useState<string>('600')
   const [note, setNote] = useState<string>('')
 
   const [submitting, setSubmitting] = useState(false)
   const [apiError, setApiError] = useState<string>('')
 
-  useEffect(() => {
-    let isMounted = true
-    async function loadJobs() {
-      setLoadingJobs(true)
-      try {
-        const res = await getJobs({ limit: 100 })
-        if (isMounted && res.data) {
-          setJobs(res.data)
-        }
-      } catch (err) {
-        if (isMounted) {
-          console.error('Failed to load jobs:', err)
-        }
-      } finally {
-        if (isMounted) setLoadingJobs(false)
-      }
-    }
-    loadJobs()
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  const selectedJob = useMemo(() => jobs.find((j) => j._id === jobId), [jobs, jobId])
-  const parsedCount = Number(dumpsterCount)
-  const parsedCost = Number(dumpsterCost)
+  const selectedJob = useMemo(() => jobs.find((j: JobItem) => j._id === jobId), [jobs, jobId])
+  const parsedCount = Number(dumpsterCount) || 0
+  const parsedCost = Number(dumpsterCost) || 0
   const calculatedTotalCost = (parsedCount > 0 && parsedCost > 0) ? parsedCount * parsedCost : 0
 
-  const canSubmit = Boolean(jobId && date.trim() && dumpsterCount && dumpsterCost && !submitting)
+  const canSubmit = Boolean(jobId && date.trim() && dumpsterCount !== '' && dumpsterCost !== '' && !submitting)
 
   async function handleSubmit() {
     if (!canSubmit || !jobId) return
@@ -121,14 +98,31 @@ export function AddDailyDumpsterCountModal({ onCancel, onSuccess }: DumpsterCost
       <div className="field-row">
         <div>
           <label className="field-label">Dumpsters Count*</label>
-          <input
-            className="field-input"
-            type="number"
-            min={1}
-            value={dumpsterCount}
-            onChange={(e) => setDumpsterCount(e.target.value)}
-            placeholder="1"
-          />
+          <div className="stepper-input">
+            <button
+              type="button"
+              className="stepper-btn"
+              onClick={() => setDumpsterCount(String(Math.max(0, (Number(dumpsterCount) || 0) - 1)))}
+              disabled={(Number(dumpsterCount) || 0) <= 0}
+            >
+              -
+            </button>
+            <input
+              className="field-input stepper-field"
+              type="number"
+              min={0}
+              value={dumpsterCount}
+              onChange={(e) => setDumpsterCount(e.target.value)}
+              placeholder="0"
+            />
+            <button
+              type="button"
+              className="stepper-btn"
+              onClick={() => setDumpsterCount(String((Number(dumpsterCount) || 0) + 1))}
+            >
+              +
+            </button>
+          </div>
         </div>
         <div>
           <label className="field-label">Dumpster Cost*</label>
@@ -140,7 +134,7 @@ export function AddDailyDumpsterCountModal({ onCancel, onSuccess }: DumpsterCost
               step="any"
               value={dumpsterCost}
               onChange={(e) => setDumpsterCost(e.target.value)}
-              placeholder="500"
+              placeholder="600"
             />
           </div>
         </div>
@@ -201,8 +195,8 @@ export function EditCostAdjustmentModal({
 }: EditCostAdjustmentModalProps) {
   const [date, setDate] = useState<string>(initialDate)
   const [laborCost, setLaborCost] = useState<string>('0')
-  const [dumpsterCount, setDumpsterCount] = useState<string>('1')
-  const [dumpsterCost, setDumpsterCost] = useState<string>('0')
+  const [dumpsterCount, setDumpsterCount] = useState<string>('0')
+  const [dumpsterCost, setDumpsterCost] = useState<string>('600')
   const [loading, setLoading] = useState<boolean>(true)
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [apiError, setApiError] = useState<string>('')
@@ -216,8 +210,8 @@ export function EditCostAdjustmentModal({
         const res = await getCostAdjustment(jobId, date)
         if (isMounted && res.success && res.data) {
           setLaborCost(String(res.data.laborCost ?? 0))
-          setDumpsterCount(String(res.data.dumpsterCount > 0 ? res.data.dumpsterCount : 1))
-          setDumpsterCost(String(res.data.dumpsterCost ?? 0))
+          setDumpsterCount(String(res.data.dumpsterCount ?? 0))
+          setDumpsterCost(String(res.data.dumpsterCost ? res.data.dumpsterCost : 600))
         }
       } catch (err: any) {
         if (isMounted) {
@@ -322,14 +316,31 @@ export function EditCostAdjustmentModal({
             </div>
             <div>
               <label className="field-label">Dumpsters Count*</label>
-              <input
-                className="field-input"
-                type="number"
-                min={1}
-                value={dumpsterCount}
-                onChange={(e) => setDumpsterCount(e.target.value)}
-                placeholder="1"
-              />
+              <div className="stepper-input">
+                <button
+                  type="button"
+                  className="stepper-btn"
+                  onClick={() => setDumpsterCount(String(Math.max(0, (Number(dumpsterCount) || 0) - 1)))}
+                  disabled={(Number(dumpsterCount) || 0) <= 0}
+                >
+                  -
+                </button>
+                <input
+                  className="field-input stepper-field"
+                  type="number"
+                  min={0}
+                  value={dumpsterCount}
+                  onChange={(e) => setDumpsterCount(e.target.value)}
+                  placeholder="0"
+                />
+                <button
+                  type="button"
+                  className="stepper-btn"
+                  onClick={() => setDumpsterCount(String((Number(dumpsterCount) || 0) + 1))}
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
 
@@ -344,7 +355,7 @@ export function EditCostAdjustmentModal({
                   step="any"
                   value={dumpsterCost}
                   onChange={(e) => setDumpsterCost(e.target.value)}
-                  placeholder="500"
+                  placeholder="600"
                 />
               </div>
             </div>

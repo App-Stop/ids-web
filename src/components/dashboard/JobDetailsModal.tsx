@@ -70,7 +70,7 @@ export default function JobDetailsModal({
         startDate: fetchedJob.startDate ? new Date(fetchedJob.startDate).toISOString().slice(0, 10) : job.startDate,
         endDate: fetchedJob.endDate ? new Date(fetchedJob.endDate).toISOString().slice(0, 10) : job.endDate,
         contractAmount: fetchedJob.contractAmount ?? job.contractAmount,
-        laborBudgetUsed: job.laborBudgetUsed,
+        laborBudgetUsed: fetchedJob.laborBudgetUsed ?? job.laborBudgetUsed,
         laborBudgetTotal: fetchedJob.laborBudget ?? job.laborBudgetTotal,
       }
     : job
@@ -215,7 +215,7 @@ export default function JobDetailsModal({
         ) : (
           <span />
         )}
-        <div className="modal-actions">
+        <div className="modal-actions__group">
           <button type="button" className="btn btn--outline" onClick={onChangeCrew}>
             {crew ? 'Change Crew' : 'Assign Crew'}
           </button>

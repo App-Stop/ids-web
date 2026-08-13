@@ -13,23 +13,18 @@ import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCrewsSummary } from '../hooks/useQueryHooks'
 import {
-  deleteCrew,
-  softDeleteUser,
-  getCrewById,
-  getCrewsSummary,
-  type CrewSummaryItem,
-  type Pagination,
-} from '../api/crewApi'
-import {
-  createCrewAssignment,
-  deleteCrewAssignment,
-  getCrewAssignments,
-  getJobs,
-  updateJob,
-  type JobItem,
-} from '../api/jobApi'
+  useCrewsSummary,
+  useCrewsSummaryPaged,
+  useJobsList,
+  useCrewMutations,
+  useUserMutations,
+  useCrewAssignmentMutations,
+  useJobMutations,
+} from '../hooks/useQueryHooks'
+import { queryKeys } from '../lib/queryKeys'
+import { getCrewById, type CrewSummaryItem } from '../api/crewApi'
+import { getCrewAssignments, type JobItem } from '../api/jobApi'
 import { getErrorMessage } from '../lib/errors'
 import type { Job, UnassignedCrew } from '../lib/dashboardData'
 import type { CrewJobAssignment, CrewMenuOption, CrewRow, RosterRow, Status } from '../lib/crewData'
@@ -63,8 +58,6 @@ const LIMIT_OPTIONS = [
   { id: '50', label: '50 per page' },
   { id: '100', label: '100 per page' },
 ]
-
-const EMPTY_PAGINATION: Pagination = { page: 1, limit: 20, totalCount: 0, totalPages: 1 }
 
 type Flow =
   | { type: 'none' }
@@ -167,12 +160,7 @@ function StatusPill({ status }: { status: Status }) {
 
 export default function Crew() {
   const [tab, setTab] = useState<Tab>('crew')
-  const [crewRows, setCrewRows] = useState<CrewRow[]>([])
-  const [rosterRows, setRosterRows] = useState<RosterRow[]>([])
-  const [jobList, setJobList] = useState<JobItem[]>([])
-  const [allCrews, setAllCrews] = useState<CrewSummaryItem[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [actionError, setActionError] = useState('')
 
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -183,7 +171,6 @@ export default function Crew() {
 
   const [rosterPage, setRosterPage] = useState(1)
   const [rosterLimit, setRosterLimit] = useState(20)
-  const [rosterPagination, setRosterPagination] = useState<Pagination>(EMPTY_PAGINATION)
 
   const [memberNames, setMemberNames] = useState<Record<string, string[]>>({})
   const [jobHover, setJobHover] = useState<{ x: number; y: number; crewId: string } | null>(null)
@@ -192,8 +179,6 @@ export default function Crew() {
   useClickDragScroll(tableWrapRef)
 
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
-
-  const jobsById = useMemo(() => new Map(jobList.map((j) => [j._id, j])), [jobList])
 
   // Debounce the search box so each keystroke doesn't fire a request.
   useEffect(() => {
@@ -211,100 +196,100 @@ export default function Crew() {
     setRosterPage(1)
   }
 
-  // Jobs back the job filter, the assign-job dropdown and the row enrichment.
-  useEffect(() => {
-    getJobs({ limit: 100 })
-      .then((res) => {
-        if (res.success && Array.isArray(res.data)) setJobList(res.data)
-      })
-      .catch((err) => console.error('Failed to load jobs:', err))
-  }, [])
-
   const queryClient = useQueryClient()
-  const { data: cachedCrews } = useCrewsSummary()
 
-  useEffect(() => {
-    if (cachedCrews && Array.isArray(cachedCrews)) {
-      setAllCrews(cachedCrews)
-    }
-  }, [cachedCrews])
+  // Jobs back the job filter, the assign-job dropdown and the row enrichment.
+  // `{ limit: 100 }` is the shared shape every screen uses, so this is usually
+  // served straight from cache.
+  const { data: jobList = [] } = useJobsList({ limit: 100 })
+  const jobsById = useMemo(() => new Map(jobList.map((j) => [j._id, j])), [jobList])
 
-  // `allCrews` is owned by the ['crews'] query now, so refreshing it after a
-  // mutation means invalidating that key rather than re-fetching by hand.
-  const loadAllCrews = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: ['crews'] }),
-    [queryClient],
+  const { data: allCrews = [] } = useCrewsSummary()
+
+  const crewSortBy =
+    sort === 'name-asc' ? 'nameAsc' : sort === 'name-desc' ? 'nameDesc' : undefined
+
+  const crewQuery = useCrewsSummary(
+    {
+      statusEmployee: 'crew',
+      jobId: jobFilter ?? undefined,
+      status: status ?? undefined,
+      search: debouncedSearch || undefined,
+      sortBy: crewSortBy,
+      sortByName: sort === 'name-asc' ? 'asc' : sort === 'name-desc' ? 'desc' : undefined,
+    },
+    tab === 'crew',
   )
 
-  const loadCrews = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      let sortByParam: string | undefined = undefined
-      if (sort === 'name-asc') sortByParam = 'nameAsc'
-      else if (sort === 'name-desc') sortByParam = 'nameDesc'
+  const rosterSortBy =
+    sort === 'name-asc'
+      ? 'nameAsc'
+      : sort === 'name-desc'
+        ? 'nameDesc'
+        : sort === 'rate-asc'
+          ? 'rateAsc'
+          : sort === 'rate-desc'
+            ? 'rateDesc'
+            : undefined
 
-      const res = await getCrewsSummary({
-        statusEmployee: 'crew',
-        jobId: jobFilter ?? undefined,
-        status: status ?? undefined,
-        search: debouncedSearch || undefined,
-        sortBy: sortByParam,
-        sortByName: sort === 'name-asc' ? 'asc' : sort === 'name-desc' ? 'desc' : undefined,
-      })
-      setCrewRows(res.success && Array.isArray(res.data) ? res.data.map((item) => toCrewRow(item, jobsById)) : [])
-    } catch (err) {
-      setError(getErrorMessage(err, 'Failed to load crews.'))
-      setCrewRows([])
-    } finally {
-      setLoading(false)
-    }
-  }, [jobFilter, status, sort, debouncedSearch, jobsById])
+  const rosterQuery = useCrewsSummaryPaged(
+    {
+      statusEmployee: 'roster',
+      crewId: crewFilter ?? undefined,
+      status: status ?? undefined,
+      search: debouncedSearch || undefined,
+      sortBy: rosterSortBy,
+      page: rosterPage,
+      limit: rosterLimit,
+    },
+    tab === 'roster',
+  )
 
-  const loadRoster = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      let sortByParam: string | undefined = undefined
-      if (sort === 'name-asc') sortByParam = 'nameAsc'
-      else if (sort === 'name-desc') sortByParam = 'nameDesc'
-      else if (sort === 'rate-asc') sortByParam = 'rateAsc'
-      else if (sort === 'rate-desc') sortByParam = 'rateDesc'
+  const crewRows: CrewRow[] = useMemo(
+    () => (crewQuery.data ?? []).map((item: CrewSummaryItem) => toCrewRow(item, jobsById)),
+    [crewQuery.data, jobsById],
+  )
+  const rosterRows: RosterRow[] = useMemo(
+    () => (rosterQuery.data?.items ?? []).map(toRosterRow),
+    [rosterQuery.data],
+  )
+  const rosterPagination = rosterQuery.data?.pagination ?? {
+    page: 1,
+    limit: rosterLimit,
+    totalCount: 0,
+    totalPages: 1,
+  }
 
-      const res = await getCrewsSummary({
-        statusEmployee: 'roster',
-        crewId: crewFilter ?? undefined,
-        status: status ?? undefined,
-        search: debouncedSearch || undefined,
-        sortBy: sortByParam,
-        page: rosterPage,
-        limit: rosterLimit,
-      })
-      setRosterRows(res.success && Array.isArray(res.data) ? res.data.map(toRosterRow) : [])
-      setRosterPagination(res.pagination ?? EMPTY_PAGINATION)
-    } catch (err) {
-      setError(getErrorMessage(err, 'Failed to load roster.'))
-      setRosterRows([])
-      setRosterPagination(EMPTY_PAGINATION)
-    } finally {
-      setLoading(false)
-    }
-  }, [crewFilter, status, debouncedSearch, sort, rosterPage, rosterLimit])
+  const loading = tab === 'crew' ? crewQuery.isPending : rosterQuery.isPending
+  const queryError = tab === 'crew' ? crewQuery.error : rosterQuery.error
+  const error =
+    actionError ||
+    (queryError
+      ? getErrorMessage(queryError, tab === 'crew' ? 'Failed to load crews.' : 'Failed to load roster.')
+      : '')
 
-  useEffect(() => {
-    if (tab === 'crew') loadCrews()
-  }, [tab, loadCrews])
+  const { deleteCrewMutation } = useCrewMutations()
+  const { softDeleteUserMutation } = useUserMutations()
+  const { createAssignmentMutation, deleteAssignmentMutation } = useCrewAssignmentMutations()
+  const { updateJobMutation, invalidateAll } = useJobMutations()
 
-  useEffect(() => {
-    if (tab === 'roster') loadRoster()
-  }, [tab, loadRoster])
+  // Refreshing after a write is one cache invalidation now, instead of a
+  // hand-rolled re-fetch of each affected list.
+  const refreshServerState = invalidateAll
 
-  /** GET /crews/summary only returns a member count, so names load on demand. */
+  /**
+   * GET /crews/summary only returns a member count, so names load on demand.
+   * fetchQuery keeps the per-crew detail in the same cache as everything else,
+   * so re-opening a tooltip after a page revisit costs nothing.
+   */
   const loadMemberNames = useCallback(
     async (crewId: string) => {
       if (memberNames[crewId]) return
       try {
-        const res = await getCrewById(crewId)
+        const res = await queryClient.fetchQuery({
+          queryKey: queryKeys.crews.detail(crewId),
+          queryFn: () => getCrewById(crewId),
+        })
         const members = res.data?.members as Array<{ firstName?: string; lastName?: string }> | undefined
         const names = Array.isArray(members)
           ? members
@@ -316,7 +301,7 @@ export default function Crew() {
         setMemberNames((prev) => ({ ...prev, [crewId]: [] }))
       }
     },
-    [memberNames],
+    [memberNames, queryClient],
   )
 
   const jobMenuOptions = useMemo(
@@ -376,25 +361,25 @@ export default function Crew() {
 
   async function handleRemoveCrew() {
     if (flow.type !== 'editCrew') return
+    setActionError('')
     try {
-      await deleteCrew(flow.crew.id)
+      await deleteCrewMutation.mutateAsync(flow.crew.id)
       setFlow({ type: 'none' })
-      await Promise.all([loadCrews(), loadAllCrews()])
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to delete crew.'))
+      setActionError(getErrorMessage(err, 'Failed to delete crew.'))
     }
   }
 
   async function handleRemoveMember() {
     if (flow.type !== 'editMember') return
+    setActionError('')
     try {
-      await softDeleteUser(flow.member.id)
-      setFlow({ type: 'none' })
       // Soft delete also pulls the user off their crew, so the crew lists are
-      // stale too, not just the roster.
-      await Promise.all([loadRoster(), loadAllCrews()])
+      // stale too, not just the roster — the mutation invalidates both.
+      await softDeleteUserMutation.mutateAsync(flow.member.id)
+      setFlow({ type: 'none' })
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to remove member.'))
+      setActionError(getErrorMessage(err, 'Failed to remove member.'))
     }
   }
 
@@ -404,50 +389,57 @@ export default function Crew() {
    * the crew's row only shows the job once that pointer is updated too.
    */
   async function assignCrewToJob(jobId: string, crewId: string, startDate: string, endDate: string, note: string) {
-    await createCrewAssignment(jobId, {
-      crewId,
-      startDate,
-      endDate: endDate || undefined,
-      note: note || undefined,
+    await createAssignmentMutation.mutateAsync({
+      jobId,
+      payload: {
+        crewId,
+        startDate,
+        endDate: endDate || undefined,
+        note: note || undefined,
+      },
     })
-    await updateJob(jobId, { assignToCrew: crewId })
+    await updateJobMutation.mutateAsync({ id: jobId, payload: { assignToCrew: crewId } })
     setFlow({ type: 'none' })
-    await Promise.all([loadCrews(), loadAllCrews()])
   }
 
   async function handleAssignJob(crewId: string, jobId: string, note: string) {
+    setActionError('')
     try {
       const job = jobsById.get(jobId)
       await assignCrewToJob(jobId, crewId, assignmentStartDate(job), isoDay(job?.endDate), note)
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to assign job.'))
+      setActionError(getErrorMessage(err, 'Failed to assign job.'))
     }
   }
 
   /** Moves a job to a different crew by opening a new assignment for it. */
   async function handleChangeCrew(jobId: string, nextCrewId: string, startDate: string, endDate: string, note: string) {
+    setActionError('')
     try {
       const today = new Date().toISOString().slice(0, 10)
       await assignCrewToJob(jobId, nextCrewId, startDate < today ? today : startDate, endDate, note)
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to reassign crew.'))
+      setActionError(getErrorMessage(err, 'Failed to reassign crew.'))
     }
   }
 
   /** Cancels the crew's current stint on the job. Backend refuses once started. */
   async function handleRemoveCrewFromJob(jobId: string, crewId: string) {
+    setActionError('')
     try {
-      const res = await getCrewAssignments(jobId)
+      const res = await queryClient.fetchQuery({
+        queryKey: queryKeys.jobs.assignments(jobId),
+        queryFn: () => getCrewAssignments(jobId),
+      })
       const current = res.data?.find((a) => a.crewId === crewId && a.status === 'scheduled')
       if (!current) {
-        setError('No scheduled assignment found for this crew on this job.')
+        setActionError('No scheduled assignment found for this crew on this job.')
         return
       }
-      await deleteCrewAssignment(jobId, current._id)
+      await deleteAssignmentMutation.mutateAsync({ jobId, assignmentId: current._id })
       setFlow({ type: 'none' })
-      await loadCrews()
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to remove crew from job.'))
+      setActionError(getErrorMessage(err, 'Failed to remove crew from job.'))
     }
   }
 
@@ -575,18 +567,14 @@ export default function Crew() {
           {tab === 'crew' ? (
             <table className="crew-table crew-table--leads">
               <colgroup>
-                <col style={{ width: '4%' }} />
-                <col style={{ width: '28%' }} />
-                <col style={{ width: '38%' }} />
-                <col style={{ width: '10%' }} />
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '44%' }} />
                 <col style={{ width: '12%' }} />
-                <col style={{ width: '8%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '12%' }} />
               </colgroup>
               <thead>
                 <tr>
-                  <th className="crew-col-check">
-                    <input type="checkbox" />
-                  </th>
                   <th>Crew Name</th>
                   <th>Job Name</th>
                   <th className="crew-center">Workers</th>
@@ -596,28 +584,25 @@ export default function Crew() {
                       <ArrowDown size={14} weight="regular" />
                     </span>
                   </th>
-                  <th>Action</th>
+                  <th className="crew-center">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="crew-empty-cell">
+                    <td colSpan={5} className="crew-empty-cell">
                       Loading crew data...
                     </td>
                   </tr>
                 ) : visibleCrewRows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="crew-empty-cell">
+                    <td colSpan={5} className="crew-empty-cell">
                       No crews found
                     </td>
                   </tr>
                 ) : (
                   visibleCrewRows.map((row) => (
                     <tr key={row.id}>
-                      <td className="crew-col-check">
-                        <input type="checkbox" />
-                      </td>
                       <td>
                         <div className="crew-name-cell" style={{ position: 'relative', paddingLeft: '14px' }}>
                           <span
@@ -680,14 +665,14 @@ export default function Crew() {
                       <td className="crew-center">
                         <StatusPill status={row.status} />
                       </td>
-                      <td>
+                      <td className="crew-center">
                         <button
                           type="button"
-                          className="btn btn--primary"
+                          className="btn btn--primary crew-edit-action-btn"
                           onClick={() => setFlow({ type: 'editCrew', crew: row })}
                         >
-                          <PenIcon size={20} />
-                          <p>Edit</p>
+                          <PenIcon size={16} />
+                          <span>Edit</span>
                           {row.status === 'Unassigned' && <span className="crew-edit-btn__dot" />}
                         </button>
                       </td>
@@ -699,19 +684,15 @@ export default function Crew() {
           ) : (
             <table className="crew-table crew-table--roster">
               <colgroup>
-                <col style={{ width: '4%' }} />
-                <col style={{ width: '22%' }} />
-                <col style={{ width: '20%' }} />
-                <col style={{ width: '15%' }} />
-                <col style={{ width: '15%' }} />
-                <col style={{ width: '12%' }} />
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '24%' }} />
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '14%' }} />
                 <col style={{ width: '12%' }} />
               </colgroup>
               <thead>
                 <tr>
-                  <th className="crew-col-check">
-                    <input type="checkbox" />
-                  </th>
                   <th>Name</th>
                   <th>Crew Assigned</th>
                   <th className="crew-center">Role</th>
@@ -723,22 +704,19 @@ export default function Crew() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="crew-empty-cell">
+                    <td colSpan={6} className="crew-empty-cell">
                       Loading roster data...
                     </td>
                   </tr>
                 ) : visibleRosterRows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="crew-empty-cell">
+                    <td colSpan={6} className="crew-empty-cell">
                       No members found
                     </td>
                   </tr>
                 ) : (
                   visibleRosterRows.map((row) => (
                     <tr key={row.id}>
-                      <td className="crew-col-check">
-                        <input type="checkbox" />
-                      </td>
                       <td>
                         <div className="crew-name-cell">
                           <Avatar name={row.name} size={28} />
@@ -778,11 +756,11 @@ export default function Crew() {
                       <td className="crew-center">
                         <button
                           type="button"
-                          className="btn btn--primary"
+                          className="btn btn--primary crew-edit-action-btn"
                           onClick={() => setFlow({ type: 'editMember', member: row })}
                         >
-                          <PenIcon size={20} />
-                          <p>Edit</p>
+                          <PenIcon size={16} />
+                          <span>Edit</span>
                         </button>
                       </td>
                     </tr>
@@ -810,7 +788,7 @@ export default function Crew() {
             </div>
             <div className="jm-pagination-controls">
               <span className="jm-pagination-info">
-                Page {rosterPagination.page} of {rosterPagination.totalPages || 1} ({rosterPagination.totalCount} total)
+                Page {rosterPagination.page} of {rosterPagination.totalPages || 1}
               </span>
               <div className="jm-pagination-btns">
                 <button
@@ -859,7 +837,7 @@ export default function Crew() {
               await handleAssignJob(apiResponse._id, assignedJobId, '')
             }
             setTab('crew')
-            await Promise.all([loadCrews(), loadAllCrews()])
+            refreshServerState()
           }}
         />
       )}
@@ -878,7 +856,7 @@ export default function Crew() {
           onCancel={() => setFlow({ type: 'none' })}
           onSubmit={async () => {
             setFlow({ type: 'none' })
-            await Promise.all([loadCrews(), loadAllCrews()])
+            refreshServerState()
           }}
           onRemove={handleRemoveCrew}
         />
@@ -918,7 +896,7 @@ export default function Crew() {
           onSubmit={async () => {
             setFlow({ type: 'none' })
             setTab('roster')
-            await loadRoster()
+            refreshServerState()
           }}
         />
       )}
@@ -940,7 +918,7 @@ export default function Crew() {
           onCancel={() => setFlow({ type: 'none' })}
           onSubmit={async () => {
             setFlow({ type: 'none' })
-            await loadRoster()
+            refreshServerState()
           }}
           onRemove={handleRemoveMember}
         />

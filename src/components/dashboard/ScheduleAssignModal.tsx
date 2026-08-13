@@ -12,6 +12,7 @@ export interface StintDraft {
   startDate: string
   /** Empty string = open-ended. */
   endDate: string
+  excludeWeekends?: boolean
   note: string
 }
 
@@ -60,7 +61,7 @@ export default function ScheduleAssignModal({
   const [crewId, setCrewId] = useState<string | null>(assignment?.crewId ?? null)
   const [startDate, setStartDate] = useState(assignment?.startDate?.slice(0, 10) ?? defaultStartDate)
   const [endDate, setEndDate] = useState(assignment?.endDate?.slice(0, 10) ?? '')
-  const [note, setNote] = useState(assignment?.note ?? '')
+  const [excludeWeekends, setExcludeWeekends] = useState(assignment?.excludeWeekends ?? false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const selected = crews.find((c) => c._id === crewId)
@@ -137,13 +138,14 @@ export default function ScheduleAssignModal({
         Leave End Date empty for an open-ended assignment.
       </p>
 
-      <label className="field-label" style={{ marginTop: '1rem' }}>Add a note</label>
-      <textarea
-        className="field-textarea"
-        placeholder="Note about this assignment..."
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: '#475569', marginTop: '0.85rem' }}>
+        <input
+          type="checkbox"
+          checked={excludeWeekends}
+          onChange={(e) => setExcludeWeekends(e.target.checked)}
+        />
+        <span>Exclude Weekends From Schedule</span>
+      </label>
 
       {error && (
         <div style={{ color: '#ef4444', marginTop: '1rem', fontSize: '0.875rem' }}>{error}</div>
@@ -155,7 +157,7 @@ export default function ScheduleAssignModal({
             Remove
           </button>
         )}
-        <div className="modal-actions">
+        <div className="modal-actions__group">
           <button type="button" className="btn btn--outline" onClick={onCancel}>
             Cancel
           </button>
@@ -164,7 +166,7 @@ export default function ScheduleAssignModal({
             className="btn btn--primary"
             disabled={!crewId || !startDate || saving}
             onClick={() => {
-              if (crewId) onSubmit({ crewId, startDate, endDate, note: note.trim() })
+              if (crewId) onSubmit({ crewId, startDate, endDate, excludeWeekends, note: '' })
             }}
           >
             {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Assign Crew'}
