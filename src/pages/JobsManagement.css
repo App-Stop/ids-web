@@ -408,16 +408,24 @@
   color: var(--ink);
 }
 
-.jm-status-dropdown,
-.jm-status-dropdown .dd,
 .jm-status-dropdown .dd__trigger {
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 0 !important;
+  border: 1px solid #e5e7eb !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05) !important;
+  border-radius: 8px !important;
+  padding: 0.35rem 0.65rem !important;
   margin: 0 !important;
   outline: none !important;
   width: auto !important;
+  min-width: 110px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.jm-status-dropdown .dd__trigger:hover {
+  border-color: #d1d5db !important;
+  background: #f9fafb !important;
 }
 
 .jm-status-dropdown .dd__chevron {
@@ -427,16 +435,15 @@
 .jm-status {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  padding: 0.3rem 0.75rem;
-  border-radius: 999px;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.4rem;
   border: none !important;
   font-size: 0.78rem;
   font-weight: 700;
+  background: transparent !important;
   cursor: pointer;
   user-select: none;
-  transition: all 0.15s ease;
 }
 
 .jm-status:hover {
