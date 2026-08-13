@@ -414,10 +414,12 @@ export default function JobsManagement() {
                                 className="jm-status"
                                 style={{
                                   color: STATUS_COLORS[job.status] || '#16a34a',
+                                  borderColor: STATUS_COLORS[job.status] || '#16a34a',
+                                  backgroundColor: `${STATUS_COLORS[job.status] || '#16a34a'}15`,
                                 }}
                               >
                                 <span>{STATUS_LABELS[job.status] || job.status}</span>
-                                <CaretDown size={13} weight="bold" style={{ color: '#6b7280' }} />
+                                <CaretDown size={12} weight="bold" style={{ color: STATUS_COLORS[job.status] || '#16a34a' }} />
                               </span>
                             }
                             onChange={(v) => handleStatusChange(job.rawId || job.id, v as JobStatus)}
