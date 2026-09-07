@@ -3,7 +3,7 @@ import Modal from './Modal'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import ConfirmModal from './ConfirmModal'
-import { crewColorFor } from '../../lib/scheduleData'
+import { crewColorFor, formatTimeWindow, windowWrapsMidnight } from '../../lib/scheduleData'
 import type { CrewSummaryItem } from '../../api/crewApi'
 import type { CrewAssignment } from '../../api/jobApi'
 
@@ -12,6 +12,9 @@ export interface StintDraft {
   startDate: string
   /** Empty string = open-ended. */
   endDate: string
+  /** "HH:mm" pair, or both empty for a round-the-clock stint. */
+  dailyStartTime: string
+  dailyEndTime: string
   excludeWeekends?: boolean
   note: string
 }
@@ -27,9 +30,11 @@ function crewLeadName(crew: CrewSummaryItem) {
 /**
  * Create or edit one crew stint on a job.
  *
- * The backend rejects overlapping stints (409) and past start dates (400);
- * those come back through `error` rather than being pre-validated here, since
- * only the server knows the full assignment picture.
+ * A stint is a crew, a date range, and optionally a daily time window that
+ * repeats across that range. Several crews can share the same days on a job so
+ * long as their windows don't overlap, and one crew can hold stints on several
+ * jobs the same day under the same rule. The server owns that check and reports
+ * conflicts through `error` rather than them being pre-validated here.
  */
 export default function ScheduleAssignModal({
   jobName,
@@ -59,12 +64,28 @@ export default function ScheduleAssignModal({
 }) {
   const isEdit = Boolean(assignment)
   const [crewId, setCrewId] = useState<string | null>(assignment?.crewId ?? null)
-  const [startDate, setStartDate] = useState(assignment?.startDate?.slice(0, 10) ?? defaultStartDate)
-  const [endDate, setEndDate] = useState(assignment?.endDate?.slice(0, 10) ?? '')
+  const [startDateTime, setStartDateTime] = useState(
+    (assignment?.startDate?.slice(0, 10) ?? defaultStartDate) + 'T' + (assignment?.dailyStartTime ?? '08:00'),
+  )
+  const [endDateTime, setEndDateTime] = useState(
+    assignment?.endDate
+      ? assignment.endDate.slice(0, 10) + 'T' + (assignment.dailyEndTime ?? '17:00')
+      : '',
+  )
   const [excludeWeekends, setExcludeWeekends] = useState(assignment?.excludeWeekends ?? false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
+  const startDate = startDateTime.split('T')[0] ?? ''
+  const endDate = endDateTime ? endDateTime.split('T')[0] ?? '' : ''
+  const dailyStartTime = startDateTime.split('T')[1] ?? ''
+  const dailyEndTime = endDateTime ? endDateTime.split('T')[1] ?? '' : ''
+
   const selected = crews.find((c) => c._id === crewId)
+  // Equal times wrap all the way around the clock, which is how a crew that
+  // holds the job for the whole day is expressed.
+  const isAllDay = Boolean(dailyStartTime) && dailyStartTime === dailyEndTime
+  const wraps = !isAllDay && windowWrapsMidnight(dailyStartTime, dailyEndTime)
+  const timesValid = Boolean(startDateTime) && (endDateTime ? Boolean(dailyEndTime) : true)
 
   if (confirmingDelete) {
     return (
@@ -82,7 +103,7 @@ export default function ScheduleAssignModal({
   }
 
   return (
-    <Modal onClose={onCancel} width={440}>
+    <Modal onClose={onCancel} width={480}>
       <h2 className="modal-title">{isEdit ? 'Edit Crew Assignment' : 'Assign Crew'}</h2>
       <p className="job-head__meta" style={{ marginTop: '0.15rem' }}>Job #{jobNo}</p>
       <p className="assign-crew__job-name">{jobName}</p>
@@ -113,32 +134,43 @@ export default function ScheduleAssignModal({
         }))}
       />
 
-      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-        <div style={{ flex: 1 }}>
-          <label className="field-label">Start Date</label>
+      <div className="field-row" style={{ marginTop: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>Start Date &amp; Time</label>
           <input
-            type="date"
+            type="datetime-local"
             className="field-input"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            value={startDateTime}
+            onChange={(e) => setStartDateTime(e.target.value)}
           />
         </div>
-        <div style={{ flex: 1 }}>
-          <label className="field-label">End Date</label>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>End Date &amp; Time</label>
           <input
-            type="date"
+            type="datetime-local"
             className="field-input"
-            value={endDate}
-            min={startDate || undefined}
-            onChange={(e) => setEndDate(e.target.value)}
+            value={endDateTime}
+            min={startDateTime || undefined}
+            onChange={(e) => setEndDateTime(e.target.value)}
           />
         </div>
       </div>
       <p className="field-hint" style={{ marginTop: '0.35rem', fontSize: '0.75rem', opacity: 0.7 }}>
-        Leave End Date empty for an open-ended assignment.
+        Leave End Date &amp; Time empty for an open-ended assignment. Set the same
+        time on both ends to keep the crew on the job round the clock.
       </p>
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: '#475569', marginTop: '0.85rem' }}>
+      {dailyStartTime && dailyEndTime && (
+        <p className="field-hint" style={{ marginTop: '0.35rem', fontSize: '0.75rem', opacity: 0.7 }}>
+          {isAllDay
+            ? 'Round the clock — the crew holds this job for the whole of every day in the range.'
+            : wraps
+              ? `Overnight shift — ${formatTimeWindow(dailyStartTime, dailyEndTime)}, carrying into the next morning.`
+              : `${formatTimeWindow(dailyStartTime, dailyEndTime)}, repeated on every day in the range.`}
+        </p>
+      )}
+
+      <label className="sb-check">
         <input
           type="checkbox"
           checked={excludeWeekends}
@@ -164,9 +196,18 @@ export default function ScheduleAssignModal({
           <button
             type="button"
             className="btn btn--primary"
-            disabled={!crewId || !startDate || saving}
+            disabled={!crewId || !startDate || !timesValid || saving}
             onClick={() => {
-              if (crewId) onSubmit({ crewId, startDate, endDate, excludeWeekends, note: '' })
+              if (!crewId) return
+              onSubmit({
+                crewId,
+                startDate,
+                endDate,
+                dailyStartTime,
+                dailyEndTime,
+                excludeWeekends,
+                note: '',
+              })
             }}
           >
             {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Assign Crew'}

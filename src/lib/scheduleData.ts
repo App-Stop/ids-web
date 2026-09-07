@@ -96,6 +96,43 @@ export function formatMdy(iso: string) {
   return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${d.getFullYear()}`
 }
 
+// --- Daily time windows -----------------------------------------------------
+// An assignment carries an optional recurring window ("HH:mm"-"HH:mm") that
+// applies to every day in its range. Both times absent means the crew has the
+// job for the whole day.
+
+/** "14:30" -> "2:30 PM". Returns null for anything that isn't HH:mm. */
+export function formatTimeOfDay(time: string | null | undefined) {
+  if (!time || !/^\d{2}:\d{2}$/.test(time)) return null
+  const [h, m] = time.split(':').map(Number)
+  const suffix = h < 12 ? 'AM' : 'PM'
+  const hour12 = h % 12 === 0 ? 12 : h % 12
+  return `${hour12}:${String(m).padStart(2, '0')} ${suffix}`
+}
+
+/**
+ * The label a schedule chip shows: "8:00 AM - 2:00 PM" for an hour-scoped
+ * stint, or "All day" when the crew has the job round the clock.
+ */
+export function formatTimeWindow(
+  start: string | null | undefined,
+  end: string | null | undefined,
+) {
+  const from = formatTimeOfDay(start)
+  const to = formatTimeOfDay(end)
+  if (!from || !to) return 'All day'
+  return `${from} - ${to}`
+}
+
+/** True when a window runs past midnight into the next day, e.g. 22:00-06:00. */
+export function windowWrapsMidnight(
+  start: string | null | undefined,
+  end: string | null | undefined,
+) {
+  if (!start || !end) return false
+  return end <= start
+}
+
 /** Fallback palette for crews whose `crewColor` is unset. */
 const FALLBACK_COLORS = ['#ea3da9', '#56bd6d', '#df3021', '#4193f7', '#e8752e', '#14b8a6', '#8b5cf6']
 

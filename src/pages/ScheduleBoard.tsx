@@ -27,12 +27,15 @@ import ZoomControl from '../components/dashboard/ZoomControl'
 import NoteModal from '../components/dashboard/NoteModal'
 import ScheduleAssignModal, { type StintDraft } from '../components/dashboard/ScheduleAssignModal'
 import ScheduleMoveModal from '../components/dashboard/ScheduleMoveModal'
+import ScheduleReplaceModal from '../components/dashboard/ScheduleReplaceModal'
 import ScheduleExtendModal from '../components/dashboard/ScheduleExtendModal'
 import { Icon } from '../components/dashboard/icons'
+import ConfirmModal from '../components/dashboard/ConfirmModal'
 import {
   createCrewAssignment,
   updateCrewAssignment,
   deleteCrewAssignment,
+  updateJob,
   type CrewAssignment,
   type GetScheduleResponse,
   type ScheduleJobRow,
@@ -53,6 +56,8 @@ import {
   weekdayShort,
   rangeLabel as formatRangeLabel,
   crewColorFor,
+  formatTimeWindow,
+  formatMdy,
   type ViewMode,
 } from '../lib/scheduleData'
 import { useSidebarCollapsed } from '../hooks/useSidebarCollapsed'
@@ -94,6 +99,20 @@ type Flow =
   | { type: 'dayNote'; jobId: string; date: string }
   | { type: 'confirmMove'; plan: MovePlan }
   | { type: 'confirmExtend'; plan: ExtendPlan }
+  /** Clicked a day that sits before the job's own start date. */
+  | { type: 'confirmPrepone'; jobId: string; date: string; jobStart: string }
+  /**
+   * A submitted stint wants hours another crew already holds on this job.
+   * Held here until confirmed, since the server hands the slot over silently.
+   */
+  | {
+      type: 'confirmReplace'
+      jobId: string
+      draft: StintDraft
+      /** Present when editing an existing stint rather than creating one. */
+      assignmentId?: string
+      displaced: DisplacedStint[]
+    }
 
 const scheduleCollision: CollisionDetection = (args) => {
   const { active, pointerCoordinates } = args
@@ -163,6 +182,166 @@ function overlapsRange(assignment: CrewAssignment, start: string, end: string | 
   if (end && s > end) return false
   if (e && e < start) return false
   return true
+}
+
+/** Minutes since midnight for "HH:mm". */
+function minutesOfDay(time: string) {
+  const [h, m] = time.split(':').map(Number)
+  return h * 60 + m
+}
+
+/** Anything carrying a daily window — a stored stint or a draft of one. */
+type TimeWindow = { dailyStartTime?: string | null; dailyEndTime?: string | null }
+
+/**
+ * Do two stints want the same hours of the day? Mirrors the server's check: a
+ * stint with no window occupies the whole day and so collides with everything,
+ * and a window may wrap past midnight, in which case it counts as two
+ * intervals either side of it.
+ */
+function windowsCollide(a: TimeWindow, b: TimeWindow) {
+  const intervals = (window: TimeWindow): Array<[number, number]> => {
+    const { dailyStartTime: from, dailyEndTime: to } = window
+    if (!from || !to) return [[0, 1440]]
+    const start = minutesOfDay(from)
+    const end = minutesOfDay(to)
+    if (end > start) return [[start, end]]
+    // Wraps midnight — the evening piece plus the following morning's. Equal
+    // times wrap the whole way round, i.e. the crew holds the entire day.
+    return [
+      [start, 1440],
+      [0, end],
+    ]
+  }
+  return intervals(a).some(([aFrom, aTo]) =>
+    intervals(b).some(([bFrom, bTo]) => aFrom < bTo && bFrom < aTo),
+  )
+}
+
+// --- Several crews per job, several jobs per crew ---------------------------
+// A job day is no longer owned by one crew: any number of stints can share it
+// as long as their daily time windows don't collide (the server enforces
+// that). Everything below turns a row's stints into a stable stacking order so
+// the same crew keeps the same slot as the eye scans across the week.
+
+/** Round-the-clock stints first, then by time of day, then by crew name. */
+function stintOrder(a: CrewAssignment, b: CrewAssignment) {
+  const aTime = a.dailyStartTime ?? ''
+  const bTime = b.dailyStartTime ?? ''
+  if (aTime !== bTime) return aTime < bTime ? -1 : 1
+  const aStart = isoDay(a.startDate) ?? ''
+  const bStart = isoDay(b.startDate) ?? ''
+  if (aStart !== bStart) return aStart < bStart ? -1 : 1
+  return (a.crew?.name ?? '').localeCompare(b.crew?.name ?? '')
+}
+
+/**
+ * What handing a slot to another crew does to the stint already holding it.
+ * Mirrors `resolveJobOverlap` on the server: a stint the new range covers
+ * entirely goes; one it clips at an edge is trimmed back; one it lands inside
+ * is split in two, leaving the crew the days either side.
+ */
+type DisplacedEffect = 'removed' | 'trimmed' | 'split'
+
+export type DisplacedStint = {
+  assignment: CrewAssignment
+  effect: DisplacedEffect
+}
+
+/**
+ * The stints a draft would push out of the way: same job, overlapping days,
+ * and wanting the same hours of those days. Stints at other hours are left
+ * alone — that is the whole point of hour-scoped assignments.
+ */
+function findDisplaced(
+  row: ScheduleJobRow | undefined,
+  draft: { startDate: string; endDate: string; dailyStartTime: string; dailyEndTime: string },
+  excludeAssignmentId?: string,
+): DisplacedStint[] {
+  if (!row) return []
+  const newStart = draft.startDate
+  const newEnd = draft.endDate || null
+
+  return row.assignments
+    .filter((a) => a._id !== excludeAssignmentId && a.status !== 'cancelled')
+    .filter((a) => overlapsRange(a, newStart, newEnd) && windowsCollide(a, draft))
+    .map((a) => {
+      const { start, end } = realBounds(a)
+      const leftRemains = start < newStart
+      const rightRemains = Boolean(newEnd) && (end === null || end > (newEnd as string))
+      const effect: DisplacedEffect =
+        leftRemains && rightRemains ? 'split' : leftRemains || rightRemains ? 'trimmed' : 'removed'
+      return { assignment: a, effect }
+    })
+}
+
+/** Per-row layout: stacking lanes for the monthly bars, plus crew summary. */
+type RowMeta = {
+  ordered: CrewAssignment[]
+  /** Monthly only — which horizontal band each bar draws in. */
+  laneOf: Map<string, number>
+  laneCount: number
+  /** Busiest visible day, i.e. how many chips the weekly stack must fit. */
+  maxPerDay: number
+  crews: Array<{ id: string; name: string; color: string; lead: string }>
+}
+
+/**
+ * Greedy lane packing: a bar reuses the topmost lane whose last bar has
+ * already finished, so non-overlapping stints share a lane and only genuinely
+ * concurrent crews push the row taller.
+ */
+function buildRowMeta(row: ScheduleJobRow, days: string[], rangeEnd: string): RowMeta {
+  const ordered = [...row.assignments].sort(stintOrder)
+
+  const laneEnds: string[] = []
+  const laneOf = new Map<string, number>()
+  for (const a of ordered) {
+    const { start, end } = stintBounds(a, rangeEnd)
+    let lane = laneEnds.findIndex((laneEnd) => laneEnd < start)
+    if (lane === -1) {
+      lane = laneEnds.length
+      laneEnds.push(end)
+    } else {
+      laneEnds[lane] = end
+    }
+    laneOf.set(a._id, lane)
+  }
+
+  let maxPerDay = 0
+  for (const iso of days) {
+    const count = ordered.reduce((n, a) => (coversDay(a, iso, rangeEnd) ? n + 1 : n), 0)
+    if (count > maxPerDay) maxPerDay = count
+  }
+
+  const seen = new Set<string>()
+  const crews: RowMeta['crews'] = []
+  for (const a of ordered) {
+    const id = String(a.crewId)
+    if (seen.has(id)) continue
+    seen.add(id)
+    const lead = a.crew?.crewLead
+    crews.push({
+      id,
+      name: a.crew?.name ?? 'Crew',
+      color: crewColorFor(a.crewId, a.crew?.crewColor),
+      lead:
+        lead && typeof lead === 'object'
+          ? [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email || ''
+          : '',
+    })
+  }
+
+  return { ordered, laneOf, laneCount: Math.max(laneEnds.length, 1), maxPerDay, crews }
+}
+
+/** Row height, kept identical in the frozen and scrolling tables so they line up. */
+function rowHeight(meta: RowMeta, view: ViewMode, zoom: number) {
+  const px =
+    view === 'monthly'
+      ? Math.max(meta.laneCount, 1) * 22 + 20
+      : (meta.maxPerDay + 1) * 40 + 22
+  return Math.round(px * zoom)
 }
 
 // --- Resize handle (left = start edge, right = end edge) -------------------
@@ -257,6 +436,7 @@ function AssignmentPill({
   color,
   compact,
   span = 1,
+  lane = 0,
   startIso,
   noteByJobDay,
   onOpenDetails,
@@ -266,12 +446,15 @@ function AssignmentPill({
   color: string
   compact: boolean
   span?: number
+  /** Stacking band within the row — several crews can share these days. */
+  lane?: number
   startIso: string
   noteByJobDay: Map<string, DayNote>
   onOpenDetails: () => void
   onOpenNote: (date: string) => void
 }) {
   const crewName = assignment.crew?.name ?? 'Crew'
+  const hours = formatTimeWindow(assignment.dailyStartTime, assignment.dailyEndTime)
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `move-${assignment._id}`,
     data: { type: 'move' as const, assignment },
@@ -307,13 +490,13 @@ function AssignmentPill({
   return (
     <div
       className={`sb-pill-wrap${compact ? ' sb-pill-wrap--compact' : ''}${isDragging ? ' is-moving' : ''}`}
-      style={{ ['--sb-span' as string]: span } as CSSProperties}
+      style={{ ['--sb-span' as string]: span, ['--sb-lane' as string]: lane } as CSSProperties}
     >
       <button
         ref={setNodeRef}
         type="button"
         className="sb-pill sb-pill--movable"
-        title={assignment.note ? `${crewName} — ${assignment.note}` : crewName}
+        title={`${crewName} — ${hours}${assignment.note ? ` — ${assignment.note}` : ''}`}
         style={
           compact
             ? { background: color }
@@ -332,7 +515,12 @@ function AssignmentPill({
         {...listeners}
         {...attributes}
       >
-        {!compact && <span className="sb-pill__name">{crewName}</span>}
+        {!compact && (
+          <>
+            <span className="sb-pill__name">{crewName}</span>
+            <span className="sb-pill__hours">{hours}</span>
+          </>
+        )}
         <ResizeHandle assignment={assignment} edge="start" color={color} compact={compact} />
         <ResizeHandle assignment={assignment} edge="end" color={color} compact={compact} />
       </button>
@@ -352,6 +540,72 @@ function AssignmentPill({
   )
 }
 
+// --- Weekly chip ------------------------------------------------------------
+// Weekly shows one chip per crew per day rather than a bar spanning the run,
+// because a day can now hold several crews at different hours and each needs
+// its own time label. The chips stack in the cell, ordered by time of day.
+
+function WeeklyChip({
+  assignment,
+  color,
+  onOpenDetails,
+}: {
+  assignment: CrewAssignment
+  color: string
+  onOpenDetails: () => void
+}) {
+  const crewName = assignment.crew?.name ?? 'Crew'
+  const hours = formatTimeWindow(assignment.dailyStartTime, assignment.dailyEndTime)
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `move-${assignment._id}`,
+    data: { type: 'move' as const, assignment },
+  })
+
+  // Same guard as the monthly pill: the click that ends a drag must not also
+  // open the edit modal on top of the move it just made.
+  const draggedRef = useRef(false)
+  useEffect(() => {
+    if (isDragging) {
+      draggedRef.current = true
+      return
+    }
+    if (!draggedRef.current) return
+    const timer = setTimeout(() => {
+      draggedRef.current = false
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [isDragging])
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      className={`sb-chip${isDragging ? ' is-moving' : ''}`}
+      title={`${crewName} — ${hours}${assignment.note ? ` — ${assignment.note}` : ''}`}
+      style={{
+        background: `color-mix(in srgb, ${color} 12%, #fff)`,
+        borderColor: color,
+        color: '#0f172a',
+        position: 'relative',
+      }}
+      onClick={() => {
+        if (draggedRef.current) {
+          draggedRef.current = false
+          return
+        }
+        onOpenDetails()
+      }}
+      {...listeners}
+      {...attributes}
+    >
+      <span className="sb-chip__hours">{hours}</span>
+      <span className="sb-chip__crew" style={{ color }}>{crewName}</span>
+      <ResizeHandle assignment={assignment} edge="start" color={color} compact={true} />
+      <ResizeHandle assignment={assignment} edge="end" color={color} compact={true} />
+    </button>
+  )
+}
+
 // --- Droppable day cell -----------------------------------------------------
 
 function DayCell({
@@ -362,6 +616,8 @@ function DayCell({
   /** This day is inside the run the hovered drop would take over. */
   replacing = false,
   disabled = false,
+  /** Before the job's own start date — allowed, but confirmed before writing. */
+  preStart = false,
   children,
 }: {
   jobId: string
@@ -370,6 +626,7 @@ function DayCell({
   occupied?: boolean
   replacing?: boolean
   disabled?: boolean
+  preStart?: boolean
   children?: React.ReactNode
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -387,7 +644,7 @@ function DayCell({
       ref={setNodeRef}
       className={`${compact ? 'sb-cell sb-cell--compact' : 'sb-cell'}${occupied ? ' sb-cell--occupied' : ''}${
         disabled ? ' sb-cell--disabled' : ''
-      }${highlight}`}
+      }${preStart ? ' sb-cell--prestart' : ''}${highlight}`}
     >
       {disabled ? null : children}
     </td>
@@ -415,7 +672,9 @@ export default function ScheduleBoard() {
   const [modalError, setModalError] = useState<string | null>(null)
 
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
-  const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
+  const [crewHover, setCrewHover] = useState<
+    { x: number; y: number; colors: string[]; names: string[] } | null
+  >(null)
   const [draggingAssignment, setDraggingAssignment] = useState<CrewAssignment | null>(null)
   const [dragKind, setDragKind] = useState<DragKind | null>(null)
   const [hoverCell, setHoverCell] = useState<{ jobId: string; date: string } | null>(null)
@@ -600,6 +859,67 @@ export default function ScheduleBoard() {
     [rows],
   )
 
+  /**
+   * Stacking layout per job row. Both tables read the heights from here so the
+   * frozen job columns stay aligned with rows that have grown taller to hold
+   * several crews at once.
+   */
+  const rowMeta = useMemo(() => {
+    const isoDays = visibleDays.map(toISO)
+    const map = new Map<string, RowMeta>()
+    for (const row of rows) map.set(row._id, buildRowMeta(row, isoDays, rangeEnd))
+    return map
+  }, [rows, visibleDays, rangeEnd])
+
+  const heightOf = useCallback(
+    (jobId: string) => {
+      const meta = rowMeta.get(jobId)
+      return meta ? rowHeight(meta, viewMode, zoom) : undefined
+    },
+    [rowMeta, viewMode, zoom],
+  )
+
+  /** ISO start day of a job, or null when it somehow has none. */
+  const jobStartOf = useCallback(
+    (row: ScheduleJobRow) => (row.startDate ? isoDay(row.startDate) : null),
+    [],
+  )
+
+  /**
+   * A day cell was clicked. Days before today stay closed — the server rejects
+   * a stint starting in the past either way. A day between today and the job's
+   * own start is allowed, but only after confirming that the job is being
+   * pulled forward.
+   */
+  function openAssign(row: ScheduleJobRow, iso: string) {
+    setModalError(null)
+    if (iso < today) {
+      setBanner('An assignment cannot start in the past.')
+      return
+    }
+    const jobStart = jobStartOf(row)
+    if (jobStart && iso < jobStart) {
+      setFlow({ type: 'confirmPrepone', jobId: row._id, date: iso, jobStart })
+      return
+    }
+    setFlow({ type: 'assignCrew', jobId: row._id, date: iso })
+  }
+
+  /** Pull a job's start date back to `date`, then carry on into the assign modal. */
+  async function preponeJob(jobId: string, date: string) {
+    setSaving(true)
+    setModalError(null)
+    try {
+      await updateJob(jobId, { startDate: date })
+      await load()
+      setFlow({ type: 'assignCrew', jobId, date })
+    } catch (err) {
+      setModalError(getErrorMessage(err, 'Could not move that job’s start date.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // --- Mutations ------------------------------------------------------------
 
   async function runMutation(action: () => Promise<unknown>, fallback: string) {
@@ -624,9 +944,45 @@ export default function ScheduleBoard() {
       startDate: draft.startDate,
       // Omitting endDate leaves the stint open-ended.
       ...(draft.endDate ? { endDate: draft.endDate } : {}),
+      // Both times or neither — the server rejects a half-specified window,
+      // and neither means the crew has the job round the clock.
+      ...(draft.dailyStartTime && draft.dailyEndTime
+        ? { dailyStartTime: draft.dailyStartTime, dailyEndTime: draft.dailyEndTime }
+        : {}),
       ...(draft.excludeWeekends !== undefined ? { excludeWeekends: draft.excludeWeekends } : {}),
       ...(draft.note ? { note: draft.note } : {}),
     }
+  }
+
+  /** Create or update the stint the draft describes. */
+  function writeStint(jobId: string, draft: StintDraft, assignmentId?: string) {
+    return runMutation(
+      () =>
+        assignmentId
+          ? updateCrewAssignment(jobId, assignmentId, draftToPayload(draft))
+          : createCrewAssignment(jobId, draftToPayload(draft)),
+      assignmentId ? 'Could not update that assignment.' : 'Could not assign that crew.',
+    )
+  }
+
+  /**
+   * Save a stint from the assign modal, pausing first if it would take hours
+   * another crew already holds on this job. The server hands the slot over
+   * without complaint — trimming, splitting or dropping whatever overlaps — so
+   * that has to be confirmed here or it happens invisibly.
+   */
+  function submitStint(jobId: string, draft: StintDraft, assignmentId?: string) {
+    const displaced = findDisplaced(
+      rows.find((r) => r._id === jobId),
+      draft,
+      assignmentId,
+    )
+    if (displaced.length > 0) {
+      setModalError(null)
+      setFlow({ type: 'confirmReplace', jobId, draft, assignmentId, displaced })
+      return
+    }
+    void writeStint(jobId, draft, assignmentId)
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -698,7 +1054,7 @@ export default function ScheduleBoard() {
     })
   }
 
-  /** Best-effort re-create of stints a failed move already deleted. */
+  /** Best-effort re-create of a stint a failed cross-job move already deleted. */
   async function restoreAssignments(jobId: string, list: CrewAssignment[]) {
     for (const a of list) {
       const { start, end } = realBounds(a)
@@ -706,6 +1062,9 @@ export default function ScheduleBoard() {
         crewId: a.crewId,
         startDate: start,
         ...(end ? { endDate: end } : {}),
+        ...(a.dailyStartTime && a.dailyEndTime
+          ? { dailyStartTime: a.dailyStartTime, dailyEndTime: a.dailyEndTime }
+          : {}),
         ...(a.note ? { note: a.note } : {}),
       }).catch(() => {
         /* nothing left to try — the reload below shows the real state */
@@ -728,21 +1087,14 @@ export default function ScheduleBoard() {
     const fromJobId = String(source.jobId)
     const { start, end } = realBounds(source)
     const crossJob = fromJobId !== targetJobId
-    const destRow = rows.find((r) => r._id === targetJobId)
 
-    // Dropping onto another crew's bar hands the whole of that bar's run to the
-    // moved crew — a 2-day stint dropped on a 3-day one becomes those 3 days.
-    // Dropping on a free day just relocates the stint at its own length.
-    const displaced = destRow?.assignments.find(
-      (a) => a._id !== source._id && coversDay(a, targetDate, rangeEnd),
-    )
-    const adopted = Boolean(displaced)
-    const newStart = displaced ? realBounds(displaced).start : targetDate
-    const newEnd = displaced
-      ? realBounds(displaced).end
-      : end === null
-        ? null
-        : addIsoDays(targetDate, daysBetween(start, end))
+    // A day can hold several crews now, so dropping on an occupied one no
+    // longer means taking that crew's run over — the stint simply relocates,
+    // keeping its own length and daily hours. Where two stints genuinely
+    // collide (same job, overlapping hours) the server trims or splits the
+    // existing one to make room; a cross-job clash it rejects outright.
+    const newStart = targetDate
+    const newEnd = end === null ? null : addIsoDays(targetDate, daysBetween(start, end))
 
     if (!crossJob && newStart === start && newEnd === end) return null
 
@@ -750,8 +1102,8 @@ export default function ScheduleBoard() {
       setBanner('An assignment cannot start in the past.')
       return null
     }
-    // PATCH cannot clear an end date back to null, so taking over an open-ended
-    // run means re-creating the stint even when the job hasn't changed.
+    // PATCH cannot clear an end date back to null, so making a stint
+    // open-ended means re-creating it even when the job hasn't changed.
     if (needsRecreate(source, newEnd, targetJobId) && start < today) {
       setBanner(
         'This assignment has already started, so it cannot be moved this way — trim its end date instead.',
@@ -759,42 +1111,39 @@ export default function ScheduleBoard() {
       return null
     }
 
-    // Only stints the board has loaded are visible here; one lying entirely
-    // outside the current range is caught by the server's overlap check.
+    // Stints the move will land on top of. Only those sharing hours with the
+    // dragged one are actually affected; they're listed so the confirm modal
+    // can say what the server will reshuffle.
+    const destRow = rows.find((r) => r._id === targetJobId)
     const occupants = (destRow?.assignments ?? []).filter(
-      (a) => a._id !== source._id && overlapsRange(a, newStart, newEnd),
+      (a) =>
+        a._id !== source._id &&
+        overlapsRange(a, newStart, newEnd) &&
+        windowsCollide(a, source),
     )
 
-    const started = occupants.find((a) => (isoDay(a.startDate) ?? '') < today)
-    if (started) {
-      setBanner(
-        `"${started.crew?.name ?? 'That crew'}" has already started on the destination — an assignment in progress cannot be replaced.`,
-      )
-      return null
-    }
-
-    return { source, fromJobId, targetJobId, newStart, newEnd, occupants, adopted }
+    return { source, fromJobId, targetJobId, newStart, newEnd, occupants, adopted: false }
   }
 
   /**
-   * Carry out a confirmed move. Whatever occupies the destination range is
-   * deleted first — the backend rejects any overlap, so "replace" has to be an
-   * explicit delete-then-write.
+   * Carry out a confirmed move.
+   *
+   * Nothing at the destination is deleted: the server trims or splits a
+   * same-job stint whose hours the move collides with, and rejects a
+   * cross-job clash. Stints at other hours of the same day simply stay put.
    *
    * There is no endpoint that re-parents an assignment, so a move to a
    * different job is delete + create rather than a PATCH.
    */
   async function commitMove(plan: MovePlan) {
-    const { source, fromJobId, targetJobId, newStart, newEnd, occupants } = plan
+    const { source, fromJobId, targetJobId, newStart, newEnd } = plan
     const recreate = needsRecreate(source, newEnd, targetJobId)
 
     const previous = rows
     patchRows((list) =>
       list.map((row) => {
         if (row._id === targetJobId) {
-          const kept = row.assignments.filter(
-            (a) => a._id !== source._id && !occupants.some((o) => o._id === a._id),
-          )
+          const kept = row.assignments.filter((a) => a._id !== source._id)
           return {
             ...row,
             assignments: [
@@ -810,13 +1159,7 @@ export default function ScheduleBoard() {
       }),
     )
 
-    const removed: CrewAssignment[] = []
     try {
-      for (const occupant of occupants) {
-        await deleteCrewAssignment(targetJobId, occupant._id)
-        removed.push(occupant)
-      }
-
       if (recreate) {
         await deleteCrewAssignment(fromJobId, source._id)
         try {
@@ -824,6 +1167,11 @@ export default function ScheduleBoard() {
             crewId: source.crewId,
             startDate: newStart,
             ...(newEnd ? { endDate: newEnd } : {}),
+            // The stint keeps its daily hours through the move — that's what
+            // lets the destination day hold it alongside other crews.
+            ...(source.dailyStartTime && source.dailyEndTime
+              ? { dailyStartTime: source.dailyStartTime, dailyEndTime: source.dailyEndTime }
+              : {}),
             ...(source.note ? { note: source.note } : {}),
           })
         } catch (err) {
@@ -842,7 +1190,6 @@ export default function ScheduleBoard() {
       await load()
       return true
     } catch (err) {
-      await restoreAssignments(targetJobId, removed)
       patchRows(() => previous)
       // Reported in the confirm modal, which stays open so the move can be
       // retried or abandoned.
@@ -882,21 +1229,18 @@ export default function ScheduleBoard() {
     }
   }
 
-  /**
-   * Days the hovered drop would hand over to the dragged crew. Non-null only
-   * when the cursor is over another crew's bar, since that's the case where the
-   * moved stint swallows the target's whole run.
-   */
+  /** The days the dragged stint would occupy if dropped where the cursor is. */
   const replacePreview = useMemo(() => {
     if (dragKind !== 'move' || !draggingAssignment || !hoverCell) return null
-    const destRow = rows.find((r) => r._id === hoverCell.jobId)
-    const displaced = destRow?.assignments.find(
-      (a) => a._id !== draggingAssignment._id && coversDay(a, hoverCell.date, rangeEnd),
-    )
-    if (!displaced) return null
-    const { start, end } = realBounds(displaced)
-    return { jobId: hoverCell.jobId, start, end: end ?? rangeEnd }
-  }, [dragKind, draggingAssignment, hoverCell, rows, rangeEnd])
+    const { start, end } = realBounds(draggingAssignment)
+    if (!end) return { jobId: hoverCell.jobId, start: hoverCell.date, end: rangeEnd }
+    const length = daysBetween(start, end)
+    return {
+      jobId: hoverCell.jobId,
+      start: hoverCell.date,
+      end: addIsoDays(hoverCell.date, length),
+    }
+  }, [dragKind, draggingAssignment, hoverCell, rangeEnd])
 
   const activeRow = flow.type !== 'none' && 'jobId' in flow ? rows.find((r) => r._id === flow.jobId) : undefined
   const draggingRow = draggingAssignment
@@ -1043,7 +1387,7 @@ export default function ScheduleBoard() {
                         <>
                           <th className="sb-col-meta">General Contractor</th>
                           <th className="sb-col-meta">GC Super</th>
-                          <th className="sb-col-meta">IDS Super</th>
+                          <th className="sb-col-meta">Crew Lead</th>
                           <th className="sb-col-meta sb-col-meta--contract">Contract</th>
                         </>
                       )}
@@ -1052,13 +1396,16 @@ export default function ScheduleBoard() {
                   </thead>
                   <tbody>
                     {rows.map((row, rowIndex) => {
-                      const crewObj = typeof row.currentCrew === 'object' && row.currentCrew !== null ? row.currentCrew : null
-                      const crewId = crewObj?._id ?? (typeof row.currentCrew === 'string' ? row.currentCrew : null)
-                      const crewName = crewObj?.name ?? (crewId ? 'Crew' : 'Unassigned')
-                      const crewColor = crewId ? crewColorFor(crewId, crewObj?.crewColor) : '#94a3b8'
+                      const meta = rowMeta.get(row._id)
+                      // The row's colour key is every crew booked on it in this
+                      // range, not just whoever happens to be there today.
+                      const rowCrews = meta?.crews ?? []
+                      const jobStart = jobStartOf(row)
+                      const startsLater = Boolean(jobStart && jobStart > today)
+                      const leads = rowCrews.map((c) => c.lead).filter(Boolean)
 
                       return (
-                        <tr key={row._id} className="sb-row">
+                        <tr key={row._id} className="sb-row" style={{ height: heightOf(row._id) }}>
                           <td className="sb-col-jobno">{row.jobIdNumber}</td>
                           <td className="sb-col-job">
                             <span
@@ -1068,16 +1415,33 @@ export default function ScheduleBoard() {
                                 setCrewHover({
                                   x: rect.right + 8,
                                   y: rect.top + rect.height / 2,
-                                  color: crewColor,
-                                  names: [crewName],
+                                  colors: rowCrews.length ? rowCrews.map((c) => c.color) : ['#94a3b8'],
+                                  names: rowCrews.length ? rowCrews.map((c) => c.name) : ['Unassigned'],
                                 })
                               }}
                               onMouseLeave={() => setCrewHover(null)}
                             >
-                              <i className="sb-row-bar" style={{ background: crewColor }} />
+                              <span className="sb-row-bar-stack">
+                                {(rowCrews.length
+                                  ? rowCrews
+                                  : [{ id: 'none', color: '#94a3b8', name: '', lead: '' }]
+                                ).map((c) => (
+                                  <i key={c.id} className="sb-row-bar" style={{ background: c.color }} />
+                                ))}
+                              </span>
                             </span>
                             <div className="sb-job-inner">
-                              <span className="sb-job-name" title={row.name ?? ''}>{row.name}</span>
+                              <span className="sb-job-text">
+                                <span className="sb-job-name" title={row.name ?? ''}>{row.name}</span>
+                                {rowCrews.length > 1 && (
+                                  <span className="sb-job-sub">{rowCrews.length} crews</span>
+                                )}
+                                {startsLater && jobStart && (
+                                  <span className="sb-job-sub sb-job-sub--start">
+                                    Starts {formatMdy(jobStart)}
+                                  </span>
+                                )}
+                              </span>
                               <Icon.ChevronRight width={14} height={14} />
                             </div>
                           </td>
@@ -1085,7 +1449,11 @@ export default function ScheduleBoard() {
                             <>
                               <td className="sb-col-meta">{row.generalContractor}</td>
                               <td className="sb-col-meta">{row.gcSuper}</td>
-                              <td className="sb-col-meta">{row.idsSuper}</td>
+                              {/* The crew lead is the IDS super — there is no
+                                  separate person to track any more. */}
+                              <td className="sb-col-meta" title={leads.join(', ')}>
+                                {leads.length ? leads.join(', ') : '—'}
+                              </td>
                               <td className="sb-col-meta sb-col-meta--contract">
                                 ${(row.contractAmount ?? 0).toLocaleString('en-US')}
                               </td>
@@ -1178,104 +1546,148 @@ export default function ScheduleBoard() {
                   </thead>
                   <tbody>
                     {rows.map((row) => {
-                      const jobStartIso = row.startDate ? (isoDay(row.startDate) ?? row.startDate.slice(0, 10)) : null
+                      const meta = rowMeta.get(row._id)
+                      const ordered = meta?.ordered ?? []
+                      const jobStartIso = jobStartOf(row)
+
                       return (
-                        <tr key={row._id} className="sb-row">
+                        <tr key={row._id} className="sb-row" style={{ height: heightOf(row._id) }}>
                           {visibleDays.map((d, dayIndex) => {
                             const iso = toISO(d)
+                            // Days before the job starts are open for business —
+                            // taking a job early is allowed, it just gets
+                            // confirmed first. Only the past stays shut.
                             const isBeforeJobStart = Boolean(jobStartIso && iso < jobStartIso)
-                            const assignment = row.assignments.find((a) => coversDay(a, iso, rangeEnd))
+                            const isPast = iso < today
+                            // Every crew on this day, not just the first: a job
+                            // can run several crews at different hours.
+                            const covering = ordered.filter((a) => coversDay(a, iso, rangeEnd))
                             const replacing =
                               !!replacePreview &&
                               replacePreview.jobId === row._id &&
                               iso >= replacePreview.start &&
                               iso <= replacePreview.end
 
-                            if (!assignment) {
-                              // Any free day can start a new stint — a job's timeline
-                              // is a sequence of crews, not a single one.
+                            const addButton = compact ? (
+                              <button
+                                type="button"
+                                className="sb-empty"
+                                onClick={() => openAssign(row, iso)}
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                className="sb-add"
+                                onClick={() => openAssign(row, iso)}
+                              >
+                                <Icon.Plus width={14} height={14} />
+                                Add
+                              </button>
+                            )
+
+                            // Weekly: a stack of per-day time chips, one per
+                            // crew, plus a slot to add another.
+                            if (!compact) {
                               return (
                                 <DayCell
                                   key={iso}
                                   jobId={row._id}
                                   iso={iso}
-                                  compact={compact}
+                                  compact={false}
+                                  occupied={covering.length > 0}
                                   replacing={replacing}
-                                  disabled={isBeforeJobStart}
+                                  disabled={isPast && covering.length === 0}
+                                  preStart={isBeforeJobStart}
                                 >
-                                  {compact ? (
-                                    <button
-                                      type="button"
-                                      className="sb-empty"
-                                      onClick={() => {
-                                        setModalError(null)
-                                        setFlow({ type: 'assignCrew', jobId: row._id, date: iso })
-                                      }}
-                                    />
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      className="sb-add"
-                                      onClick={() => {
-                                        setModalError(null)
-                                        setFlow({ type: 'assignCrew', jobId: row._id, date: iso })
-                                      }}
-                                    >
-                                      <Icon.Plus width={14} height={14} />
-                                      Add
-                                    </button>
+                                  <div className="sb-stack">
+                                    {covering.map((assignment) => (
+                                      <WeeklyChip
+                                        key={assignment._id}
+                                        assignment={assignment}
+                                        color={crewColorFor(assignment.crewId, assignment.crew?.crewColor)}
+                                        onOpenDetails={() => {
+                                          setModalError(null)
+                                          setFlow({
+                                            type: 'editAssignment',
+                                            jobId: row._id,
+                                            assignmentId: assignment._id,
+                                          })
+                                        }}
+                                      />
+                                    ))}
+                                    {addButton}
+                                  </div>
+                                  {covering.length > 0 && (
+                                    <span className="sb-cell__note">
+                                      <DayNoteBadge
+                                        note={noteByJobDay.get(`${row._id}__${iso}`)}
+                                        onOpen={() => setFlow({ type: 'dayNote', jobId: row._id, date: iso })}
+                                      />
+                                    </span>
                                   )}
                                 </DayCell>
                               )
                             }
 
+                            // Monthly: spanning bars, one lane per concurrent
+                            // crew. A bar is drawn by the cell its run starts in.
                             const prevIso = dayIndex > 0 ? toISO(visibleDays[dayIndex - 1]) : null
-                            const isSpanStart = !prevIso || !coversDay(assignment, prevIso, rangeEnd)
-
-                            let span = 1
-                            if (isSpanStart) {
-                              while (
-                                dayIndex + span < visibleDays.length &&
-                                coversDay(assignment, toISO(visibleDays[dayIndex + span]), rangeEnd)
-                              ) {
-                                span++
-                              }
-                            }
+                            const starting = covering.filter(
+                              (a) => !prevIso || !coversDay(a, prevIso, rangeEnd),
+                            )
 
                             return (
                               <DayCell
                                 key={iso}
                                 jobId={row._id}
                                 iso={iso}
-                                compact={compact}
-                                occupied
+                                compact
+                                occupied={covering.length > 0}
                                 replacing={replacing}
-                                disabled={isBeforeJobStart}
+                                // A past day that already has bars still has to
+                                // render them; only empty past days close.
+                                disabled={isPast && covering.length === 0}
+                                preStart={isBeforeJobStart}
                               >
-                              {isSpanStart ? (
-                                <AssignmentPill
-                                  assignment={assignment}
-                                  color={crewColorFor(assignment.crewId, assignment.crew?.crewColor)}
-                                  compact={compact}
-                                  span={span}
-                                  startIso={iso}
-                                  noteByJobDay={noteByJobDay}
-                                  onOpenDetails={() => {
-                                    setModalError(null)
-                                    setFlow({
-                                      type: 'editAssignment',
-                                      jobId: row._id,
-                                      assignmentId: assignment._id,
-                                    })
-                                  }}
-                                  onOpenNote={(dateIso) => setFlow({ type: 'dayNote', jobId: row._id, date: dateIso })}
-                                />
-                              ) : null}
-                            </DayCell>
-                          )
-                        })}
-                      </tr>
-                    )})}
+                                {starting.map((assignment) => {
+                                  let span = 1
+                                  while (
+                                    dayIndex + span < visibleDays.length &&
+                                    coversDay(assignment, toISO(visibleDays[dayIndex + span]), rangeEnd)
+                                  ) {
+                                    span++
+                                  }
+                                  return (
+                                    <AssignmentPill
+                                      key={assignment._id}
+                                      assignment={assignment}
+                                      color={crewColorFor(assignment.crewId, assignment.crew?.crewColor)}
+                                      compact
+                                      span={span}
+                                      lane={meta?.laneOf.get(assignment._id) ?? 0}
+                                      startIso={iso}
+                                      noteByJobDay={noteByJobDay}
+                                      onOpenDetails={() => {
+                                        setModalError(null)
+                                        setFlow({
+                                          type: 'editAssignment',
+                                          jobId: row._id,
+                                          assignmentId: assignment._id,
+                                        })
+                                      }}
+                                      onOpenNote={(dateIso) =>
+                                        setFlow({ type: 'dayNote', jobId: row._id, date: dateIso })
+                                      }
+                                    />
+                                  )
+                                })}
+                                {covering.length === 0 ? addButton : null}
+                              </DayCell>
+                            )
+                          })}
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1303,8 +1715,12 @@ export default function ScheduleBoard() {
 
       {crewHover && (
         <div className="sb-jobno-tooltip sb-jobno-tooltip--fixed" style={{ left: crewHover.x, top: crewHover.y }}>
-          {crewHover.names.map((name) => (
-            <span key={name} className="sb-jobno-tooltip__pill" style={{ background: crewHover.color }}>
+          {crewHover.names.map((name, i) => (
+            <span
+              key={name}
+              className="sb-jobno-tooltip__pill"
+              style={{ background: crewHover.colors[i] ?? crewHover.colors[0] }}
+            >
               {name}
             </span>
           ))}
@@ -1320,12 +1736,7 @@ export default function ScheduleBoard() {
           error={modalError}
           saving={saving}
           onCancel={() => setFlow({ type: 'none' })}
-          onSubmit={(draft) =>
-            void runMutation(
-              () => createCrewAssignment(flow.jobId, draftToPayload(draft)),
-              'Could not assign that crew.',
-            )
-          }
+          onSubmit={(draft) => submitStint(flow.jobId, draft)}
         />
       )}
 
@@ -1342,12 +1753,7 @@ export default function ScheduleBoard() {
           // trimming its end date is the supported way to close one out.
           canDelete={(isoDay(editing.startDate) ?? '') > today}
           onCancel={() => setFlow({ type: 'none' })}
-          onSubmit={(draft) =>
-            void runMutation(
-              () => updateCrewAssignment(flow.jobId, editing._id, draftToPayload(draft)),
-              'Could not update that assignment.',
-            )
-          }
+          onSubmit={(draft) => submitStint(flow.jobId, draft, editing._id)}
           onDelete={() =>
             void runMutation(
               () => deleteCrewAssignment(flow.jobId, editing._id),
@@ -1437,6 +1843,59 @@ export default function ScheduleBoard() {
                 if (ok) setFlow({ type: 'none' })
               })()
             }}
+          />
+        )
+      })()}
+
+      {flow.type === 'confirmReplace' && (() => {
+        const { jobId, draft, assignmentId, displaced } = flow
+        const row = rows.find((r) => r._id === jobId)
+        const crew = crews.find((c) => c._id === draft.crewId)
+
+        return (
+          <ScheduleReplaceModal
+            crewName={crew?.name ?? 'Crew'}
+            crewColor={crewColorFor(draft.crewId, crew?.crewColor)}
+            jobName={row?.name ?? ''}
+            jobNo={row?.jobIdNumber ?? ''}
+            start={draft.startDate}
+            end={draft.endDate || null}
+            dailyStartTime={draft.dailyStartTime || null}
+            dailyEndTime={draft.dailyEndTime || null}
+            isEdit={Boolean(assignmentId)}
+            replacing={displaced.map(({ assignment, effect }) => {
+              const bounds = realBounds(assignment)
+              return {
+                id: assignment._id,
+                crewName: assignment.crew?.name ?? 'Crew',
+                crewColor: crewColorFor(assignment.crewId, assignment.crew?.crewColor),
+                start: bounds.start,
+                end: bounds.end,
+                dailyStartTime: assignment.dailyStartTime,
+                dailyEndTime: assignment.dailyEndTime,
+                effect,
+              }
+            })}
+            saving={saving}
+            error={modalError}
+            onCancel={() => setFlow({ type: 'none' })}
+            onConfirm={() => void writeStint(jobId, draft, assignmentId)}
+          />
+        )
+      })()}
+
+      {flow.type === 'confirmPrepone' && (() => {
+        const { jobId, date, jobStart } = flow
+        const row = rows.find((r) => r._id === jobId)
+        return (
+          <ConfirmModal
+            iconType="question"
+            confirmBtnClass="btn--primary"
+            title="Start this job earlier?"
+            message={`${row?.name ?? 'This job'} is scheduled to start on ${formatMdy(jobStart)}. Assigning a crew on ${formatMdy(date)} moves the job's start date forward to that day.`}
+            confirmLabel={saving ? 'Moving…' : 'Yes, move start date'}
+            onCancel={() => setFlow({ type: 'none' })}
+            onConfirm={() => void preponeJob(jobId, date)}
           />
         )
       })()}

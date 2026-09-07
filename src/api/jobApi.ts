@@ -28,11 +28,19 @@ export interface Pagination {
   totalPages: number
 }
 
+/**
+ * One crew's stint, as accepted inline by POST /jobs. `startDate` and
+ * `excludeWeekends` are both required per entry; omitting `endDate` makes the
+ * stint cover the rest of the job's own duration.
+ */
 export interface CrewAssignmentPayloadItem {
   crewId: string
-  startDate?: string
+  startDate: string
   endDate?: string
-  excludeWeekends?: boolean
+  /** "HH:mm" 24h. Send both or neither — neither means the stint runs 24/7. */
+  dailyStartTime?: string
+  dailyEndTime?: string
+  excludeWeekends: boolean
   note?: string
 }
 
@@ -41,16 +49,26 @@ export interface CreateJobPayload {
   name?: string
   generalContractor: string
   gcSuper?: string | null
+  /**
+   * Derived from the assigned crew's lead — there is no separate IDS Super
+   * input any more. Still sent because Job.idsSuper is required server-side.
+   */
   idsSuper?: string | null
-  siteAddress: string
+  siteAddress?: string
   assignToCrew?: string | null
   startDate?: string
   endDate?: string
-  contractAmount: number
-  laborBudget: number
+  contractAmount?: number
+  laborBudget?: number
   note?: string
   status?: string
-  crewAssignment?: CrewAssignmentPayloadItem
+  /**
+   * Crews to put on the job as it is created. A single object is still
+   * accepted, but an array assigns several crews in one request — and the
+   * whole thing is atomic: if any stint is rejected the job is rolled back
+   * too, so the client never has to clean up a half-assigned job.
+   */
+  crewAssignment?: CrewAssignmentPayloadItem | CrewAssignmentPayloadItem[]
 }
 
 export type UpdateJobPayload = Partial<CreateJobPayload>
@@ -144,6 +162,13 @@ export interface CrewAssignment {
   startDate: string
   /** null = open-ended; the stint runs until explicitly closed out. */
   endDate: string | null
+  /**
+   * Recurring daily window ("HH:mm", 24h) applied to every day in the range.
+   * Both null = the stint runs the whole day. The window may wrap past
+   * midnight, e.g. "22:00"-"06:00" for an overnight shift.
+   */
+  dailyStartTime: string | null
+  dailyEndTime: string | null
   laborCost: number
   isLaborCostOverridden: boolean
   status: 'scheduled' | 'cancelled'
@@ -159,13 +184,21 @@ export interface CreateCrewAssignmentPayload {
   crewId: string
   startDate: string
   endDate?: string
+  /** Send both or neither; omitting both assigns the crew for the whole day. */
+  dailyStartTime?: string
+  dailyEndTime?: string
   excludeWeekends?: boolean
   /** Passing this marks the cost as admin-overridden; omit to auto-compute. */
   laborCost?: number
   note?: string
 }
 
-export type UpdateCrewAssignmentPayload = Partial<CreateCrewAssignmentPayload>
+export type UpdateCrewAssignmentPayload = Partial<
+  Omit<CreateCrewAssignmentPayload, 'endDate'>
+> & {
+  /** Explicit null clears the end date, making the stint open-ended. */
+  endDate?: string | null
+}
 
 export interface CrewAssignmentResponse {
   success: boolean

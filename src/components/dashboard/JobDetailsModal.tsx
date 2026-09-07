@@ -4,7 +4,8 @@ import Avatar from './Avatar'
 import ConfirmModal from './ConfirmModal'
 import { Icon } from './icons'
 import { formatMoney, type Job, type UnassignedCrew } from '../../lib/dashboardData'
-import { getJobById, type JobItem } from '../../api/jobApi'
+import { getJobById, getCrewAssignments, type JobItem, type CrewAssignment } from '../../api/jobApi'
+import { crewColorFor, formatTimeWindow, formatMdy } from '../../lib/scheduleData'
 
 export default function JobDetailsModal({
   job,
@@ -30,6 +31,8 @@ export default function JobDetailsModal({
   const [editingNote, setEditingNote] = useState(false)
   const [noteDraft, setNoteDraft] = useState(note)
   const [fetchedJob, setFetchedJob] = useState<JobItem | null>(null)
+  /** Every crew booked on this job, with the hours each one works. */
+  const [assignments, setAssignments] = useState<CrewAssignment[]>([])
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(Boolean(job.id && !job.id.startsWith('#tmp')))
 
   useEffect(() => {
@@ -40,12 +43,18 @@ export default function JobDetailsModal({
       }
       setIsLoadingDetails(true)
       try {
-        const res = await getJobById(job.id)
+        const [res, assignmentsRes] = await Promise.all([
+          getJobById(job.id),
+          getCrewAssignments(job.id).catch(() => null),
+        ])
         if (res.success && res.data) {
           setFetchedJob(res.data)
           if (res.data.note) {
             setNoteDraft(res.data.note)
           }
+        }
+        if (assignmentsRes?.data) {
+          setAssignments(assignmentsRes.data.filter((a) => a.status !== 'cancelled'))
         }
       } catch (err) {
         console.error('Failed to fetch job details:', err)
@@ -142,8 +151,21 @@ export default function JobDetailsModal({
 
       <hr className="divider" />
 
-      <span className="field-label">Assigned Crew Lead</span>
-      {crew ? (
+      <span className="field-label">Assigned Crews</span>
+      {assignments.length > 0 ? (
+        <div className="job-crew-chips">
+          {assignments.map((a) => (
+            <span key={a._id} className="job-crew-chip">
+              <i style={{ background: crewColorFor(a.crewId, a.crew?.crewColor) }} />
+              <span className="job-crew-chip__name">{a.crew?.name ?? 'Crew'}</span>
+              <span className="job-crew-chip__meta">
+                {formatTimeWindow(a.dailyStartTime, a.dailyEndTime)}
+                {a.startDate ? ` · from ${formatMdy(a.startDate.slice(0, 10))}` : ''}
+              </span>
+            </span>
+          ))}
+        </div>
+      ) : crew ? (
         <div className="crew-row">
           <Avatar name={crew.leadName} src={crew.avatar} />
           <span className="crew-row__name">

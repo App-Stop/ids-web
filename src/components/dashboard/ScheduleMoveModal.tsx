@@ -36,8 +36,10 @@ function dayCount(start: string, end: string | null) {
 /**
  * Confirms a drag-and-drop move of a crew stint before anything is written.
  *
- * Replacing is destructive — the stints listed under "will be removed" are
- * deleted outright, because the backend rejects any overlapping assignment.
+ * The stints listed under `replacing` are the ones wanting the same hours of
+ * the same days at the destination. The server carves room for the moved crew
+ * out of them — trimming or splitting where part survives, dropping one it
+ * covers completely — so this is destructive, but only for the overlap.
  */
 export default function ScheduleMoveModal({
   crewName,
@@ -112,7 +114,9 @@ export default function ScheduleMoveModal({
         <div className="sb-move__warn">
           <span className="sb-move__warn-head">
             <Icon.AlertTriangle width={17} height={17} />
-            {replacing.length === 1 ? 'This assignment will be removed' : `${replacing.length} assignments will be removed`}
+            {replacing.length === 1
+              ? 'This crew already has those hours'
+              : `${replacing.length} crews already have those hours`}
           </span>
           <ul className="sb-move__replaced">
             {replacing.map((stint) => (
@@ -124,11 +128,7 @@ export default function ScheduleMoveModal({
             ))}
           </ul>
           <p className="sb-move__warn-foot">
-            {adopted
-              ? `${crewName} takes over the full run shown above${
-                  wasSpan && wasSpan !== span ? `, not its original ${wasSpan}` : ''
-                }. To hand over only part of it, cancel and drag the edge of the bar instead.`
-              : 'The whole stint is deleted, not just the overlapping days. To free up a day or two instead, cancel and drag the edge of the bar.'}
+            {`${crewName} takes the overlapping days and hours; each crew above keeps whatever falls outside them, and loses its assignment only where nothing is left. Crews on this job at other times of day are unaffected.`}
           </p>
         </div>
       )}

@@ -97,15 +97,17 @@ function toRow(j: JobItem): Row {
   }
 
   const gcSuperVal = j.gcSuper || '-'
+  // The IDS super is the assigned crew's lead. The stored idsSuper string is
+  // only a fallback for jobs saved before that rule, or ones with no crew yet.
   let idsSuperVal = '-'
-  if (j.idsSuper) {
+  if (leadName !== 'Unassigned') {
+    idsSuperVal = leadName
+  } else if (j.idsSuper) {
     if (typeof j.idsSuper === 'object' && j.idsSuper !== null) {
       idsSuperVal = `${j.idsSuper.firstName || ''} ${j.idsSuper.lastName || ''}`.trim() || '-'
     } else if (typeof j.idsSuper === 'string') {
       idsSuperVal = j.idsSuper
     }
-  } else if (leadName !== 'Unassigned') {
-    idsSuperVal = leadName
   }
 
   return {
@@ -313,7 +315,7 @@ export default function JobsManagement() {
                 <th>Crew Assigned</th>
                 <th>GC</th>
                 <th className="jm-center">GC Super</th>
-                <th className="jm-center">IDS Super</th>
+                <th className="jm-center">Crew Lead</th>
                 <th className="jm-center">Contract</th>
                 <th className="jm-center">Duration</th>
                 <th className="jm-center">

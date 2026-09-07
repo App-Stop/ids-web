@@ -1426,3 +1426,178 @@ td.sb-col-divider {
     overflow: visible !important;
   }
 }
+/* --- Several crews on one job ------------------------------------------- */
+/* A job day can hold more than one crew now, so the left colour key is a
+   stack of bands (one per crew) and rows grow taller to fit the busiest day.
+   Row heights are set inline from the same computation in both tables, which
+   is what keeps the frozen columns aligned with the day grid. */
+
+.sb-row-bar-stack {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.sb-row-bar-stack .sb-row-bar {
+  position: static;
+  flex: 1 1 0;
+  width: 100%;
+}
+
+.sb-job-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sb-job-sub {
+  font-size: calc(0.72rem * var(--table-zoom, 1));
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.sb-job-sub--start {
+  color: #b45309;
+}
+
+/* --- Weekly: stacked per-day time chips ---------------------------------- */
+
+.sb-stack {
+  position: absolute;
+  inset: var(--sb-cell-inset);
+  display: flex;
+  flex-direction: column;
+  gap: calc(4px * var(--table-zoom, 1));
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow: visible;
+}
+
+.sb-chip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: calc(32px * var(--table-zoom, 1));
+  padding: calc(4px * var(--table-zoom, 1)) calc(6px * var(--table-zoom, 1));
+  border: 1px solid;
+  border-radius: 8px;
+  font-size: calc(0.78rem * var(--table-zoom, 1));
+  font-weight: 600;
+  line-height: 1.15;
+  cursor: pointer;
+  text-align: center;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.sb-chip:hover {
+  filter: brightness(0.98);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.sb-chip.is-moving {
+  opacity: 0.4;
+}
+
+.sb-chip__hours {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* The crew name is the secondary line — the colour already identifies them,
+   so it only needs to be readable, not loud. */
+.sb-chip__crew {
+  font-size: calc(0.68rem * var(--table-zoom, 1));
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* In a stack the add button sits under the chips rather than filling the cell */
+.sb-stack .sb-add,
+.sb-stack .sb-empty {
+  position: static;
+  inset: auto;
+  flex: 1 0 calc(28px * var(--table-zoom, 1));
+  min-height: calc(28px * var(--table-zoom, 1));
+}
+
+/* Day note badge for a cell that already has chips in it */
+.sb-cell__note {
+  position: absolute;
+  top: calc(-10px * var(--table-zoom, 1));
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.sb-cell__note > * {
+  pointer-events: auto;
+}
+
+/* --- Monthly: one lane per concurrent crew ------------------------------- */
+
+.sb-cell--compact .sb-pill-wrap {
+  --sb-lane: 0;
+  top: calc(10px + (var(--sb-lane) * 22px) * var(--table-zoom, 1));
+  bottom: auto;
+  height: calc(18px * var(--table-zoom, 1));
+}
+
+/* --- Before the job's own start date ------------------------------------- */
+/* Not a blocker any more: a job can be pulled forward, so these days stay
+   clickable and only read as "outside the planned run" until confirmed. */
+
+.sb-cell--prestart {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(148, 163, 184, 0.14),
+    rgba(148, 163, 184, 0.14) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
+/* --- Shared checkbox row used by the schedule modals --------------------- */
+
+.sb-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  margin-top: 0.85rem;
+}
+
+/* What a replacement actually does to the crew already holding the slot —
+   trimmed, split, or removed. Sits on its own line under the crew it applies
+   to, so the name/date row keeps its shape. */
+.sb-move__replaced li {
+  flex-wrap: wrap;
+}
+
+.sb-move__effect {
+  flex: 1 0 100%;
+  padding-left: 1.1rem;
+  font-size: 0.74rem;
+  font-style: italic;
+  opacity: 0.85;
+}

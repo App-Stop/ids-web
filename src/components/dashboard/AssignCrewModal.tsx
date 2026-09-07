@@ -60,10 +60,17 @@ export default function AssignCrewModal({
   const crewOptions: AssignableCrewOption[] = crews ?? apiCrews
 
   const [crewId, setCrewId] = useState<string | null>(null)
-  const [startDate, setStartDate] = useState<string>(new Date().toISOString().slice(0, 10))
-  const [endDate, setEndDate] = useState<string>('')
+  const [startDateTime, setStartDateTime] = useState<string>(
+    new Date().toISOString().slice(0, 10) + 'T08:00',
+  )
+  const [endDateTime, setEndDateTime] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const startDate = startDateTime.split('T')[0] ?? ''
+  const startTime = startDateTime.split('T')[1] ?? ''
+  const endDate = endDateTime ? endDateTime.split('T')[0] ?? '' : ''
+  const endTime = endDateTime ? endDateTime.split('T')[1] ?? '' : ''
 
   const selected = crewOptions.find((c) => c.id === crewId)
 
@@ -77,6 +84,7 @@ export default function AssignCrewModal({
         crewId,
         startDate,
         endDate: endDate || undefined,
+        ...(startTime && endTime ? { dailyStartTime: startTime, dailyEndTime: endTime } : {}),
       })
       onAssign?.(crewId, startDate, endDate, '')
       onSuccess?.()
@@ -90,7 +98,7 @@ export default function AssignCrewModal({
   }
 
   return (
-    <Modal onClose={onCancel} width={440}>
+    <Modal onClose={onCancel} width={480}>
       <h2 className="modal-title">Assign Crew</h2>
       {jobNoStr && <p className="job-head__meta" style={{ marginTop: '0.15rem' }}>Job #{jobNoStr}</p>}
       {jobNameStr && <p className="assign-crew__job-name">{jobNameStr}</p>}
@@ -123,29 +131,29 @@ export default function AssignCrewModal({
         }))}
       />
 
-      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-        <div style={{ flex: 1 }}>
-          <label className="field-label">Start Date*</label>
+      <div className="field-row" style={{ marginTop: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>Start Date & Time*</label>
           <input
-            type="date"
+            type="datetime-local"
             className="field-input"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            value={startDateTime}
+            onChange={(e) => setStartDateTime(e.target.value)}
           />
         </div>
-        <div style={{ flex: 1 }}>
-          <label className="field-label">End Date</label>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>End Date & Time</label>
           <input
-            type="date"
+            type="datetime-local"
             className="field-input"
-            value={endDate}
-            min={startDate || undefined}
-            onChange={(e) => setEndDate(e.target.value)}
+            value={endDateTime}
+            min={startDateTime || undefined}
+            onChange={(e) => setEndDateTime(e.target.value)}
           />
         </div>
       </div>
       <p className="field-hint" style={{ marginTop: '0.35rem', fontSize: '0.75rem', opacity: 0.7 }}>
-        Leave End Date empty for an open-ended assignment.
+        Leave End Date & Time empty for an open-ended assignment.
       </p>
 
       {error && (

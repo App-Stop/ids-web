@@ -861,6 +861,14 @@
   outline: none;
 }
 
+.field-input[type="datetime-local"],
+.field-input[type="time"],
+.field-input[type="date"] {
+  padding-left: 0.5rem;
+  padding-right: 0.3rem;
+  min-width: 13.5rem;
+}
+
 .field-input:focus {
   border-color: var(--yellow-dark);
 }
@@ -1644,4 +1652,104 @@ input[type='number'] {
   .sidebar-mobile-nav {
     display: none;
   }
+}
+
+/* --- Job form: one card per crew stint ----------------------------------- */
+/* A job can run several crews at once, so the assignment side of the form is a
+   list of independent stints rather than a single crew picker. */
+
+.job-assign__hint {
+  margin: 0.15rem 0 0.6rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.35;
+}
+
+.job-assign-card {
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 0.75rem;
+  margin-bottom: 0.7rem;
+  background: #fafafa;
+}
+
+.job-assign-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.job-assign-card__remove {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fff;
+  color: #dc2626;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.job-assign-card__remove:hover {
+  background: #fef2f2;
+}
+
+.job-assign__add {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+/* Shared checkbox row — also used by the schedule board's assign modal. */
+.sb-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  margin-top: 0.85rem;
+}
+
+/* Crew chips in the job details modal — one per stint, with its daily hours */
+.job-crew-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.job-crew-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background: #fff;
+}
+
+.job-crew-chip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.job-crew-chip__name {
+  font-weight: 600;
+  color: var(--ink, #0f172a);
+}
+
+.job-crew-chip__meta {
+  color: #6b7280;
 }
