@@ -52,6 +52,8 @@
   border-radius: 20px;
   background: var(--card-bg);
   box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+  position: relative;
+  z-index: 50;
 }
 
 .sb-nav-btn {
@@ -87,7 +89,7 @@
   position: absolute;
   top: calc(100% + 0.4rem);
   left: 0;
-  z-index: 20;
+  z-index: 100;
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 0.5rem;
