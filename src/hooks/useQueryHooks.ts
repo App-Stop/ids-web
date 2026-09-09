@@ -18,6 +18,7 @@ import {
 } from '../api/jobApi'
 import {
   getCrewsSummary,
+  getAvailableCrews,
   getCrewById,
   getUserById,
   createCrew,
@@ -30,6 +31,7 @@ import {
   removeCrewMember,
   removeCrewLeadOrMember,
   type GetCrewsSummaryParams,
+  type GetAvailableCrewsParams,
   type CrewSummaryItem,
 } from '../api/crewApi'
 import {
@@ -118,6 +120,19 @@ export function useCrewsSummary(params?: GetCrewsSummaryParams, enabled: boolean
     queryFn: () => getCrewsSummary(params),
     select: (res) => unwrapList<CrewSummaryItem>(res),
     enabled,
+  })
+}
+
+/**
+ * Crews with no conflicting assignment over the given window. Disabled until a
+ * start date exists, since the endpoint requires one.
+ */
+export function useAvailableCrews(params: GetAvailableCrewsParams | null) {
+  return useQuery({
+    queryKey: queryKeys.crews.available(params),
+    queryFn: () => getAvailableCrews(params!),
+    select: (res) => unwrapList<CrewSummaryItem>(res),
+    enabled: Boolean(params?.startDate),
   })
 }
 

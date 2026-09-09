@@ -143,3 +143,55 @@ export function crewColorFor(crewId: string | null | undefined, explicit?: strin
   for (let i = 0; i < crewId.length; i++) hash = (hash * 31 + crewId.charCodeAt(i)) >>> 0
   return FALLBACK_COLORS[hash % FALLBACK_COLORS.length]
 }
+
+// --- Overlap tests ----------------------------------------------------------
+// The scheduling rule the UI has to respect: a job may run any number of crews
+// at once, at whatever hours, but a crew works a single job at a time. So the
+// only clash worth detecting is one crew wanted in two places — which means
+// comparing both the date ranges and the daily windows of two stints.
+
+/** Minutes since midnight for "HH:mm". */
+function minutesOfDay(time: string) {
+  const [h, m] = time.split(':').map(Number)
+  return h * 60 + m
+}
+
+/** Anything carrying a daily window — a stored stint or a draft of one. */
+export type TimeWindow = { dailyStartTime?: string | null; dailyEndTime?: string | null }
+
+/**
+ * Do two stints want the same hours of the day? Mirrors the server's check: a
+ * stint with no window occupies the whole day and so collides with everything,
+ * and a window may wrap past midnight, in which case it counts as two
+ * intervals either side of it.
+ */
+export function windowsCollide(a: TimeWindow, b: TimeWindow) {
+  const intervals = (window: TimeWindow): Array<[number, number]> => {
+    const { dailyStartTime: from, dailyEndTime: to } = window
+    if (!from || !to) return [[0, 1440]]
+    const start = minutesOfDay(from)
+    const end = minutesOfDay(to)
+    if (end > start) return [[start, end]]
+    // Wraps midnight — the evening piece plus the following morning's. Equal
+    // times wrap the whole way round, i.e. the crew holds the entire day.
+    return [
+      [start, 1440],
+      [0, end],
+    ]
+  }
+  return intervals(a).some(([aFrom, aTo]) =>
+    intervals(b).some(([bFrom, bTo]) => aFrom < bTo && bFrom < aTo),
+  )
+}
+
+/** Do two day ranges share a day? A null end means open-ended. */
+export function rangesOverlap(
+  aStart: string,
+  aEnd: string | null,
+  bStart: string,
+  bEnd: string | null,
+) {
+  if (bEnd && aStart > bEnd) return false
+  if (aEnd && aEnd < bStart) return false
+  return true
+}

@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal'
+import PlaceholderDateTimeInput from './PlaceholderDateTimeInput'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import { createCrewAssignment } from '../../api/jobApi'
 import { type UserItem } from '../../api/crewApi'
-import { useCrewsSummary } from '../../hooks/useQueryHooks'
+import { useAvailableCrews } from '../../hooks/useQueryHooks'
 import { parseApiErrors } from '../../lib/errors'
 import type { Job } from '../../lib/dashboardData'
 
@@ -20,15 +21,12 @@ export interface AssignableCrewOption {
 export default function AssignCrewModal({
   job,
   jobId,
-  crews,
   onCancel,
   onAssign,
   onSuccess,
 }: {
   job?: Job
   jobId?: string
-  /** Real crews from the API. Callers that omit this fall back to fetched API crews. */
-  crews?: AssignableCrewOption[]
   onCancel: () => void
   onAssign?: (crewLeadId: string, startDate: string, endDate: string, note: string) => void
   onSuccess?: () => void
@@ -37,15 +35,35 @@ export default function AssignCrewModal({
   const jobNameStr = job?.name || ''
   const jobNoStr = job?.jobNo || ''
 
-  // Shares the ['crews', null] cache entry with the pages behind this modal, so
-  // opening it is normally free.
-  const { data: fetchedCrews = [], isPending } = useCrewsSummary(undefined, !crews)
-  const loadingCrews = !crews && isPending
+  // The window is picked first: the crew list is whatever /crews/available
+  // returns for it, so there is no way to select a crew that is already busy.
+  const [startDate, setStartDate] = useState<string>('')
+  const [startTime, setStartTime] = useState<string>('')
+  const [endDate, setEndDate] = useState<string>('')
+  const [endTime, setEndTime] = useState<string>('')
+  const [crewId, setCrewId] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const apiCrews: AssignableCrewOption[] = useMemo(
+  // Daily times only narrow the window as a pair — sending one half would ask
+  // the backend about a range it cannot evaluate.
+  const windowParams = useMemo(() => {
+    if (!startDate) return null
+    return {
+      startDate,
+      ...(endDate ? { endDate } : {}),
+      ...(startTime && endTime ? { dailyStartTime: startTime, dailyEndTime: endTime } : {}),
+    }
+  }, [startDate, endDate, startTime, endTime])
+
+  const { data: availableCrews = [], isPending, isError } = useAvailableCrews(windowParams)
+  const loadingCrews = Boolean(windowParams) && isPending
+
+  const crewOptions: AssignableCrewOption[] = useMemo(
     () =>
-      fetchedCrews.map((c) => {
-        const leadObj = typeof c.crewLead === 'object' && c.crewLead !== null ? (c.crewLead as UserItem) : null
+      availableCrews.map((c) => {
+        const leadObj =
+          typeof c.crewLead === 'object' && c.crewLead !== null ? (c.crewLead as UserItem) : null
         const leadName = leadObj ? `${leadObj.firstName || ''} ${leadObj.lastName || ''}`.trim() : c.name
         return {
           id: c._id,
@@ -55,24 +73,24 @@ export default function AssignCrewModal({
           color: c.crewColor || '#3b82f6',
         }
       }),
-    [fetchedCrews],
+    [availableCrews],
   )
-  const crewOptions: AssignableCrewOption[] = crews ?? apiCrews
 
-  const [crewId, setCrewId] = useState<string | null>(null)
-  const [startDateTime, setStartDateTime] = useState<string>(
-    new Date().toISOString().slice(0, 10) + 'T08:00',
-  )
-  const [endDateTime, setEndDateTime] = useState<string>('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const startDate = startDateTime.split('T')[0] ?? ''
-  const startTime = startDateTime.split('T')[1] ?? ''
-  const endDate = endDateTime ? endDateTime.split('T')[0] ?? '' : ''
-  const endTime = endDateTime ? endDateTime.split('T')[1] ?? '' : ''
+  // Editing the window can drop the picked crew out of the available set.
+  useEffect(() => {
+    if (crewId && !crewOptions.some((c) => c.id === crewId)) setCrewId(null)
+  }, [crewOptions, crewId])
 
   const selected = crewOptions.find((c) => c.id === crewId)
+  const noneAvailable = Boolean(startDate) && !loadingCrews && !isError && crewOptions.length === 0
+
+  function crewPlaceholder() {
+    if (!startDate) return 'Select dates first'
+    if (loadingCrews) return 'Loading available crews…'
+    if (isError) return 'Could not load crews'
+    if (!crewOptions.length) return 'No crews available'
+    return '-'
+  }
 
   async function handleAssignSubmit() {
     if (!crewId || !startDate || !targetJobId) return
@@ -103,10 +121,57 @@ export default function AssignCrewModal({
       {jobNoStr && <p className="job-head__meta" style={{ marginTop: '0.15rem' }}>Job #{jobNoStr}</p>}
       {jobNameStr && <p className="assign-crew__job-name">{jobNameStr}</p>}
 
-      <label className="field-label">Assign Crew*</label>
+      <div className="field-row">
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>Start Date*</label>
+          <PlaceholderDateTimeInput
+            type="date"
+            placeholder="DD-MM-YYYY"
+            value={startDate}
+            onChange={setStartDate}
+          />
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>Start Time</label>
+          <PlaceholderDateTimeInput
+            type="time"
+            placeholder="hh:mm"
+            value={startTime}
+            onChange={setStartTime}
+          />
+        </div>
+      </div>
+
+      <div className="field-row" style={{ marginTop: '0.75rem' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>End Date</label>
+          <PlaceholderDateTimeInput
+            type="date"
+            placeholder="DD-MM-YYYY"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={setEndDate}
+          />
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>End Time</label>
+          <PlaceholderDateTimeInput
+            type="time"
+            placeholder="hh:mm"
+            value={endTime}
+            onChange={setEndTime}
+          />
+        </div>
+      </div>
+      <p className="field-hint" style={{ marginTop: '0.35rem', fontSize: '0.75rem', opacity: 0.7 }}>
+        Leave End Date &amp; Time empty for an open-ended assignment.
+      </p>
+
+      <label className="field-label" style={{ marginTop: '1rem' }}>Assign Crew*</label>
       <Dropdown
         value={crewId}
-        placeholder={loadingCrews ? 'Loading crews…' : '-'}
+        disabled={!startDate || loadingCrews || crewOptions.length === 0}
+        placeholder={crewPlaceholder()}
         onChange={setCrewId}
         selectedLabel={
           selected && (
@@ -130,31 +195,11 @@ export default function AssignCrewModal({
           ),
         }))}
       />
-
-      <div className="field-row" style={{ marginTop: '1rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>Start Date & Time*</label>
-          <input
-            type="datetime-local"
-            className="field-input"
-            value={startDateTime}
-            onChange={(e) => setStartDateTime(e.target.value)}
-          />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>End Date & Time</label>
-          <input
-            type="datetime-local"
-            className="field-input"
-            value={endDateTime}
-            min={startDateTime || undefined}
-            onChange={(e) => setEndDateTime(e.target.value)}
-          />
-        </div>
-      </div>
-      <p className="field-hint" style={{ marginTop: '0.35rem', fontSize: '0.75rem', opacity: 0.7 }}>
-        Leave End Date & Time empty for an open-ended assignment.
-      </p>
+      {noneAvailable && (
+        <p className="field-hint" style={{ marginTop: '0.35rem', fontSize: '0.75rem', opacity: 0.7 }}>
+          No crews are free for this period. Try a different date or time range.
+        </p>
+      )}
 
       {error && (
         <div style={{ color: '#ef4444', marginTop: '0.75rem', fontSize: '0.875rem' }}>

@@ -16,10 +16,12 @@ export default function Dropdown({
   staticLabel,
   onSearchChange,
   searchValue,
+  disabled = false,
 }: {
   value: string | null
   options: DropdownOption[]
   placeholder?: string
+  disabled?: boolean
   selectedLabel?: ReactNode
   onChange: (id: string) => void
   /** When set, the trigger always shows this text instead of the selection (checkmark still tracks value). */
@@ -48,6 +50,7 @@ export default function Dropdown({
   }, [])
 
   function toggleOpen() {
+    if (disabled) return
     if (!open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
       setCoords({
@@ -84,7 +87,13 @@ export default function Dropdown({
 
   return (
     <div className="dd" ref={ref}>
-      <button ref={triggerRef} type="button" className="dd__trigger" onClick={toggleOpen}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="dd__trigger"
+        disabled={disabled}
+        onClick={toggleOpen}
+      >
         <span className="dd__value">
           {staticLabel ??
             (selectedLabel ??

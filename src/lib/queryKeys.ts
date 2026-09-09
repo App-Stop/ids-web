@@ -10,6 +10,7 @@ export const queryKeys = {
     all: ['crews'] as const,
     list: (params?: unknown) => ['crews', params ?? null] as const,
     detail: (id: string) => ['crew', id] as const,
+    available: (params: unknown) => ['crews', 'available', params] as const,
   },
 
   jobs: {

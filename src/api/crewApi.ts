@@ -328,3 +328,22 @@ export async function getUsers(params?: GetUsersParams): Promise<GetUsersRespons
   const response = await api.get<GetUsersResponse>('/users', { params })
   return response.data
 }
+
+export interface GetAvailableCrewsParams {
+  startDate: string
+  endDate?: string
+  dailyStartTime?: string
+  dailyEndTime?: string
+}
+
+/**
+ * Crews with no conflicting assignment over the given window. The response
+ * reuses the /crews/summary envelope, so callers can treat rows as
+ * CrewSummaryItem.
+ */
+export async function getAvailableCrews(
+  params: GetAvailableCrewsParams,
+): Promise<GetCrewsSummaryResponse> {
+  const response = await api.get<GetCrewsSummaryResponse>('/crews/available', { params })
+  return response.data
+}

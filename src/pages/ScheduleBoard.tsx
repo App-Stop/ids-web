@@ -27,7 +27,7 @@ import ZoomControl from '../components/dashboard/ZoomControl'
 import NoteModal from '../components/dashboard/NoteModal'
 import ScheduleAssignModal, { type StintDraft } from '../components/dashboard/ScheduleAssignModal'
 import ScheduleMoveModal from '../components/dashboard/ScheduleMoveModal'
-import ScheduleReplaceModal from '../components/dashboard/ScheduleReplaceModal'
+import ScheduleConflictModal from '../components/dashboard/ScheduleConflictModal'
 import ScheduleExtendModal from '../components/dashboard/ScheduleExtendModal'
 import { Icon } from '../components/dashboard/icons'
 import ConfirmModal from '../components/dashboard/ConfirmModal'
@@ -58,6 +58,8 @@ import {
   crewColorFor,
   formatTimeWindow,
   formatMdy,
+  windowsCollide,
+  rangesOverlap,
   type ViewMode,
 } from '../lib/scheduleData'
 import { useSidebarCollapsed } from '../hooks/useSidebarCollapsed'
@@ -66,6 +68,16 @@ import './ScheduleBoard.css'
 
 type DragKind = 'extend' | 'move'
 
+/**
+ * The floating crew tooltip, anchored in viewport coordinates.
+ *
+ * Two things raise it: the job row's colour bar, which names every crew booked
+ * on that job, and a single assignment pill, which names just its own crew —
+ * the monthly pill is a bare colour bar with no room for a label, so hovering
+ * is the only way to read it.
+ */
+type CrewHover = { x: number; y: number; colors: string[]; names: string[] }
+
 /** A validated drag-and-drop move, held until the user confirms it. */
 type MovePlan = {
   source: CrewAssignment
@@ -73,13 +85,11 @@ type MovePlan = {
   targetJobId: string
   newStart: string
   newEnd: string | null
-  /** Stints in the destination range that confirming will delete. */
-  occupants: CrewAssignment[]
   /**
-   * True when the drop landed on an existing stint, so the moved crew took over
-   * that stint's full date range instead of keeping its own length.
+   * Other jobs already holding this crew over the destination range. Non-empty
+   * means the move cannot be made at all — the crew would be in two places.
    */
-  adopted: boolean
+  conflicts: CrewConflict[]
 }
 
 type ExtendPlan = {
@@ -94,24 +104,27 @@ type ExtendPlan = {
 
 type Flow =
   | { type: 'none' }
-  | { type: 'assignCrew'; jobId: string; date: string }
-  | { type: 'editAssignment'; jobId: string; assignmentId: string }
+  // `draft` is only set when reopening the modal on a rejected stint, so the
+  // form comes back filled in rather than blank.
+  | { type: 'assignCrew'; jobId: string; date: string; draft?: StintDraft }
+  | { type: 'editAssignment'; jobId: string; assignmentId: string; draft?: StintDraft }
   | { type: 'dayNote'; jobId: string; date: string }
   | { type: 'confirmMove'; plan: MovePlan }
   | { type: 'confirmExtend'; plan: ExtendPlan }
   /** Clicked a day that sits before the job's own start date. */
   | { type: 'confirmPrepone'; jobId: string; date: string; jobStart: string }
   /**
-   * A submitted stint wants hours another crew already holds on this job.
-   * Held here until confirmed, since the server hands the slot over silently.
+   * A submitted stint would put its crew on two jobs at once. There is nothing
+   * to confirm — the clash is shown so it can be resolved, and the draft is
+   * kept so the modal can be reopened with the same values.
    */
   | {
-      type: 'confirmReplace'
+      type: 'crewConflict'
       jobId: string
       draft: StintDraft
       /** Present when editing an existing stint rather than creating one. */
       assignmentId?: string
-      displaced: DisplacedStint[]
+      conflicts: CrewConflict[]
     }
 
 const scheduleCollision: CollisionDetection = (args) => {
@@ -136,7 +149,7 @@ const JOBNO_W = 72
 const JOB_W = 230
 const JOB_W_WEEKLY = 180
 const DIVIDER_W = 10
-const META_WIDTHS = [130, 130, 130, 100] as const
+const META_WIDTHS = [130, 130, 100] as const
 /** Fallback day width when monthly + separator open if we couldn't measure. */
 const MONTH_DAY_META_W = 56
 
@@ -179,50 +192,14 @@ function needsRecreate(source: CrewAssignment, newEnd: string | null, targetJobI
 /** Does a stint intersect [start, end]? A null `end` means open-ended. */
 function overlapsRange(assignment: CrewAssignment, start: string, end: string | null) {
   const { start: s, end: e } = realBounds(assignment)
-  if (end && s > end) return false
-  if (e && e < start) return false
-  return true
-}
-
-/** Minutes since midnight for "HH:mm". */
-function minutesOfDay(time: string) {
-  const [h, m] = time.split(':').map(Number)
-  return h * 60 + m
-}
-
-/** Anything carrying a daily window — a stored stint or a draft of one. */
-type TimeWindow = { dailyStartTime?: string | null; dailyEndTime?: string | null }
-
-/**
- * Do two stints want the same hours of the day? Mirrors the server's check: a
- * stint with no window occupies the whole day and so collides with everything,
- * and a window may wrap past midnight, in which case it counts as two
- * intervals either side of it.
- */
-function windowsCollide(a: TimeWindow, b: TimeWindow) {
-  const intervals = (window: TimeWindow): Array<[number, number]> => {
-    const { dailyStartTime: from, dailyEndTime: to } = window
-    if (!from || !to) return [[0, 1440]]
-    const start = minutesOfDay(from)
-    const end = minutesOfDay(to)
-    if (end > start) return [[start, end]]
-    // Wraps midnight — the evening piece plus the following morning's. Equal
-    // times wrap the whole way round, i.e. the crew holds the entire day.
-    return [
-      [start, 1440],
-      [0, end],
-    ]
-  }
-  return intervals(a).some(([aFrom, aTo]) =>
-    intervals(b).some(([bFrom, bTo]) => aFrom < bTo && bFrom < aTo),
-  )
+  return rangesOverlap(s, e, start, end)
 }
 
 // --- Several crews per job, several jobs per crew ---------------------------
-// A job day is no longer owned by one crew: any number of stints can share it
-// as long as their daily time windows don't collide (the server enforces
-// that). Everything below turns a row's stints into a stable stacking order so
-// the same crew keeps the same slot as the eye scans across the week.
+// A job day is not owned by one crew: any number of stints can share it, at
+// identical hours if that's how the work runs. Nothing below filters them —
+// it turns a row's stints into a stable stacking order so the same crew keeps
+// the same slot as the eye scans across the week.
 
 /** Round-the-clock stints first, then by time of day, then by crew name. */
 function stintOrder(a: CrewAssignment, b: CrewAssignment) {
@@ -236,43 +213,57 @@ function stintOrder(a: CrewAssignment, b: CrewAssignment) {
 }
 
 /**
- * What handing a slot to another crew does to the stint already holding it.
- * Mirrors `resolveJobOverlap` on the server: a stint the new range covers
- * entirely goes; one it clips at an edge is trimmed back; one it lands inside
- * is split in two, leaving the crew the days either side.
+ * A stint that already has the crew somewhere else at the same time.
+ *
+ * The only remaining exclusivity rule is on the crew's side: a job may run any
+ * number of crews at once, including at identical hours, but a crew cannot be
+ * on two jobs at the same time. So a clash is always cross-job, and it is never
+ * resolved by carving up the existing stint — the new one simply cannot stand.
  */
-type DisplacedEffect = 'removed' | 'trimmed' | 'split'
-
-export type DisplacedStint = {
+export type CrewConflict = {
   assignment: CrewAssignment
-  effect: DisplacedEffect
+  jobId: string
+  jobName: string
+  jobNo: string | number
 }
 
 /**
- * The stints a draft would push out of the way: same job, overlapping days,
- * and wanting the same hours of those days. Stints at other hours are left
- * alone — that is the whole point of hour-scoped assignments.
+ * Other jobs that already hold this crew over the draft's days and hours.
+ *
+ * Stints on the target job itself are ignored — several crews sharing a job,
+ * even round the clock, is exactly what the schedule is meant to express.
+ *
+ * Only the rows currently loaded are searched, so a clash with a job outside
+ * the visible range (or filtered out) isn't caught here. This is an early
+ * warning that saves a round trip; the server is still the authority and
+ * rejects a double-booking regardless.
  */
-function findDisplaced(
-  row: ScheduleJobRow | undefined,
+function findCrewConflicts(
+  rows: ScheduleJobRow[],
+  jobId: string,
+  crewId: string,
   draft: { startDate: string; endDate: string; dailyStartTime: string; dailyEndTime: string },
   excludeAssignmentId?: string,
-): DisplacedStint[] {
-  if (!row) return []
+): CrewConflict[] {
   const newStart = draft.startDate
   const newEnd = draft.endDate || null
+  const conflicts: CrewConflict[] = []
 
-  return row.assignments
-    .filter((a) => a._id !== excludeAssignmentId && a.status !== 'cancelled')
-    .filter((a) => overlapsRange(a, newStart, newEnd) && windowsCollide(a, draft))
-    .map((a) => {
-      const { start, end } = realBounds(a)
-      const leftRemains = start < newStart
-      const rightRemains = Boolean(newEnd) && (end === null || end > (newEnd as string))
-      const effect: DisplacedEffect =
-        leftRemains && rightRemains ? 'split' : leftRemains || rightRemains ? 'trimmed' : 'removed'
-      return { assignment: a, effect }
-    })
+  for (const row of rows) {
+    if (row._id === jobId) continue
+    for (const a of row.assignments) {
+      if (a._id === excludeAssignmentId || a.status === 'cancelled') continue
+      if (String(a.crewId) !== String(crewId)) continue
+      if (!overlapsRange(a, newStart, newEnd) || !windowsCollide(a, draft)) continue
+      conflicts.push({
+        assignment: a,
+        jobId: row._id,
+        jobName: row.name ?? '',
+        jobNo: row.jobIdNumber ?? '',
+      })
+    }
+  }
+  return conflicts
 }
 
 /** Per-row layout: stacking lanes for the monthly bars, plus crew summary. */
@@ -283,7 +274,7 @@ type RowMeta = {
   laneCount: number
   /** Busiest visible day, i.e. how many chips the weekly stack must fit. */
   maxPerDay: number
-  crews: Array<{ id: string; name: string; color: string; lead: string }>
+  crews: Array<{ id: string; name: string; color: string }>
 }
 
 /**
@@ -320,27 +311,33 @@ function buildRowMeta(row: ScheduleJobRow, days: string[], rangeEnd: string): Ro
     const id = String(a.crewId)
     if (seen.has(id)) continue
     seen.add(id)
-    const lead = a.crew?.crewLead
     crews.push({
       id,
       name: a.crew?.name ?? 'Crew',
       color: crewColorFor(a.crewId, a.crew?.crewColor),
-      lead:
-        lead && typeof lead === 'object'
-          ? [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email || ''
-          : '',
     })
   }
 
   return { ordered, laneOf, laneCount: Math.max(laneEnds.length, 1), maxPerDay, crews }
 }
 
-/** Row height, kept identical in the frozen and scrolling tables so they line up. */
+/**
+ * Row height, kept identical in the frozen and scrolling tables so they line up.
+ *
+ * Weekly rows are sized to what the stack actually needs — one 32px chip plus a
+ * 4px gap per crew, the cell's 8px insets, and a short slot for the Add button.
+ * Anything beyond that is slack the stack has to absorb, which shows up as an
+ * oversized Add button.
+ */
+const WEEKLY_CHIP_H = 36
+const WEEKLY_ADD_H = 20
+const WEEKLY_CELL_PAD = 16
+
 function rowHeight(meta: RowMeta, view: ViewMode, zoom: number) {
   const px =
     view === 'monthly'
       ? Math.max(meta.laneCount, 1) * 22 + 20
-      : (meta.maxPerDay + 1) * 40 + 22
+      : meta.maxPerDay * WEEKLY_CHIP_H + WEEKLY_ADD_H + WEEKLY_CELL_PAD
   return Math.round(px * zoom)
 }
 
@@ -441,6 +438,7 @@ function AssignmentPill({
   noteByJobDay,
   onOpenDetails,
   onOpenNote,
+  onHover,
 }: {
   assignment: CrewAssignment
   color: string
@@ -452,6 +450,8 @@ function AssignmentPill({
   noteByJobDay: Map<string, DayNote>
   onOpenDetails: () => void
   onOpenNote: (date: string) => void
+  /** Raises the floating crew label; null while the pointer is off the pill. */
+  onHover?: (hover: CrewHover | null) => void
 }) {
   const crewName = assignment.crew?.name ?? 'Crew'
   const hours = formatTimeWindow(assignment.dailyStartTime, assignment.dailyEndTime)
@@ -496,7 +496,19 @@ function AssignmentPill({
         ref={setNodeRef}
         type="button"
         className="sb-pill sb-pill--movable"
-        title={`${crewName} — ${hours}${assignment.note ? ` — ${assignment.note}` : ''}`}
+        // The crew name comes from the floating label instead of a native
+        // tooltip — two on one target read as a bug, and the native one only
+        // appears after a delay.
+        title={assignment.note || undefined}
+        onMouseMove={(e) =>
+          onHover?.({
+            x: e.clientX + 14,
+            y: e.clientY,
+            colors: [color],
+            names: [compact ? `${crewName} — ${hours}` : crewName],
+          })
+        }
+        onMouseLeave={() => onHover?.(null)}
         style={
           compact
             ? { background: color }
@@ -549,10 +561,13 @@ function WeeklyChip({
   assignment,
   color,
   onOpenDetails,
+  onHover,
 }: {
   assignment: CrewAssignment
   color: string
   onOpenDetails: () => void
+  /** Raises the floating crew label; null while the pointer is off the chip. */
+  onHover?: (hover: CrewHover | null) => void
 }) {
   const crewName = assignment.crew?.name ?? 'Crew'
   const hours = formatTimeWindow(assignment.dailyStartTime, assignment.dailyEndTime)
@@ -581,7 +596,13 @@ function WeeklyChip({
       ref={setNodeRef}
       type="button"
       className={`sb-chip${isDragging ? ' is-moving' : ''}`}
-      title={`${crewName} — ${hours}${assignment.note ? ` — ${assignment.note}` : ''}`}
+      // The chip shows only its hours, so the crew comes from the floating
+      // label rather than a native tooltip that would double up with it.
+      title={assignment.note || undefined}
+      onMouseMove={(e) =>
+        onHover?.({ x: e.clientX + 14, y: e.clientY, colors: [color], names: [crewName] })
+      }
+      onMouseLeave={() => onHover?.(null)}
       style={{
         background: `color-mix(in srgb, ${color} 12%, #fff)`,
         borderColor: color,
@@ -599,7 +620,6 @@ function WeeklyChip({
       {...attributes}
     >
       <span className="sb-chip__hours">{hours}</span>
-      <span className="sb-chip__crew" style={{ color }}>{crewName}</span>
       <ResizeHandle assignment={assignment} edge="start" color={color} compact={true} />
       <ResizeHandle assignment={assignment} edge="end" color={color} compact={true} />
     </button>
@@ -613,8 +633,8 @@ function DayCell({
   iso,
   compact,
   occupied = false,
-  /** This day is inside the run the hovered drop would take over. */
-  replacing = false,
+  /** This day is inside the run the hovered drop would land on. */
+  previewing = false,
   disabled = false,
   /** Before the job's own start date — allowed, but confirmed before writing. */
   preStart = false,
@@ -624,7 +644,7 @@ function DayCell({
   iso: string
   compact: boolean
   occupied?: boolean
-  replacing?: boolean
+  previewing?: boolean
   disabled?: boolean
   preStart?: boolean
   children?: React.ReactNode
@@ -635,9 +655,9 @@ function DayCell({
     disabled,
   })
 
-  // A takeover highlights the displaced crew's whole run in red; an ordinary
-  // relocation just marks the hovered cell green.
-  const highlight = replacing ? ' sb-cell--drop-replace' : isOver ? ' sb-cell--drop-target' : ''
+  // No drop displaces anyone now, so the whole run the stint would occupy is
+  // previewed in the same colour as the cell under the cursor.
+  const highlight = previewing || isOver ? ' sb-cell--drop-target' : ''
 
   return (
     <td
@@ -672,9 +692,7 @@ export default function ScheduleBoard() {
   const [modalError, setModalError] = useState<string | null>(null)
 
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
-  const [crewHover, setCrewHover] = useState<
-    { x: number; y: number; colors: string[]; names: string[] } | null
-  >(null)
+  const [crewHover, setCrewHover] = useState<CrewHover | null>(null)
   const [draggingAssignment, setDraggingAssignment] = useState<CrewAssignment | null>(null)
   const [dragKind, setDragKind] = useState<DragKind | null>(null)
   const [hoverCell, setHoverCell] = useState<{ jobId: string; date: string } | null>(null)
@@ -966,20 +984,19 @@ export default function ScheduleBoard() {
   }
 
   /**
-   * Save a stint from the assign modal, pausing first if it would take hours
-   * another crew already holds on this job. The server hands the slot over
-   * without complaint — trimming, splitting or dropping whatever overlaps — so
-   * that has to be confirmed here or it happens invisibly.
+   * Save a stint from the assign modal.
+   *
+   * Nothing on this job stands in the way any more — a job runs as many crews
+   * as it needs, whatever hours they keep. The one thing that still blocks is
+   * the crew already being on another job over the same days and hours, which
+   * the server rejects; catching it here says which job, rather than surfacing
+   * a bare 409.
    */
   function submitStint(jobId: string, draft: StintDraft, assignmentId?: string) {
-    const displaced = findDisplaced(
-      rows.find((r) => r._id === jobId),
-      draft,
-      assignmentId,
-    )
-    if (displaced.length > 0) {
+    const conflicts = findCrewConflicts(rows, jobId, draft.crewId, draft, assignmentId)
+    if (conflicts.length > 0) {
       setModalError(null)
-      setFlow({ type: 'confirmReplace', jobId, draft, assignmentId, displaced })
+      setFlow({ type: 'crewConflict', jobId, draft, assignmentId, conflicts })
       return
     }
     void writeStint(jobId, draft, assignmentId)
@@ -989,6 +1006,9 @@ export default function ScheduleBoard() {
     const a = event.active.data.current?.assignment as CrewAssignment | undefined
     setDraggingAssignment(a ?? null)
     setDragKind((event.active.data.current?.type as DragKind | undefined) ?? null)
+    // The pill is about to leave under the cursor without firing mouseleave,
+    // which would strand its label mid-board.
+    setCrewHover(null)
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -1088,11 +1108,9 @@ export default function ScheduleBoard() {
     const { start, end } = realBounds(source)
     const crossJob = fromJobId !== targetJobId
 
-    // A day can hold several crews now, so dropping on an occupied one no
-    // longer means taking that crew's run over — the stint simply relocates,
-    // keeping its own length and daily hours. Where two stints genuinely
-    // collide (same job, overlapping hours) the server trims or splits the
-    // existing one to make room; a cross-job clash it rejects outright.
+    // A day can hold several crews, so dropping on an occupied one never means
+    // taking that crew's run over — the stint simply relocates, keeping its own
+    // length and daily hours, and sits alongside whoever is already there.
     const newStart = targetDate
     const newEnd = end === null ? null : addIsoDays(targetDate, daysBetween(start, end))
 
@@ -1111,26 +1129,30 @@ export default function ScheduleBoard() {
       return null
     }
 
-    // Stints the move will land on top of. Only those sharing hours with the
-    // dragged one are actually affected; they're listed so the confirm modal
-    // can say what the server will reshuffle.
-    const destRow = rows.find((r) => r._id === targetJobId)
-    const occupants = (destRow?.assignments ?? []).filter(
-      (a) =>
-        a._id !== source._id &&
-        overlapsRange(a, newStart, newEnd) &&
-        windowsCollide(a, source),
+    // The only thing that can stop the move: this crew being wanted on another
+    // job over the same days and hours. Whoever else is on the destination job
+    // is irrelevant — they keep their own stints and work alongside this one.
+    const conflicts = findCrewConflicts(
+      rows,
+      targetJobId,
+      source.crewId,
+      {
+        startDate: newStart,
+        endDate: newEnd ?? '',
+        dailyStartTime: source.dailyStartTime ?? '',
+        dailyEndTime: source.dailyEndTime ?? '',
+      },
+      source._id,
     )
 
-    return { source, fromJobId, targetJobId, newStart, newEnd, occupants, adopted: false }
+    return { source, fromJobId, targetJobId, newStart, newEnd, conflicts }
   }
 
   /**
    * Carry out a confirmed move.
    *
-   * Nothing at the destination is deleted: the server trims or splits a
-   * same-job stint whose hours the move collides with, and rejects a
-   * cross-job clash. Stints at other hours of the same day simply stay put.
+   * Nothing at the destination is touched: the crews already on that job keep
+   * their stints and the moved one joins them, whatever hours they share.
    *
    * There is no endpoint that re-parents an assignment, so a move to a
    * different job is delete + create rather than a PATCH.
@@ -1230,7 +1252,7 @@ export default function ScheduleBoard() {
   }
 
   /** The days the dragged stint would occupy if dropped where the cursor is. */
-  const replacePreview = useMemo(() => {
+  const dropPreview = useMemo(() => {
     if (dragKind !== 'move' || !draggingAssignment || !hoverCell) return null
     const { start, end } = realBounds(draggingAssignment)
     if (!end) return { jobId: hoverCell.jobId, start: hoverCell.date, end: rangeEnd }
@@ -1387,7 +1409,6 @@ export default function ScheduleBoard() {
                         <>
                           <th className="sb-col-meta">General Contractor</th>
                           <th className="sb-col-meta">GC Super</th>
-                          <th className="sb-col-meta">Crew Lead</th>
                           <th className="sb-col-meta sb-col-meta--contract">Contract</th>
                         </>
                       )}
@@ -1402,7 +1423,6 @@ export default function ScheduleBoard() {
                       const rowCrews = meta?.crews ?? []
                       const jobStart = jobStartOf(row)
                       const startsLater = Boolean(jobStart && jobStart > today)
-                      const leads = rowCrews.map((c) => c.lead).filter(Boolean)
 
                       return (
                         <tr key={row._id} className="sb-row" style={{ height: heightOf(row._id) }}>
@@ -1424,7 +1444,7 @@ export default function ScheduleBoard() {
                               <span className="sb-row-bar-stack">
                                 {(rowCrews.length
                                   ? rowCrews
-                                  : [{ id: 'none', color: '#94a3b8', name: '', lead: '' }]
+                                  : [{ id: 'none', color: '#94a3b8', name: '' }]
                                 ).map((c) => (
                                   <i key={c.id} className="sb-row-bar" style={{ background: c.color }} />
                                 ))}
@@ -1449,11 +1469,6 @@ export default function ScheduleBoard() {
                             <>
                               <td className="sb-col-meta">{row.generalContractor}</td>
                               <td className="sb-col-meta">{row.gcSuper}</td>
-                              {/* The crew lead is the IDS super — there is no
-                                  separate person to track any more. */}
-                              <td className="sb-col-meta" title={leads.join(', ')}>
-                                {leads.length ? leads.join(', ') : '—'}
-                              </td>
                               <td className="sb-col-meta sb-col-meta--contract">
                                 ${(row.contractAmount ?? 0).toLocaleString('en-US')}
                               </td>
@@ -1562,11 +1577,11 @@ export default function ScheduleBoard() {
                             // Every crew on this day, not just the first: a job
                             // can run several crews at different hours.
                             const covering = ordered.filter((a) => coversDay(a, iso, rangeEnd))
-                            const replacing =
-                              !!replacePreview &&
-                              replacePreview.jobId === row._id &&
-                              iso >= replacePreview.start &&
-                              iso <= replacePreview.end
+                            const previewing =
+                              !!dropPreview &&
+                              dropPreview.jobId === row._id &&
+                              iso >= dropPreview.start &&
+                              iso <= dropPreview.end
 
                             const addButton = compact ? (
                               <button
@@ -1595,7 +1610,7 @@ export default function ScheduleBoard() {
                                   iso={iso}
                                   compact={false}
                                   occupied={covering.length > 0}
-                                  replacing={replacing}
+                                  previewing={previewing}
                                   disabled={isPast && covering.length === 0}
                                   preStart={isBeforeJobStart}
                                 >
@@ -1613,6 +1628,7 @@ export default function ScheduleBoard() {
                                             assignmentId: assignment._id,
                                           })
                                         }}
+                                        onHover={setCrewHover}
                                       />
                                     ))}
                                     {addButton}
@@ -1643,7 +1659,7 @@ export default function ScheduleBoard() {
                                 iso={iso}
                                 compact
                                 occupied={covering.length > 0}
-                                replacing={replacing}
+                                previewing={previewing}
                                 // A past day that already has bars still has to
                                 // render them; only empty past days close.
                                 disabled={isPast && covering.length === 0}
@@ -1732,7 +1748,7 @@ export default function ScheduleBoard() {
           jobName={activeRow.name ?? ''}
           jobNo={activeRow.jobIdNumber ?? ''}
           crews={crews}
-          defaultStartDate={flow.date}
+          initialDraft={flow.draft}
           error={modalError}
           saving={saving}
           onCancel={() => setFlow({ type: 'none' })}
@@ -1746,7 +1762,7 @@ export default function ScheduleBoard() {
           jobNo={activeRow.jobIdNumber ?? ''}
           crews={crews}
           assignment={editing}
-          defaultStartDate={isoDay(editing.startDate) ?? today}
+          initialDraft={flow.draft}
           error={modalError}
           saving={saving}
           // The backend refuses to delete a stint that has already started —
@@ -1774,7 +1790,6 @@ export default function ScheduleBoard() {
             crewName={plan.source.crew?.name ?? 'Crew'}
             crewColor={crewColorFor(plan.source.crewId, plan.source.crew?.crewColor)}
             sameJob={plan.fromJobId === plan.targetJobId}
-            adopted={plan.adopted}
             from={{
               jobName: fromRow?.name ?? '',
               jobNo: fromRow?.jobIdNumber ?? '',
@@ -1787,12 +1802,12 @@ export default function ScheduleBoard() {
               start: plan.newStart,
               end: plan.newEnd,
             }}
-            replacing={plan.occupants.map((a) => {
-              const bounds = realBounds(a)
+            conflicts={plan.conflicts.map(({ assignment, jobName, jobNo }) => {
+              const bounds = realBounds(assignment)
               return {
-                id: a._id,
-                crewName: a.crew?.name ?? 'Crew',
-                crewColor: crewColorFor(a.crewId, a.crew?.crewColor),
+                id: assignment._id,
+                jobName,
+                jobNo,
                 start: bounds.start,
                 end: bounds.end,
               }
@@ -1847,13 +1862,13 @@ export default function ScheduleBoard() {
         )
       })()}
 
-      {flow.type === 'confirmReplace' && (() => {
-        const { jobId, draft, assignmentId, displaced } = flow
+      {flow.type === 'crewConflict' && (() => {
+        const { jobId, draft, assignmentId, conflicts } = flow
         const row = rows.find((r) => r._id === jobId)
         const crew = crews.find((c) => c._id === draft.crewId)
 
         return (
-          <ScheduleReplaceModal
+          <ScheduleConflictModal
             crewName={crew?.name ?? 'Crew'}
             crewColor={crewColorFor(draft.crewId, crew?.crewColor)}
             jobName={row?.name ?? ''}
@@ -1862,24 +1877,26 @@ export default function ScheduleBoard() {
             end={draft.endDate || null}
             dailyStartTime={draft.dailyStartTime || null}
             dailyEndTime={draft.dailyEndTime || null}
-            isEdit={Boolean(assignmentId)}
-            replacing={displaced.map(({ assignment, effect }) => {
+            conflicts={conflicts.map(({ assignment, jobName, jobNo }) => {
               const bounds = realBounds(assignment)
               return {
                 id: assignment._id,
-                crewName: assignment.crew?.name ?? 'Crew',
-                crewColor: crewColorFor(assignment.crewId, assignment.crew?.crewColor),
+                jobName,
+                jobNo,
                 start: bounds.start,
                 end: bounds.end,
                 dailyStartTime: assignment.dailyStartTime,
                 dailyEndTime: assignment.dailyEndTime,
-                effect,
               }
             })}
-            saving={saving}
-            error={modalError}
-            onCancel={() => setFlow({ type: 'none' })}
-            onConfirm={() => void writeStint(jobId, draft, assignmentId)}
+            onClose={() => setFlow({ type: 'none' })}
+            onBack={() =>
+              setFlow(
+                assignmentId
+                  ? { type: 'editAssignment', jobId, assignmentId, draft }
+                  : { type: 'assignCrew', jobId, date: draft.startDate, draft },
+              )
+            }
           />
         )
       })()}

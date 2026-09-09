@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import Modal from './Modal'
+import PlaceholderDateTimeInput from './PlaceholderDateTimeInput'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import { createCrewAssignment, type JobItem } from '../../api/jobApi'
@@ -33,17 +34,12 @@ export default function AssignJobModal({
   const jobOptions = needsFetch ? apiJobs : jobs!
 
   const [jobId, setJobId] = useState<string | null>(null)
-  const [startDateTime, setStartDateTime] = useState<string>(
-    new Date().toISOString().slice(0, 10) + 'T08:00',
-  )
-  const [endDateTime, setEndDateTime] = useState<string>('')
+  const [startDate, setStartDate] = useState<string>('')
+  const [startTime, setStartTime] = useState<string>('')
+  const [endDate, setEndDate] = useState<string>('')
+  const [endTime, setEndTime] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const startDate = startDateTime.split('T')[0] ?? ''
-  const startTime = startDateTime.split('T')[1] ?? ''
-  const endDate = endDateTime ? endDateTime.split('T')[0] ?? '' : ''
-  const endTime = endDateTime ? endDateTime.split('T')[1] ?? '' : ''
 
   const selected = jobOptions.find((j) => j.id === jobId)
 
@@ -93,28 +89,49 @@ export default function AssignJobModal({
       />
 
       <div className="field-row" style={{ marginTop: '1rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>Start Date & Time*</label>
-          <input
-            type="datetime-local"
-            className="field-input"
-            value={startDateTime}
-            onChange={(e) => setStartDateTime(e.target.value)}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>Start Date*</label>
+          <PlaceholderDateTimeInput
+            type="date"
+            placeholder="DD-MM-YYYY"
+            value={startDate}
+            onChange={setStartDate}
           />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>End Date & Time</label>
-          <input
-            type="datetime-local"
-            className="field-input"
-            value={endDateTime}
-            min={startDateTime || undefined}
-            onChange={(e) => setEndDateTime(e.target.value)}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>Start Time</label>
+          <PlaceholderDateTimeInput
+            type="time"
+            placeholder="hh:mm"
+            value={startTime}
+            onChange={setStartTime}
+          />
+        </div>
+      </div>
+
+      <div className="field-row" style={{ marginTop: '0.75rem' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>End Date</label>
+          <PlaceholderDateTimeInput
+            type="date"
+            placeholder="DD-MM-YYYY"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={setEndDate}
+          />
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>End Time</label>
+          <PlaceholderDateTimeInput
+            type="time"
+            placeholder="hh:mm"
+            value={endTime}
+            onChange={setEndTime}
           />
         </div>
       </div>
       <p className="field-hint" style={{ marginTop: '0.35rem', fontSize: '0.75rem', opacity: 0.7 }}>
-        Leave End Date & Time empty for an open-ended assignment.
+        Leave End Date &amp; Time empty for an open-ended assignment.
       </p>
 
       {error && (

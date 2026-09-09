@@ -75,6 +75,28 @@ function toCrew(row: Row): UnassignedCrew | null {
   }
 }
 
+/**
+ * A money field as a number, whatever shape the API sent it in.
+ *
+ * Mongo currency fields arrive as a plain number, as a numeric string, or —
+ * when the column is a Decimal128 — as `{ $numberDecimal: "50000" }`. Only the
+ * first survives `.toLocaleString()` intact: a string passes through unformatted
+ * and the object renders as "[object Object]", so the cell has to normalise
+ * before it formats. Anything unparseable becomes 0.
+ */
+function toAmount(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  if (value && typeof value === 'object' && '$numberDecimal' in value) {
+    const parsed = Number((value as { $numberDecimal: string }).$numberDecimal)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  return 0
+}
+
 /** Flattens a JobItem (with its populated crew) into the sheet's row shape. */
 function toRow(j: JobItem): Row {
   const crewObj = typeof j.currentCrew === 'object' && j.currentCrew !== null ? j.currentCrew : null
@@ -119,13 +141,13 @@ function toRow(j: JobItem): Row {
     gc: j.generalContractor || '-',
     gcSuper: gcSuperVal,
     idsSuper: idsSuperVal,
-    contract: j.contractAmount || 0,
+    contract: toAmount(j.contractAmount),
     startDate: formattedStart,
     endDate: formattedEnd,
     status: normalizedStatus,
-    laborBudgetUsed: j.laborBudgetUsed ?? 0,
-    laborBudgetTotal: j.laborBudget || 0,
-    crewRate: crewLeadObj?.hourlyRate || 0,
+    laborBudgetUsed: toAmount(j.laborBudgetUsed),
+    laborBudgetTotal: toAmount(j.laborBudget),
+    crewRate: toAmount(crewLeadObj?.hourlyRate),
     workers: Array.isArray(crewObj?.members) ? crewObj.members.length : 1,
     note: j.note || undefined,
   }
@@ -302,7 +324,6 @@ export default function JobsManagement() {
               <col />
               <col />
               <col />
-              <col />
             </colgroup>
             <thead>
               <tr>
@@ -315,7 +336,6 @@ export default function JobsManagement() {
                 <th>Crew Assigned</th>
                 <th>GC</th>
                 <th className="jm-center">GC Super</th>
-                <th className="jm-center">Crew Lead</th>
                 <th className="jm-center">Contract</th>
                 <th className="jm-center">Duration</th>
                 <th className="jm-center">
@@ -342,13 +362,13 @@ export default function JobsManagement() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="crew-empty-cell" style={{ textAlign: 'center', padding: '32px 0' }}>
+                  <td colSpan={10} className="crew-empty-cell" style={{ textAlign: 'center', padding: '32px 0' }}>
                     Loading jobs...
                   </td>
                 </tr>
               ) : jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="crew-empty-cell" style={{ textAlign: 'center', padding: '32px 0' }}>
+                  <td colSpan={10} className="crew-empty-cell" style={{ textAlign: 'center', padding: '32px 0' }}>
                     No jobs found
                   </td>
                 </tr>
@@ -405,8 +425,7 @@ export default function JobsManagement() {
                       </td>
                       <td>{job.gc}</td>
                       <td className="jm-center">{job.gcSuper}</td>
-                      <td className="jm-center">{job.idsSuper}</td>
-                      <td className="jm-center jm-contract">${job.contract.toLocaleString('en-US')}</td>
+                      <td className="jm-center jm-contract">{formatMoney(job.contract)}</td>
                       <td className="jm-center jm-duration">
                         <div>{job.startDate}</div>
                         <div>{job.endDate}</div>

@@ -10,10 +10,11 @@ export interface MoveSide {
   end: string | null
 }
 
-export interface ReplacedStint {
+/** Another job already holding the moved crew over the destination range. */
+export interface ConflictingStint {
   id: string
-  crewName: string
-  crewColor: string
+  jobName: string
+  jobNo: string | number
   start: string
   end: string | null
 }
@@ -36,19 +37,19 @@ function dayCount(start: string, end: string | null) {
 /**
  * Confirms a drag-and-drop move of a crew stint before anything is written.
  *
- * The stints listed under `replacing` are the ones wanting the same hours of
- * the same days at the destination. The server carves room for the moved crew
- * out of them — trimming or splitting where part survives, dropping one it
- * covers completely — so this is destructive, but only for the overlap.
+ * The move never displaces anyone: the destination job keeps every crew it
+ * already has and this one joins them, whatever hours they share. The only
+ * thing that stops a move is `conflicts` — other jobs wanting this same crew
+ * over the destination days and hours, which no reshuffle can satisfy. When
+ * there are any, the move is blocked rather than confirmed.
  */
 export default function ScheduleMoveModal({
   crewName,
   crewColor,
   from,
   to,
-  replacing,
+  conflicts,
   sameJob,
-  adopted = false,
   saving = false,
   error,
   onCancel,
@@ -58,27 +59,26 @@ export default function ScheduleMoveModal({
   crewColor: string
   from: MoveSide
   to: MoveSide
-  replacing: ReplacedStint[]
+  conflicts: ConflictingStint[]
   sameJob: boolean
-  /** The moved crew took over the displaced stint's full run. */
-  adopted?: boolean
   saving?: boolean
   error?: string | null
   onCancel: () => void
   onConfirm: () => void
 }) {
-  const isReplacing = replacing.length > 0
+  const blocked = conflicts.length > 0
   const span = dayCount(to.start, to.end)
-  const wasSpan = dayCount(from.start, from.end)
 
   return (
     <Modal onClose={onCancel} width={520}>
-      <h2 className="modal-title">{isReplacing ? 'Replace assignment?' : 'Move assignment?'}</h2>
+      <h2 className="modal-title">
+        {blocked ? 'This crew is booked elsewhere then' : 'Move assignment?'}
+      </h2>
       <p className="sb-move__lede">
         <i className="sb-move__swatch" style={{ background: crewColor }} />
         <strong>{crewName}</strong>
         <span className="sb-move__span">
-          {adopted && wasSpan && wasSpan !== span ? `${wasSpan} → ${span ?? 'open-ended'}` : (span ?? 'open-ended')}
+          {span ?? 'open-ended'}
         </span>
       </p>
 
@@ -110,25 +110,29 @@ export default function ScheduleMoveModal({
 
       {sameJob && <p className="sb-move__note">Same job — only the dates change.</p>}
 
-      {isReplacing && (
+      {blocked && (
         <div className="sb-move__warn">
           <span className="sb-move__warn-head">
             <Icon.AlertTriangle width={17} height={17} />
-            {replacing.length === 1
-              ? 'This crew already has those hours'
-              : `${replacing.length} crews already have those hours`}
+            {conflicts.length === 1
+              ? `${crewName} is already on another job then`
+              : `${crewName} is already on ${conflicts.length} other jobs then`}
           </span>
           <ul className="sb-move__replaced">
-            {replacing.map((stint) => (
+            {conflicts.map((stint) => (
               <li key={stint.id}>
-                <i className="sb-move__swatch" style={{ background: stint.crewColor }} />
-                <span className="sb-move__replaced-name">{stint.crewName}</span>
+                <i className="sb-move__swatch" style={{ background: crewColor }} />
+                <span className="sb-move__replaced-name" title={stint.jobName}>
+                  #{stint.jobNo} · {stint.jobName}
+                </span>
                 <span className="sb-move__replaced-dates">{rangeText(stint.start, stint.end)}</span>
               </li>
             ))}
           </ul>
           <p className="sb-move__warn-foot">
-            {`${crewName} takes the overlapping days and hours; each crew above keeps whatever falls outside them, and loses its assignment only where nothing is left. Crews on this job at other times of day are unaffected.`}
+            The destination job can take another crew — this one just isn’t free.
+            Move or shorten the assignments above first, or drop this stint on
+            days they don’t cover.
           </p>
         </div>
       )}
@@ -137,16 +141,13 @@ export default function ScheduleMoveModal({
 
       <div className="modal-actions">
         <button type="button" className="btn btn--outline" onClick={onCancel} disabled={saving}>
-          Cancel
+          {blocked ? 'Close' : 'Cancel'}
         </button>
-        <button
-          type="button"
-          className={`btn ${isReplacing ? 'btn--danger' : 'btn--primary'}`}
-          onClick={onConfirm}
-          disabled={saving}
-        >
-          {saving ? 'Moving…' : isReplacing ? 'Replace' : 'Move'}
-        </button>
+        {!blocked && (
+          <button type="button" className="btn btn--primary" onClick={onConfirm} disabled={saving}>
+            {saving ? 'Moving…' : 'Move'}
+          </button>
+        )}
       </div>
     </Modal>
   )

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Modal from './Modal'
+import PlaceholderDateTimeInput from './PlaceholderDateTimeInput'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import { Icon } from './icons'
@@ -18,8 +19,9 @@ import {
   type JobItem,
 } from '../../api/jobApi'
 import { type UserItem } from '../../api/crewApi'
-import { useCachedFetchers } from '../../hooks/useQueryHooks'
+import { useCachedFetchers, useAvailableCrews } from '../../hooks/useQueryHooks'
 import { parseApiErrors } from '../../lib/errors'
+import { rangesOverlap, windowsCollide } from '../../lib/scheduleData'
 
 export interface JobFormData {
   name: string
@@ -55,9 +57,6 @@ function toMdyDate(iso: string) {
   return `${mm}-${dd}-${yyyy}`
 }
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 function DatePickerField({
   value,
@@ -111,9 +110,10 @@ interface AvailableCrewItem {
 }
 
 /**
- * One crew's stint on the job. A job can carry any number of these — several
- * crews may share a day as long as their daily hours differ, which is why each
- * row owns its own time window rather than the job owning one schedule.
+ * One crew's stint on the job. A job can carry any number of these, and they
+ * may freely share days and hours — several crews working the site at once is
+ * normal, which is why each row owns its own window rather than the job owning
+ * one schedule.
  *
  * `id` is present only for stints that already exist on the server; rows
  * without one are created on save, and stints missing from the list are
@@ -135,16 +135,226 @@ interface AssignmentDraft {
   excludeWeekends: boolean
 }
 
+/**
+ * One crew stint row. The window is picked first and the crew list is whatever
+ * /crews/available returns for it, so a busy crew can't be booked. Each row
+ * owns its own lookup because each row owns its own window — hence a component
+ * rather than inline JSX, which could not call the hook per row.
+ */
+function AssignmentRow({
+  draft,
+  allCrews,
+  onPatch,
+  onRemove,
+  errors,
+  duplicated,
+}: {
+  draft: AssignmentDraft
+  /** Every crew, used only to resolve a stint's existing crew while editing. */
+  allCrews: AvailableCrewItem[]
+  onPatch: (patch: Partial<AssignmentDraft>) => void
+  onRemove: () => void
+  errors: string[]
+  duplicated: boolean
+}) {
+  // Daily times only narrow the window as a pair — half of one describes a
+  // range the backend cannot evaluate.
+  const windowParams = useMemo(() => {
+    if (!draft.startDate) return null
+    return {
+      startDate: draft.startDate,
+      ...(draft.endDate ? { endDate: draft.endDate } : {}),
+      ...(draft.dailyStartTime && draft.dailyEndTime
+        ? { dailyStartTime: draft.dailyStartTime, dailyEndTime: draft.dailyEndTime }
+        : {}),
+    }
+  }, [draft.startDate, draft.endDate, draft.dailyStartTime, draft.dailyEndTime])
+
+  const { data: available = [], isPending, isError } = useAvailableCrews(windowParams)
+  const loadingCrews = Boolean(windowParams) && isPending
+
+  const crewOptions: AvailableCrewItem[] = useMemo(() => {
+    if (!windowParams) return []
+    const mapped: AvailableCrewItem[] = available.map((c) => {
+      const leadObj =
+        typeof c.crewLead === 'object' && c.crewLead !== null ? (c.crewLead as UserItem) : null
+      const leadName = leadObj ? `${leadObj.firstName || ''} ${leadObj.lastName || ''}`.trim() : c.name
+      return {
+        id: c._id,
+        name: c.name,
+        leadName: leadName || c.name,
+        rate: leadObj?.hourlyRate ?? 0,
+        color: c.crewColor || '#3b82f6',
+      }
+    })
+    // A saved stint's own crew is busy on this very stint, so the endpoint
+    // leaves it out — keep it selectable so a time-only edit still works.
+    const current = draft.id ? allCrews.find((c) => c.id === draft.crewId) : undefined
+    if (current && !mapped.some((c) => c.id === current.id)) return [current, ...mapped]
+    return mapped
+  }, [available, windowParams, draft.id, draft.crewId, allCrews])
+
+  // Editing the window can drop the picked crew out of the available set.
+  useEffect(() => {
+    if (draft.crewId && windowParams && !loadingCrews && !crewOptions.some((c) => c.id === draft.crewId)) {
+      onPatch({ crewId: null })
+    }
+  }, [crewOptions, draft.crewId, windowParams, loadingCrews])
+
+  const selected = crewOptions.find((c) => c.id === draft.crewId)
+  const noneAvailable =
+    Boolean(draft.startDate) && !loadingCrews && !isError && crewOptions.length === 0
+
+  function crewPlaceholder() {
+    if (!draft.startDate) return 'Select dates first'
+    if (loadingCrews) return 'Loading available crews…'
+    if (isError) return 'Could not load crews'
+    if (!crewOptions.length) return 'No crews available'
+    return 'Select crew'
+  }
+
+  return (
+    <div className="job-assign-card">
+      <div className="field-row">
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>
+            Start Date*
+          </label>
+          <PlaceholderDateTimeInput
+            type="date"
+            placeholder="DD-MM-YYYY"
+            value={draft.startDate}
+            onChange={(v) => onPatch({ startDate: v })}
+          />
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>
+            Start Time
+          </label>
+          <PlaceholderDateTimeInput
+            type="time"
+            placeholder="hh:mm"
+            value={draft.dailyStartTime}
+            onChange={(v) => onPatch({ dailyStartTime: v })}
+          />
+        </div>
+      </div>
+
+      <div className="field-row" style={{ marginTop: '0.75rem' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>
+            End Date
+          </label>
+          <PlaceholderDateTimeInput
+            type="date"
+            placeholder="DD-MM-YYYY"
+            value={draft.endDate}
+            min={draft.startDate || undefined}
+            onChange={(v) => onPatch({ endDate: v })}
+          />
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label className="field-label" style={{ whiteSpace: 'nowrap' }}>
+            End Time
+          </label>
+          <PlaceholderDateTimeInput
+            type="time"
+            placeholder="hh:mm"
+            value={draft.dailyEndTime}
+            onChange={(v) => onPatch({ dailyEndTime: v })}
+          />
+        </div>
+      </div>
+      <p className="job-assign__hint" style={{ margin: '0.35rem 0 0' }}>
+        Same time on both ends keeps the crew on the job round the clock.
+      </p>
+
+      <label className="field-label" style={{ marginTop: '0.75rem' }}>
+        Assign Crew*
+      </label>
+      <Dropdown
+        value={draft.crewId ?? ''}
+        disabled={!draft.startDate || loadingCrews || crewOptions.length === 0}
+        placeholder={crewPlaceholder()}
+        onChange={(id) => onPatch({ crewId: id || null })}
+        selectedLabel={
+          selected && (
+            <span className="dd__avatar-label">
+              <Avatar name={selected.name} src={selected.avatar} size={24} />
+              {selected.name}
+            </span>
+          )
+        }
+        options={crewOptions.map((c) => ({
+          id: c.id,
+          label: (
+            <span className="dd__crew-label">
+              <Avatar name={c.leadName} src={c.avatar} size={24} />
+              <span className="dd__crew-label__text">{c.name}</span>
+              <i className="dot" style={{ background: c.color }} />
+            </span>
+          ),
+        }))}
+      />
+      {noneAvailable && (
+        <p className="job-assign__hint" style={{ margin: '0.35rem 0 0' }}>
+          No crews are free for this period. Try a different date or time range.
+        </p>
+      )}
+
+      <div className="job-assign-card__foot">
+        <label className="sb-check">
+          <input
+            type="checkbox"
+            checked={draft.excludeWeekends}
+            onChange={(e) => onPatch({ excludeWeekends: e.target.checked })}
+          />
+          <span>Exclude Weekends From Schedule</span>
+        </label>
+        <button
+          type="button"
+          className="job-assign-card__remove"
+          aria-label="Remove this crew assignment"
+          onClick={onRemove}
+        >
+          <Icon.Trash width={15} height={15} />
+          <span>Remove</span>
+        </button>
+      </div>
+
+      {draft.crewId && !draft.startDate && (
+        <span className="field-error-text">Pick a start date for this crew.</span>
+      )}
+      {duplicated && (
+        <span className="field-error-text">
+          {selected?.name ?? 'This crew'} is already on this job over the same days
+          and hours. One crew works one slot at a time — add a different crew, or
+          change the dates or hours.
+        </span>
+      )}
+      {errors.map((message) => (
+        <span key={message} className="field-error-text">{message}</span>
+      ))}
+    </div>
+  )
+}
+
 let draftKeySeq = 0
-function newAssignmentDraft(startDate = ''): AssignmentDraft {
+
+/**
+ * A blank row. Nothing is pre-filled — not the job's own start date, not a
+ * default working window — because a guessed value looks identical to one the
+ * user chose, and these dates decide when a crew actually turns up.
+ */
+function newAssignmentDraft(): AssignmentDraft {
   draftKeySeq += 1
   return {
     key: `draft-${draftKeySeq}`,
     crewId: null,
-    startDate,
+    startDate: '',
     endDate: '',
-    dailyStartTime: '08:00',
-    dailyEndTime: '17:00',
+    dailyStartTime: '',
+    dailyEndTime: '',
     excludeWeekends: false,
   }
 }
@@ -263,7 +473,38 @@ export default function CreateJobModal({
   const filledAssignments = assignments.filter((a) => a.crewId)
   const firstCrew = availableCrews.find((c) => c.id === filledAssignments[0]?.crewId)
   const jobIdValid = typeof jobIdNumber === 'number' && jobIdNumber >= 10000 && jobIdNumber <= 99999
-  const canSubmit = !isSubmitting && !isLoadingData && jobIdValid && name.trim().length >= 2
+  // Two rows booking the same crew over the same slot can't be saved — the
+  // server would reject them and, on create, take the whole job down with them.
+  const hasDuplicateCrew = filledAssignments.some(
+    (draft, i) =>
+      draft.startDate &&
+      filledAssignments.some(
+        (other, j) =>
+          j > i &&
+          other.crewId === draft.crewId &&
+          Boolean(other.startDate) &&
+          rangesOverlap(
+            draft.startDate,
+            draft.endDate || null,
+            other.startDate,
+            other.endDate || null,
+          ) &&
+          windowsCollide(
+            { dailyStartTime: draft.dailyStartTime, dailyEndTime: draft.dailyEndTime },
+            { dailyStartTime: other.dailyStartTime, dailyEndTime: other.dailyEndTime },
+          ),
+      ),
+  )
+  // A crew row with no start date used to inherit the job's; now it simply
+  // isn't saveable, so the day a crew turns up is always one someone chose.
+  const missingStartDate = filledAssignments.some((a) => !a.startDate)
+  const canSubmit =
+    !isSubmitting &&
+    !isLoadingData &&
+    jobIdValid &&
+    name.trim().length >= 2 &&
+    !hasDuplicateCrew &&
+    !missingStartDate
 
   function patchAssignment(key: string, patch: Partial<AssignmentDraft>) {
     setAssignments((list) => list.map((a) => (a.key === key ? { ...a, ...patch } : a)))
@@ -274,6 +515,35 @@ export default function CreateJobModal({
    * against the array it was sent — `crewAssignment.1.startDate` — so they are
    * matched back to the card by its position among the filled-in rows.
    */
+  /**
+   * Rows that book the same crew twice over the same days and hours.
+   *
+   * Two different crews sharing a slot is fine — that's the point of the list.
+   * The same crew twice is not: it would have one crew in two places, which the
+   * server rejects, so it is caught here before the whole atomic create fails.
+   */
+  function duplicateCrewKeys(draft: AssignmentDraft) {
+    if (!draft.crewId || !draft.startDate) return []
+    return filledAssignments
+      .filter(
+        (other) =>
+          other.key !== draft.key &&
+          other.crewId === draft.crewId &&
+          Boolean(other.startDate) &&
+          rangesOverlap(
+            draft.startDate,
+            draft.endDate || null,
+            other.startDate,
+            other.endDate || null,
+          ) &&
+          windowsCollide(
+            { dailyStartTime: draft.dailyStartTime, dailyEndTime: draft.dailyEndTime },
+            { dailyStartTime: other.dailyStartTime, dailyEndTime: other.dailyEndTime },
+          ),
+      )
+      .map((other) => other.key)
+  }
+
   function assignmentErrors(draft: AssignmentDraft) {
     const index = filledAssignments.findIndex((a) => a.key === draft.key)
     const prefixes =
@@ -301,7 +571,10 @@ export default function CreateJobModal({
   function assignmentPayload(draft: AssignmentDraft): CrewAssignmentPayloadItem {
     return {
       crewId: draft.crewId as string,
-      startDate: toIsoDate(draft.startDate) || toIsoDate(startDate) || todayIso(),
+      // Never falls back to the job's start date: submit is gated on every
+      // crew row having its own, so an empty one can't be quietly backfilled
+      // with a day nobody picked.
+      startDate: toIsoDate(draft.startDate),
       ...(draft.endDate ? { endDate: toIsoDate(draft.endDate) } : {}),
       // Both times or neither — the server rejects a half-specified window.
       ...(draft.dailyStartTime && draft.dailyEndTime
@@ -496,7 +769,7 @@ export default function CreateJobModal({
                   onChange={(e) => setJobIdNumber(e.target.value === '' ? '' : Number(e.target.value))}
                 />
                 <span style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '3px', display: 'block', lineHeight: 1.2 }}>
-                  5 digits, chosen by you
+                  5 digit ID
                 </span>
                 {fieldErrors.jobIdNumber && <span className="field-error-text">{fieldErrors.jobIdNumber}</span>}
               </div>
@@ -524,7 +797,7 @@ export default function CreateJobModal({
             />
             {fieldErrors.siteAddress && <span className="field-error-text">{fieldErrors.siteAddress}</span>}
 
-            <label className="field-label">General Contractor</label>
+            <label className="field-label">General Contractor <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
             <input
               className={`field-input${fieldErrors.generalContractor || fieldErrors.gc ? ' field-input--error' : ''}`}
               placeholder="Enter GC Name"
@@ -535,7 +808,7 @@ export default function CreateJobModal({
               <span className="field-error-text">{fieldErrors.generalContractor || fieldErrors.gc}</span>
             )}
 
-            <label className="field-label">GC Super</label>
+            <label className="field-label">GC Super <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
             <input
               className={`field-input${fieldErrors.gcSuper ? ' field-input--error' : ''}`}
               placeholder="General Contractor Superintendent"
@@ -626,117 +899,27 @@ export default function CreateJobModal({
           <div className="job-form-modal__side">
             <label className="field-label">Assign Crew</label>
             <p className="job-assign__hint">
-              Add a row per crew. Crews can share the same days as long as their hours differ.
+              Add a row per crew
             </p>
 
-            {assignments.map((draft) => {
-              const selected = availableCrews.find((c) => c.id === draft.crewId)
-              const errors = assignmentErrors(draft)
-              return (
-                <div key={draft.key} className="job-assign-card">
-                  <div className="job-assign-card__head">
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <Dropdown
-                        value={draft.crewId ?? ''}
-                        placeholder="Select crew"
-                        onChange={(id) => patchAssignment(draft.key, { crewId: id || null })}
-                        selectedLabel={
-                          selected && (
-                            <span className="dd__avatar-label">
-                              <Avatar name={selected.name} src={selected.avatar} size={24} />
-                              {selected.name}
-                            </span>
-                          )
-                        }
-                        options={availableCrews.map((c) => ({
-                          id: c.id,
-                          label: (
-                            <span className="dd__crew-label">
-                              <Avatar name={c.leadName} src={c.avatar} size={24} />
-                              <span className="dd__crew-label__text">{c.name}</span>
-                              <i className="dot" style={{ background: c.color }} />
-                            </span>
-                          ),
-                        }))}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      className="job-assign-card__remove"
-                      aria-label="Remove this crew assignment"
-                      onClick={() =>
-                        setAssignments((list) => list.filter((a) => a.key !== draft.key))
-                      }
-                    >
-                      <Icon.Trash width={16} height={16} />
-                    </button>
-                  </div>
-
-                  <div className="field-row">
-                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                      <label className="field-label" style={{ whiteSpace: 'nowrap' }}>
-                        Start Date &amp; Time*
-                      </label>
-                      <input
-                        type="datetime-local"
-                        className="field-input"
-                        value={draft.startDate ? `${draft.startDate}T${draft.dailyStartTime || '08:00'}` : ''}
-                        onChange={(e) => {
-                          const [d, t] = e.target.value.split('T')
-                          patchAssignment(draft.key, {
-                            startDate: d || '',
-                            ...(t ? { dailyStartTime: t } : {}),
-                          })
-                        }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                      <label className="field-label" style={{ whiteSpace: 'nowrap' }}>
-                        End Date &amp; Time
-                      </label>
-                      <input
-                        type="datetime-local"
-                        className="field-input"
-                        value={draft.endDate ? `${draft.endDate}T${draft.dailyEndTime || '17:00'}` : ''}
-                        min={draft.startDate ? `${draft.startDate}T${draft.dailyStartTime || '08:00'}` : undefined}
-                        onChange={(e) => {
-                          const [d, t] = e.target.value.split('T')
-                          patchAssignment(draft.key, {
-                            endDate: d || '',
-                            ...(t ? { dailyEndTime: t } : {}),
-                          })
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <p className="job-assign__hint" style={{ margin: '0.35rem 0 0' }}>
-                    Same time on both ends keeps the crew on the job round the clock.
-                  </p>
-
-                  <label className="sb-check">
-                    <input
-                      type="checkbox"
-                      checked={draft.excludeWeekends}
-                      onChange={(e) => patchAssignment(draft.key, { excludeWeekends: e.target.checked })}
-                    />
-                    <span>Exclude Weekends From Schedule</span>
-                  </label>
-
-                  {errors.map((message) => (
-                    <span key={message} className="field-error-text">{message}</span>
-                  ))}
-                </div>
-              )
-            })}
+            {assignments.map((draft) => (
+              <AssignmentRow
+                key={draft.key}
+                draft={draft}
+                allCrews={availableCrews}
+                onPatch={(patch) => patchAssignment(draft.key, patch)}
+                onRemove={() =>
+                  setAssignments((list) => list.filter((a) => a.key !== draft.key))
+                }
+                errors={assignmentErrors(draft)}
+                duplicated={duplicateCrewKeys(draft).length > 0}
+              />
+            ))}
 
             <button
               type="button"
               className="btn btn--outline job-assign__add"
-              onClick={() =>
-                // Seeded from the job's own start date, in the ISO form the
-                // datetime inputs read.
-                setAssignments((list) => [...list, newAssignmentDraft(toIsoDate(startDate) || todayIso())])
-              }
+              onClick={() => setAssignments((list) => [...list, newAssignmentDraft()])}
             >
               <Icon.Plus width={16} height={16} />
               {assignments.length === 0 ? 'Assign Crew' : 'Assign More'}

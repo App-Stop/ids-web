@@ -1164,13 +1164,6 @@ td.sb-col-divider {
   outline-offset: -2px;
 }
 
-/* Dropping here overwrites the crew already booked on these days */
-.sb-cell--drop-replace {
-  background: rgba(239, 68, 68, 0.14);
-  outline: 2px dashed rgba(239, 68, 68, 0.6);
-  outline-offset: -2px;
-}
-
 /* --- Move / replace confirmation modal ----------------------------------- */
 
 .sb-move__lede {
@@ -1515,6 +1508,7 @@ td.sb-col-divider {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  font-weight: 500;
 }
 
 /* The crew name is the secondary line — the colour already identifies them,
@@ -1528,13 +1522,26 @@ td.sb-col-divider {
   max-width: 100%;
 }
 
-/* In a stack the add button sits under the chips rather than filling the cell */
+/* In a stack the add button sits under the chips rather than filling the cell.
+   It must not grow: any slack left in the row would otherwise stretch it into a
+   band taller than the chips above it. */
 .sb-stack .sb-add,
 .sb-stack .sb-empty {
   position: static;
   inset: auto;
-  flex: 1 0 calc(28px * var(--table-zoom, 1));
-  min-height: calc(28px * var(--table-zoom, 1));
+  flex: 0 0 calc(20px * var(--table-zoom, 1));
+  min-height: calc(20px * var(--table-zoom, 1));
+}
+
+/* Every row in the sheet is as tall as its busiest day, so a cell with fewer
+   crews than its neighbours always has slack. Packed from the top that slack
+   all lands under the Add button, which reads as a gap someone forgot to
+   close; on a day with no crews at all it is the whole cell. Centring the
+   button splits the slack evenly above and below instead, so it sits in the
+   cell rather than clinging to its top edge. Cells that do have chips stay
+   top-packed — the chips are the content and must line up across the week. */
+.sb-stack:not(:has(.sb-chip)) {
+  justify-content: center;
 }
 
 /* Day note badge for a cell that already has chips in it */
@@ -1589,9 +1596,8 @@ td.sb-col-divider {
   margin-top: 0.85rem;
 }
 
-/* What a replacement actually does to the crew already holding the slot —
-   trimmed, split, or removed. Sits on its own line under the crew it applies
-   to, so the name/date row keeps its shape. */
+/* A secondary line under the job it applies to — the daily hours of a clashing
+   stint. Sits on its own line so the name/date row keeps its shape. */
 .sb-move__replaced li {
   flex-wrap: wrap;
 }

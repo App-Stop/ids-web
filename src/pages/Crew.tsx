@@ -950,17 +950,6 @@ export default function Crew() {
       {flow.type === 'assignCrew' && activeCrew && activeJob && (
         <AssignCrewModal
           job={activeJob}
-          crews={allCrews.map((c) => {
-            const lead = typeof c.crewLead === 'object' && c.crewLead !== null ? c.crewLead : null
-            const leadName = lead ? `${lead.firstName ?? ''} ${lead.lastName ?? ''}`.trim() : ''
-            return {
-              id: c._id,
-              name: c.name,
-              leadName: leadName || c.name,
-              rate: lead?.hourlyRate ?? 0,
-              color: c.crewColor || '#94a3b8',
-            }
-          })}
           onCancel={() => setFlow({ type: 'viewJob', crewId: activeCrew.id, jobIndex: flow.jobIndex })}
           onAssign={(crewId, startDate, endDate, note) =>
             handleChangeCrew(activeJob.id, crewId, startDate, endDate, note)
