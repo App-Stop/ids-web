@@ -734,23 +734,6 @@ td.sb-col-divider {
   z-index: 5;
 }
 
-.sb-cell--disabled {
-  background-color: #cbd5e1 !important;
-  background-image: repeating-linear-gradient(
-    -45deg,
-    rgba(0, 0, 0, 0.03),
-    rgba(0, 0, 0, 0.03) 6px,
-    transparent 6px,
-    transparent 12px
-  ) !important;
-  cursor: not-allowed !important;
-  opacity: 0.85;
-}
-
-.sb-cell--disabled * {
-  pointer-events: none !important;
-}
-
 .sb-cell--compact {
   --sb-cell-inset: 8px;
   z-index: 1;
@@ -792,8 +775,10 @@ td.sb-col-divider {
   --sb-span: 1;
   position: absolute;
   left: var(--sb-cell-inset);
-  top: 14px;
-  bottom: 8px;
+  /* Room above the bar for the notes badge that straddles its top edge, so the
+     first row's badges clear the sticky header. */
+  top: calc(20px * var(--table-zoom, 1));
+  bottom: calc(6px * var(--table-zoom, 1));
   width: calc(
     (var(--sb-span) * 100%) + ((var(--sb-span) - 1) * 1px) - (2 * var(--sb-cell-inset))
   );
@@ -1570,19 +1555,6 @@ td.sb-col-divider {
 }
 
 /* --- Before the job's own start date ------------------------------------- */
-/* Not a blocker any more: a job can be pulled forward, so these days stay
-   clickable and only read as "outside the planned run" until confirmed. */
-
-.sb-cell--prestart {
-  background-image: repeating-linear-gradient(
-    -45deg,
-    rgba(148, 163, 184, 0.14),
-    rgba(148, 163, 184, 0.14) 6px,
-    transparent 6px,
-    transparent 12px
-  );
-}
-
 /* --- Shared checkbox row used by the schedule modals --------------------- */
 
 .sb-check {

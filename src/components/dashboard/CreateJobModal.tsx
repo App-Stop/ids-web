@@ -144,6 +144,7 @@ interface AssignmentDraft {
 function AssignmentRow({
   draft,
   allCrews,
+  takenCrewIds,
   onPatch,
   onRemove,
   errors,
@@ -152,6 +153,8 @@ function AssignmentRow({
   draft: AssignmentDraft
   /** Every crew, used only to resolve a stint's existing crew while editing. */
   allCrews: AvailableCrewItem[]
+  /** Crews already picked in the other rows — hidden from this row's list. */
+  takenCrewIds: string[]
   onPatch: (patch: Partial<AssignmentDraft>) => void
   onRemove: () => void
   errors: string[]
@@ -190,9 +193,10 @@ function AssignmentRow({
     // A saved stint's own crew is busy on this very stint, so the endpoint
     // leaves it out — keep it selectable so a time-only edit still works.
     const current = draft.id ? allCrews.find((c) => c.id === draft.crewId) : undefined
-    if (current && !mapped.some((c) => c.id === current.id)) return [current, ...mapped]
-    return mapped
-  }, [available, windowParams, draft.id, draft.crewId, allCrews])
+    const withCurrent = current && !mapped.some((c) => c.id === current.id) ? [current, ...mapped] : mapped
+    // A crew picked in another row isn't offered again here.
+    return withCurrent.filter((c) => c.id === draft.crewId || !takenCrewIds.includes(c.id))
+  }, [available, windowParams, draft.id, draft.crewId, allCrews, takenCrewIds])
 
   // Editing the window can drop the picked crew out of the available set.
   useEffect(() => {
@@ -907,6 +911,9 @@ export default function CreateJobModal({
                 key={draft.key}
                 draft={draft}
                 allCrews={availableCrews}
+                takenCrewIds={assignments
+                  .filter((a) => a.key !== draft.key && a.crewId)
+                  .map((a) => a.crewId as string)}
                 onPatch={(patch) => patchAssignment(draft.key, patch)}
                 onRemove={() =>
                   setAssignments((list) => list.filter((a) => a.key !== draft.key))

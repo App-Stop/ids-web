@@ -17,6 +17,7 @@ export default function Dropdown({
   onSearchChange,
   searchValue,
   disabled = false,
+  placement = 'bottom',
 }: {
   value: string | null
   options: DropdownOption[]
@@ -28,9 +29,11 @@ export default function Dropdown({
   staticLabel?: string
   onSearchChange?: (val: string) => void
   searchValue?: string
+  /** Which side of the trigger the menu opens on. */
+  placement?: 'bottom' | 'top'
 }) {
   const [open, setOpen] = useState(false)
-  const [coords, setCoords] = useState<{ top: number; left: number; minWidth: number }>({ top: 0, left: 0, minWidth: 120 })
+  const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number; minWidth: number }>({ top: 0, left: 0, minWidth: 120 })
   const ref = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
@@ -54,7 +57,9 @@ export default function Dropdown({
     if (!open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
       setCoords({
-        top: rect.bottom + 6,
+        ...(placement === 'top'
+          ? { bottom: window.innerHeight - rect.top + 6 }
+          : { top: rect.bottom + 6 }),
         left: rect.left,
         minWidth: Math.max(120, rect.width),
       })
@@ -109,7 +114,8 @@ export default function Dropdown({
             className="dd__menu-wrap"
             style={{
               position: 'fixed',
-              top: `${coords.top}px`,
+              top: coords.top !== undefined ? `${coords.top}px` : undefined,
+              bottom: coords.bottom !== undefined ? `${coords.bottom}px` : undefined,
               left: `${coords.left}px`,
               minWidth: `${coords.minWidth}px`,
               zIndex: 99999,

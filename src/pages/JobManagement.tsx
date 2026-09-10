@@ -490,6 +490,7 @@ export default function JobsManagement() {
           <div className="jm-pagination-limit">
             <span>Show:</span>
             <Dropdown
+              placement="top"
               value={String(limit)}
               onChange={(v) => {
                 setLimit(Number(v))

@@ -663,10 +663,10 @@ function DayCell({
     <td
       ref={setNodeRef}
       className={`${compact ? 'sb-cell sb-cell--compact' : 'sb-cell'}${occupied ? ' sb-cell--occupied' : ''}${
-        disabled ? ' sb-cell--disabled' : ''
-      }${preStart ? ' sb-cell--prestart' : ''}${highlight}`}
+        preStart ? ' sb-cell--prestart' : ''
+      }${highlight}`}
     >
-      {disabled ? null : children}
+      {children}
     </td>
   )
 }
@@ -1583,7 +1583,8 @@ export default function ScheduleBoard() {
                               iso >= dropPreview.start &&
                               iso <= dropPreview.end
 
-                            const addButton = compact ? (
+                            // Past days look like any other day but can't take new work.
+                            const addButton = isPast ? null : compact ? (
                               <button
                                 type="button"
                                 className="sb-empty"

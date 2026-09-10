@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type FocusEvent } from 'react'
 import { Icon } from './icons'
 import Avatar from './Avatar'
 import './crew-modals.css'
@@ -48,8 +48,13 @@ export default function MenuDropdown({
   const label = value === null ? (includeAll ? allLabel : placeholder) : selected?.label ?? placeholder
   const useCrewItems = showAvatar || showDot
 
-  function handleBlur() {
-    closeTimeout.current = setTimeout(() => setOpen(false), 120)
+  function handleBlur(e: FocusEvent<HTMLDivElement>) {
+    // Focus moving within the dropdown (e.g. trigger -> autofocused search input) must not close it.
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+    closeTimeout.current = setTimeout(() => {
+      setOpen(false)
+      setSearch('')
+    }, 120)
   }
   function cancelBlur() {
     if (closeTimeout.current) clearTimeout(closeTimeout.current)
