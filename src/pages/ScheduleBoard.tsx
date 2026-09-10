@@ -1930,8 +1930,15 @@ export default function ScheduleBoard() {
             onCancel={() => setFlow({ type: 'none' })}
             onConfirm={(excludeWeekends) => {
               void (async () => {
+                // The backend rejects excludeWeekends without an endDate in the
+                // same body, and a start-edge drag's patch carries only startDate.
+                if (excludeWeekends && !plan.newEnd) {
+                  setModalError('Excluding weekends needs an end date — set one on this assignment first.')
+                  return
+                }
                 const patch = {
                   ...plan.patch,
+                  ...(excludeWeekends && plan.newEnd ? { endDate: plan.newEnd } : {}),
                   excludeWeekends,
                 }
                 const ok = await runMutation(
