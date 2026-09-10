@@ -956,9 +956,9 @@ export default function ScheduleBoard() {
     }
   }
 
-  function draftToPayload(draft: StintDraft) {
+  /** The draft's shared window; callers add which crew(s) it is for. */
+  function draftWindow(draft: StintDraft) {
     return {
-      crewId: draft.crewId,
       startDate: draft.startDate,
       // Omitting endDate leaves the stint open-ended.
       ...(draft.endDate ? { endDate: draft.endDate } : {}),
@@ -972,14 +972,38 @@ export default function ScheduleBoard() {
     }
   }
 
-  /** Create or update the stint the draft describes. */
+  /**
+   * Create or update the stint(s) the draft describes.
+   *
+   * A new draft goes out as one request — the server books every crew in it,
+   * or none. An existing assignment belongs to one crew, so an edit keeps that
+   * crew on it (or swaps in the first picked one if it was removed) and adds
+   * any other picked crews as new assignments sharing the same window.
+   */
   function writeStint(jobId: string, draft: StintDraft, assignmentId?: string) {
+    const several = draft.crewIds.length > 1
     return runMutation(
-      () =>
-        assignmentId
-          ? updateCrewAssignment(jobId, assignmentId, draftToPayload(draft))
-          : createCrewAssignment(jobId, draftToPayload(draft)),
-      assignmentId ? 'Could not update that assignment.' : 'Could not assign that crew.',
+      async () => {
+        if (!assignmentId) {
+          await createCrewAssignment(jobId, { ...draftWindow(draft), crewIds: draft.crewIds })
+          return
+        }
+        const savedCrewId = findAssignment(jobId, assignmentId)?.crewId
+        const kept =
+          savedCrewId && draft.crewIds.includes(String(savedCrewId)) ? String(savedCrewId) : draft.crewIds[0]
+        await updateCrewAssignment(jobId, assignmentId, { ...draftWindow(draft), crewId: kept })
+        const extras = draft.crewIds.filter((id) => id !== kept)
+        if (extras.length) {
+          await createCrewAssignment(jobId, { ...draftWindow(draft), crewIds: extras })
+        }
+      },
+      assignmentId
+        ? several
+          ? 'Could not save those assignments.'
+          : 'Could not update that assignment.'
+        : several
+          ? 'Could not assign those crews.'
+          : 'Could not assign that crew.',
     )
   }
 
@@ -993,7 +1017,10 @@ export default function ScheduleBoard() {
    * a bare 409.
    */
   function submitStint(jobId: string, draft: StintDraft, assignmentId?: string) {
-    const conflicts = findCrewConflicts(rows, jobId, draft.crewId, draft, assignmentId)
+    // Every picked crew is checked; any one of them clashing stops the save.
+    const conflicts = draft.crewIds.flatMap((crewId) =>
+      findCrewConflicts(rows, jobId, crewId, draft, assignmentId),
+    )
     if (conflicts.length > 0) {
       setModalError(null)
       setFlow({ type: 'crewConflict', jobId, draft, assignmentId, conflicts })
@@ -1866,12 +1893,16 @@ export default function ScheduleBoard() {
       {flow.type === 'crewConflict' && (() => {
         const { jobId, draft, assignmentId, conflicts } = flow
         const row = rows.find((r) => r._id === jobId)
-        const crew = crews.find((c) => c._id === draft.crewId)
+        const crewInfo = (crewId: string) => {
+          const crew = crews.find((c) => c._id === crewId)
+          return { id: crewId, name: crew?.name ?? 'Crew', color: crewColorFor(crewId, crew?.crewColor) }
+        }
+        // Only the crews that actually clash are named; the rest of the draft is fine.
+        const clashingCrews = [...new Set(conflicts.map((c) => String(c.assignment.crewId)))].map(crewInfo)
 
         return (
           <ScheduleConflictModal
-            crewName={crew?.name ?? 'Crew'}
-            crewColor={crewColorFor(draft.crewId, crew?.crewColor)}
+            crews={clashingCrews}
             jobName={row?.name ?? ''}
             jobNo={row?.jobIdNumber ?? ''}
             start={draft.startDate}
@@ -1880,8 +1911,11 @@ export default function ScheduleBoard() {
             dailyEndTime={draft.dailyEndTime || null}
             conflicts={conflicts.map(({ assignment, jobName, jobNo }) => {
               const bounds = realBounds(assignment)
+              const crew = crewInfo(String(assignment.crewId))
               return {
                 id: assignment._id,
+                crewName: crew.name,
+                crewColor: crew.color,
                 jobName,
                 jobNo,
                 start: bounds.start,

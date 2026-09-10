@@ -4,6 +4,7 @@ import PlaceholderDateTimeInput from './PlaceholderDateTimeInput'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import { Icon } from './icons'
+import './crew-modals.css'
 import LocationPickerInput from './LocationPickerInput'
 import { crewColors, type Job } from '../../lib/dashboardData'
 import {
@@ -15,7 +16,7 @@ import {
   getCrewAssignments,
   type CreateJobPayload,
   type UpdateJobPayload,
-  type CrewAssignmentPayloadItem,
+  type CrewAssignmentWindow,
   type JobItem,
 } from '../../api/jobApi'
 import { type UserItem } from '../../api/crewApi'
@@ -122,7 +123,14 @@ interface AvailableCrewItem {
 interface AssignmentDraft {
   key: string
   id?: string
-  crewId: string | null
+  /**
+   * Crews sharing this row's window — the server makes one assignment per
+   * crew. On a saved stint (`id` set) the stored assignment keeps one of them
+   * and the rest are added as new assignments on save.
+   */
+  crewIds: string[]
+  /** The crew the saved stint belongs to on the server. */
+  savedCrewId?: string
   /** YYYY-MM-DD — the date half of the datetime-local inputs. */
   startDate: string
   endDate: string
@@ -148,7 +156,7 @@ function AssignmentRow({
   onPatch,
   onRemove,
   errors,
-  duplicated,
+  duplicateCrewIds,
 }: {
   draft: AssignmentDraft
   /** Every crew, used only to resolve a stint's existing crew while editing. */
@@ -158,7 +166,8 @@ function AssignmentRow({
   onPatch: (patch: Partial<AssignmentDraft>) => void
   onRemove: () => void
   errors: string[]
-  duplicated: boolean
+  /** Crews on this row that another row already books over the same slot. */
+  duplicateCrewIds: string[]
 }) {
   // Daily times only narrow the window as a pair — half of one describes a
   // range the backend cannot evaluate.
@@ -176,7 +185,8 @@ function AssignmentRow({
   const { data: available = [], isPending, isError } = useAvailableCrews(windowParams)
   const loadingCrews = Boolean(windowParams) && isPending
 
-  const crewOptions: AvailableCrewItem[] = useMemo(() => {
+  /** Every crew free for this window, plus a saved stint's own crew. */
+  const rowCrews: AvailableCrewItem[] = useMemo(() => {
     if (!windowParams) return []
     const mapped: AvailableCrewItem[] = available.map((c) => {
       const leadObj =
@@ -192,30 +202,62 @@ function AssignmentRow({
     })
     // A saved stint's own crew is busy on this very stint, so the endpoint
     // leaves it out — keep it selectable so a time-only edit still works.
-    const current = draft.id ? allCrews.find((c) => c.id === draft.crewId) : undefined
-    const withCurrent = current && !mapped.some((c) => c.id === current.id) ? [current, ...mapped] : mapped
-    // A crew picked in another row isn't offered again here.
-    return withCurrent.filter((c) => c.id === draft.crewId || !takenCrewIds.includes(c.id))
-  }, [available, windowParams, draft.id, draft.crewId, allCrews, takenCrewIds])
+    const current = draft.savedCrewId ? allCrews.find((c) => c.id === draft.savedCrewId) : undefined
+    return current && !mapped.some((c) => c.id === current.id) ? [current, ...mapped] : mapped
+  }, [available, windowParams, draft.savedCrewId, allCrews])
 
-  // Editing the window can drop the picked crew out of the available set.
+  // Editing the window can drop picked crews out of the available set. A
+  // failed lookup says nothing about availability, so it leaves them alone.
   useEffect(() => {
-    if (draft.crewId && windowParams && !loadingCrews && !crewOptions.some((c) => c.id === draft.crewId)) {
-      onPatch({ crewId: null })
-    }
-  }, [crewOptions, draft.crewId, windowParams, loadingCrews])
+    if (!windowParams || loadingCrews || isError || !draft.crewIds.length) return
+    const kept = draft.crewIds.filter((id) => rowCrews.some((c) => c.id === id))
+    if (kept.length !== draft.crewIds.length) onPatch({ crewIds: kept })
+  }, [rowCrews, draft.crewIds, windowParams, loadingCrews, isError, onPatch])
 
-  const selected = crewOptions.find((c) => c.id === draft.crewId)
+  // Picked crews, resolved for their pills even before a window loads them. A
+  // crew missing from both lists still gets a pill, so it can be seen and removed.
+  const selectedCrews: AvailableCrewItem[] = draft.crewIds.map(
+    (id) =>
+      rowCrews.find((c) => c.id === id) ??
+      allCrews.find((c) => c.id === id) ?? {
+        id,
+        name: `Crew #${id.slice(-4)}`,
+        leadName: '',
+        rate: 0,
+        color: '#94a3b8',
+      },
+  )
+  // Crews this row doesn't already hold, minus any picked in another row.
+  const options = rowCrews.filter((c) => !draft.crewIds.includes(c.id) && !takenCrewIds.includes(c.id))
   const noneAvailable =
-    Boolean(draft.startDate) && !loadingCrews && !isError && crewOptions.length === 0
+    Boolean(draft.startDate) && !loadingCrews && !isError && !draft.crewIds.length && !options.length
+  const duplicateNames = duplicateCrewIds.map(
+    (id) => selectedCrews.find((c) => c.id === id)?.name ?? 'A crew',
+  )
 
   function crewPlaceholder() {
     if (!draft.startDate) return 'Select dates first'
     if (loadingCrews) return 'Loading available crews…'
     if (isError) return 'Could not load crews'
-    if (!crewOptions.length) return 'No crews available'
-    return 'Select crew'
+    if (!options.length) return draft.crewIds.length ? 'All available crews added' : 'No crews available'
+    return draft.crewIds.length ? 'Add another crew' : 'Select crews'
   }
+
+  function crewOption(c: AvailableCrewItem) {
+    return {
+      id: c.id,
+      searchText: `${c.name} ${c.leadName}`,
+      label: (
+        <span className="dd__crew-label">
+          <Avatar name={c.leadName} src={c.avatar} size={24} />
+          <span className="dd__crew-label__text">{c.name}</span>
+          <i className="dot" style={{ background: c.color }} />
+        </span>
+      ),
+    }
+  }
+
+  const pickerDisabled = !draft.startDate || loadingCrews || !options.length
 
   return (
     <div className="job-assign-card">
@@ -274,32 +316,48 @@ function AssignmentRow({
       </p>
 
       <label className="field-label" style={{ marginTop: '0.75rem' }}>
-        Assign Crew*
+        Assign Crews*
       </label>
       <Dropdown
-        value={draft.crewId ?? ''}
-        disabled={!draft.startDate || loadingCrews || crewOptions.length === 0}
+        value={null}
+        disabled={pickerDisabled}
         placeholder={crewPlaceholder()}
-        onChange={(id) => onPatch({ crewId: id || null })}
-        selectedLabel={
-          selected && (
-            <span className="dd__avatar-label">
-              <Avatar name={selected.name} src={selected.avatar} size={24} />
-              {selected.name}
-            </span>
-          )
-        }
-        options={crewOptions.map((c) => ({
-          id: c.id,
-          label: (
-            <span className="dd__crew-label">
-              <Avatar name={c.leadName} src={c.avatar} size={24} />
-              <span className="dd__crew-label__text">{c.name}</span>
-              <i className="dot" style={{ background: c.color }} />
-            </span>
-          ),
-        }))}
+        onChange={(id) => {
+          if (id && !draft.crewIds.includes(id)) onPatch({ crewIds: [...draft.crewIds, id] })
+        }}
+        options={options.map(crewOption)}
       />
+      {selectedCrews.length > 0 && (
+        <div className="crew-chip-input" style={{ marginTop: '8px' }}>
+          {selectedCrews.map((c) => (
+            <span key={c.id} className="crew-chip-input__chip">
+              <i
+                aria-hidden
+                style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, flexShrink: 0 }}
+              />
+              {c.name}
+              <button
+                type="button"
+                className="crew-chip-input__remove"
+                aria-label={`Remove ${c.name}`}
+                onClick={() => onPatch({ crewIds: draft.crewIds.filter((id) => id !== c.id) })}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {draft.id && draft.crewIds.length > 1 && (
+        <p className="job-assign__hint" style={{ margin: '0.35rem 0 0' }}>
+          The added crews are saved as their own assignments with these dates and hours.
+        </p>
+      )}
+      {draft.id && draft.crewIds.length === 0 && (
+        <p className="job-assign__hint" style={{ margin: '0.35rem 0 0' }}>
+          With no crews left, this assignment is removed when you save.
+        </p>
+      )}
       {noneAvailable && (
         <p className="job-assign__hint" style={{ margin: '0.35rem 0 0' }}>
           No crews are free for this period. Try a different date or time range.
@@ -326,14 +384,16 @@ function AssignmentRow({
         </button>
       </div>
 
-      {draft.crewId && !draft.startDate && (
-        <span className="field-error-text">Pick a start date for this crew.</span>
-      )}
-      {duplicated && (
+      {draft.crewIds.length > 0 && !draft.startDate && (
         <span className="field-error-text">
-          {selected?.name ?? 'This crew'} is already on this job over the same days
-          and hours. One crew works one slot at a time — add a different crew, or
-          change the dates or hours.
+          Pick a start date for {draft.crewIds.length === 1 ? 'this crew' : 'these crews'}.
+        </span>
+      )}
+      {duplicateNames.length > 0 && (
+        <span className="field-error-text">
+          {duplicateNames.join(', ')} {duplicateNames.length === 1 ? 'is' : 'are'} already on this
+          job over the same days and hours. One crew works one slot at a time — remove{' '}
+          {duplicateNames.length === 1 ? 'it' : 'them'} here, or change the dates or hours.
         </span>
       )}
       {errors.map((message) => (
@@ -354,7 +414,7 @@ function newAssignmentDraft(): AssignmentDraft {
   draftKeySeq += 1
   return {
     key: `draft-${draftKeySeq}`,
-    crewId: null,
+    crewIds: [],
     startDate: '',
     endDate: '',
     dailyStartTime: '',
@@ -451,7 +511,8 @@ export default function CreateJobModal({
                 return {
                   key: `existing-${a._id}`,
                   id: a._id,
-                  crewId: a.crewId,
+                  crewIds: [a.crewId],
+                  savedCrewId: a.crewId,
                   startDate: a.startDate.slice(0, 10),
                   endDate: a.endDate ? a.endDate.slice(0, 10) : '',
                   // A stint stored without a window runs all day, which shows
@@ -474,31 +535,12 @@ export default function CreateJobModal({
     loadData()
   }, [isEdit, job?.id])
 
-  const filledAssignments = assignments.filter((a) => a.crewId)
-  const firstCrew = availableCrews.find((c) => c.id === filledAssignments[0]?.crewId)
+  const filledAssignments = assignments.filter((a) => a.crewIds.length > 0)
+  const firstCrew = availableCrews.find((c) => c.id === filledAssignments[0]?.crewIds[0])
   const jobIdValid = typeof jobIdNumber === 'number' && jobIdNumber >= 10000 && jobIdNumber <= 99999
   // Two rows booking the same crew over the same slot can't be saved — the
   // server would reject them and, on create, take the whole job down with them.
-  const hasDuplicateCrew = filledAssignments.some(
-    (draft, i) =>
-      draft.startDate &&
-      filledAssignments.some(
-        (other, j) =>
-          j > i &&
-          other.crewId === draft.crewId &&
-          Boolean(other.startDate) &&
-          rangesOverlap(
-            draft.startDate,
-            draft.endDate || null,
-            other.startDate,
-            other.endDate || null,
-          ) &&
-          windowsCollide(
-            { dailyStartTime: draft.dailyStartTime, dailyEndTime: draft.dailyEndTime },
-            { dailyStartTime: other.dailyStartTime, dailyEndTime: other.dailyEndTime },
-          ),
-      ),
-  )
+  const hasDuplicateCrew = filledAssignments.some((draft) => duplicateCrewIds(draft).length > 0)
   // A crew row with no start date used to inherit the job's; now it simply
   // isn't saveable, so the day a crew turns up is always one someone chose.
   const missingStartDate = filledAssignments.some((a) => !a.startDate)
@@ -526,26 +568,23 @@ export default function CreateJobModal({
    * The same crew twice is not: it would have one crew in two places, which the
    * server rejects, so it is caught here before the whole atomic create fails.
    */
-  function duplicateCrewKeys(draft: AssignmentDraft) {
-    if (!draft.crewId || !draft.startDate) return []
-    return filledAssignments
-      .filter(
-        (other) =>
-          other.key !== draft.key &&
-          other.crewId === draft.crewId &&
-          Boolean(other.startDate) &&
-          rangesOverlap(
-            draft.startDate,
-            draft.endDate || null,
-            other.startDate,
-            other.endDate || null,
-          ) &&
-          windowsCollide(
-            { dailyStartTime: draft.dailyStartTime, dailyEndTime: draft.dailyEndTime },
-            { dailyStartTime: other.dailyStartTime, dailyEndTime: other.dailyEndTime },
-          ),
-      )
-      .map((other) => other.key)
+  function duplicateCrewIds(draft: AssignmentDraft) {
+    if (!draft.crewIds.length || !draft.startDate) return []
+    const clashing = new Set<string>()
+    for (const other of filledAssignments) {
+      if (other.key === draft.key || !other.startDate) continue
+      const sameSlot =
+        rangesOverlap(draft.startDate, draft.endDate || null, other.startDate, other.endDate || null) &&
+        windowsCollide(
+          { dailyStartTime: draft.dailyStartTime, dailyEndTime: draft.dailyEndTime },
+          { dailyStartTime: other.dailyStartTime, dailyEndTime: other.dailyEndTime },
+        )
+      if (!sameSlot) continue
+      for (const id of other.crewIds) {
+        if (draft.crewIds.includes(id)) clashing.add(id)
+      }
+    }
+    return [...clashing]
   }
 
   function assignmentErrors(draft: AssignmentDraft) {
@@ -571,10 +610,13 @@ export default function CreateJobModal({
     if (preset.status) setStatus(preset.status)
   }
 
-  /** A draft row in the shape both POST /jobs and the stint endpoints take. */
-  function assignmentPayload(draft: AssignmentDraft): CrewAssignmentPayloadItem {
+  /**
+   * A row's date/time window, in the shape both POST /jobs and the stint
+   * endpoints take. Callers add who it's for: `crewIds` for a new row,
+   * `crewId` for a saved stint.
+   */
+  function assignmentWindow(draft: AssignmentDraft): CrewAssignmentWindow {
     return {
-      crewId: draft.crewId as string,
       // Never falls back to the job's start date: submit is gated on every
       // crew row having its own, so an empty one can't be quietly backfilled
       // with a day nobody picked.
@@ -596,7 +638,8 @@ export default function CreateJobModal({
    * create request, which the server applies atomically.
    */
   async function syncAssignments(jobId: string) {
-    const keptIds = new Set(assignments.filter((a) => a.id).map((a) => a.id as string))
+    // A saved row emptied of crews goes the same way as a removed row.
+    const keptIds = new Set(filledAssignments.filter((a) => a.id).map((a) => a.id as string))
     for (const removedId of originalAssignmentIds) {
       if (!keptIds.has(removedId)) {
         // A stint that has already started can't be deleted server-side; that
@@ -607,9 +650,19 @@ export default function CreateJobModal({
 
     for (const draft of filledAssignments) {
       if (draft.id) {
-        await updateCrewAssignment(jobId, draft.id, assignmentPayload(draft))
+        // The stored assignment keeps its crew if it's still picked (otherwise
+        // takes the first one); every other crew on the row is added as a new
+        // assignment sharing the same window.
+        const kept =
+          draft.savedCrewId && draft.crewIds.includes(draft.savedCrewId) ? draft.savedCrewId : draft.crewIds[0]
+        await updateCrewAssignment(jobId, draft.id, { ...assignmentWindow(draft), crewId: kept })
+        const extras = draft.crewIds.filter((id) => id !== kept)
+        if (extras.length) {
+          await createCrewAssignment(jobId, { ...assignmentWindow(draft), crewIds: extras })
+        }
       } else {
-        await createCrewAssignment(jobId, assignmentPayload(draft))
+        // One call per row: the server books every crew in it, or none.
+        await createCrewAssignment(jobId, { ...assignmentWindow(draft), crewIds: draft.crewIds })
       }
     }
   }
@@ -636,7 +689,7 @@ export default function CreateJobModal({
       endDate,
       contractAmount: contractVal ?? 0,
       laborBudgetTotal: laborVal ?? 0,
-      crewLeadId: filledAssignments[0]?.crewId ?? null,
+      crewLeadId: filledAssignments[0]?.crewIds[0] ?? null,
       note,
       color: firstCrew?.color ?? color,
       status,
@@ -667,7 +720,12 @@ export default function CreateJobModal({
           // atomically, so a rejected stint takes the job down with it rather
           // than leaving a half-assigned job behind.
           ...(filledAssignments.length
-            ? { crewAssignment: filledAssignments.map(assignmentPayload) }
+            ? {
+                crewAssignment: filledAssignments.map((draft) => ({
+                  ...assignmentWindow(draft),
+                  crewIds: draft.crewIds,
+                })),
+              }
             : {}),
         }
         const res = await createJob(payload)
@@ -912,14 +970,14 @@ export default function CreateJobModal({
                 draft={draft}
                 allCrews={availableCrews}
                 takenCrewIds={assignments
-                  .filter((a) => a.key !== draft.key && a.crewId)
-                  .map((a) => a.crewId as string)}
+                  .filter((a) => a.key !== draft.key)
+                  .flatMap((a) => a.crewIds)}
                 onPatch={(patch) => patchAssignment(draft.key, patch)}
                 onRemove={() =>
                   setAssignments((list) => list.filter((a) => a.key !== draft.key))
                 }
                 errors={assignmentErrors(draft)}
-                duplicated={duplicateCrewKeys(draft).length > 0}
+                duplicateCrewIds={duplicateCrewIds(draft)}
               />
             ))}
 

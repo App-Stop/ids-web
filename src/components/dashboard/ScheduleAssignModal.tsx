@@ -1,16 +1,22 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import Modal from './Modal'
 import PlaceholderDateTimeInput from './PlaceholderDateTimeInput'
 import Dropdown from './Dropdown'
 import Avatar from './Avatar'
 import ConfirmModal from './ConfirmModal'
+import './crew-modals.css'
 import { crewColorFor, formatTimeWindow, windowWrapsMidnight } from '../../lib/scheduleData'
 import { useAvailableCrews } from '../../hooks/useQueryHooks'
 import type { CrewSummaryItem } from '../../api/crewApi'
 import type { CrewAssignment } from '../../api/jobApi'
 
 export interface StintDraft {
-  crewId: string
+  /**
+   * Crews sharing this window — the server makes one assignment per crew.
+   * When editing, the stored assignment keeps one of them and the rest are
+   * added as new assignments with the same dates and hours.
+   */
+  crewIds: string[]
   startDate: string
   /** Empty string = open-ended. */
   endDate: string
@@ -30,15 +36,16 @@ function crewLeadName(crew: CrewSummaryItem) {
 }
 
 /**
- * Create or edit one crew stint on a job.
+ * Create or edit a crew stint on a job.
  *
  * A stint is a crew, a date range, and optionally a daily time window that
- * repeats across that range. Any number of crews can share a job at the same
- * time, identical hours included — nothing already on the job restricts what
- * can be added. The one rule left is on the crew: it works a single job at a
- * time, so a stint is refused when that crew is already elsewhere over the same
- * days and hours. The board checks that against what it has loaded, and the
- * server has the final say, reporting through `error`.
+ * repeats across that range. Several crews can be picked at once to share the
+ * same window. Any number of crews can share a job at the same time, identical
+ * hours included — nothing already on the job restricts what can be added. The
+ * one rule left is on the crew: it works a single job at a time, so a stint is
+ * refused when that crew is already elsewhere over the same days and hours.
+ * The board checks that against what it has loaded, and the server has the
+ * final say, reporting through `error`.
  */
 export default function ScheduleAssignModal({
   jobName,
@@ -71,10 +78,11 @@ export default function ScheduleAssignModal({
   onDelete?: () => void
 }) {
   const isEdit = Boolean(assignment)
+  const savedCrewId = assignment ? String(assignment.crewId) : null
   // A draft handed back from a rejected save wins over the stored assignment —
   // it is what the user last typed.
-  const [crewId, setCrewId] = useState<string | null>(
-    initialDraft?.crewId ?? assignment?.crewId ?? null,
+  const [pickedCrewIds, setPickedCrewIds] = useState<string[]>(
+    initialDraft?.crewIds ?? (savedCrewId ? [savedCrewId] : []),
   )
   const [startDate, setStartDate] = useState<string>(
     initialDraft?.startDate ?? assignment?.startDate?.slice(0, 10) ?? '',
@@ -112,34 +120,51 @@ export default function ScheduleAssignModal({
   // When editing, the stint's own crew is busy on this very stint, so the
   // endpoint leaves it out — keep it selectable so an edit that only moves the
   // times still works.
-  const crewOptions: CrewSummaryItem[] = useMemo(() => {
+  const rowCrews: CrewSummaryItem[] = useMemo(() => {
     if (!windowParams) return []
-    const current = assignment ? crews.find((c) => c._id === assignment.crewId) : undefined
+    const current = savedCrewId ? crews.find((c) => c._id === savedCrewId) : undefined
     if (current && !available.some((c) => c._id === current._id)) return [current, ...available]
     return available
-  }, [available, windowParams, assignment, crews])
+  }, [available, windowParams, savedCrewId, crews])
 
-  // Editing the window can drop the picked crew out of the available set.
-  useEffect(() => {
-    if (crewId && windowParams && !loadingCrews && !crewOptions.some((c) => c._id === crewId)) {
-      setCrewId(null)
+  // Editing the window can drop picked crews out of the available set; only
+  // the ones still free for it count. A failed lookup says nothing about
+  // availability, so it keeps them all.
+  const crewIds =
+    windowParams && !loadingCrews && !isError
+      ? pickedCrewIds.filter((id) => rowCrews.some((c) => c._id === id))
+      : pickedCrewIds
+
+  // Picked crews, resolved for their pills even before a window loads them. A
+  // crew missing from both lists still gets a pill, so it can be seen and removed.
+  const selectedCrews = crewIds.map((id) => {
+    const crew = rowCrews.find((c) => c._id === id) ?? crews.find((c) => c._id === id)
+    return {
+      id,
+      name: crew?.name ?? `Crew #${id.slice(-4)}`,
+      color: crewColorFor(id, crew?.crewColor),
     }
-  }, [crewOptions, crewId, windowParams, loadingCrews])
-
-  const selected = crewOptions.find((c) => c._id === crewId)
+  })
+  const options = rowCrews.filter((c) => !crewIds.includes(c._id))
 
   function crewPlaceholder() {
     if (!startDate) return 'Select dates first'
     if (loadingCrews) return 'Loading available crews…'
     if (isError) return 'Could not load crews'
-    if (!crewOptions.length) return 'No crews available'
-    return '-'
+    if (!options.length) return crewIds.length ? 'All available crews added' : 'No crews available'
+    return crewIds.length ? 'Add another crew' : 'Select crews'
   }
   // Equal times wrap all the way around the clock, which is how a crew that
   // holds the job for the whole day is expressed.
   const isAllDay = Boolean(dailyStartTime) && dailyStartTime === dailyEndTime
   const wraps = !isAllDay && windowWrapsMidnight(dailyStartTime, dailyEndTime)
   const timesValid = Boolean(startDate)
+
+  function submitLabel() {
+    if (saving) return 'Saving…'
+    if (isEdit) return 'Save Changes'
+    return crewIds.length > 1 ? `Assign ${crewIds.length} Crews` : 'Assign Crew'
+  }
 
   if (confirmingDelete) {
     return (
@@ -219,23 +244,17 @@ export default function ScheduleAssignModal({
         </p>
       )}
 
-      <label className="field-label" style={{ marginTop: '1rem' }}>Assign Crew*</label>
+      <label className="field-label" style={{ marginTop: '1rem' }}>Assign Crews*</label>
       <Dropdown
-        value={crewId}
-        disabled={!startDate || loadingCrews || crewOptions.length === 0}
+        value={null}
+        disabled={!startDate || loadingCrews || options.length === 0}
         placeholder={crewPlaceholder()}
-        onChange={setCrewId}
-        selectedLabel={
-          selected && (
-            <span className="dd__crew-label">
-              <Avatar name={crewLeadName(selected) || selected.name || ''} size={24} />
-              <span className="dd__crew-label__text">{selected.name}</span>
-              <i className="dot" style={{ background: crewColorFor(selected._id, selected.crewColor) }} />
-            </span>
-          )
-        }
-        options={crewOptions.map((c) => ({
+        onChange={(id) => {
+          if (id) setPickedCrewIds((ids) => (ids.includes(id) ? ids : [...ids, id]))
+        }}
+        options={options.map((c) => ({
           id: c._id,
+          searchText: `${c.name ?? ''} ${crewLeadName(c)}`,
           label: (
             <span className="dd__crew-label">
               <Avatar name={crewLeadName(c) || c.name || ''} size={24} />
@@ -245,9 +264,35 @@ export default function ScheduleAssignModal({
           ),
         }))}
       />
-      {startDate && !loadingCrews && !isError && crewOptions.length === 0 && (
+      {selectedCrews.length > 0 && (
+        <div className="crew-chip-input" style={{ marginTop: '8px' }}>
+          {selectedCrews.map((c) => (
+            <span key={c.id} className="crew-chip-input__chip">
+              <i
+                aria-hidden
+                style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, flexShrink: 0 }}
+              />
+              {c.name}
+              <button
+                type="button"
+                className="crew-chip-input__remove"
+                aria-label={`Remove ${c.name}`}
+                onClick={() => setPickedCrewIds((ids) => ids.filter((id) => id !== c.id))}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {startDate && !loadingCrews && !isError && rowCrews.length === 0 && (
         <p className="field-hint" style={{ marginTop: '0.35rem', fontSize: '0.75rem', opacity: 0.7 }}>
           No crews are free for this period. Try a different date or time range.
+        </p>
+      )}
+      {isEdit && crewIds.length > 1 && (
+        <p className="field-hint" style={{ marginTop: '0.35rem', fontSize: '0.75rem', opacity: 0.7 }}>
+          The added crews are saved as their own assignments with these dates and hours.
         </p>
       )}
 
@@ -277,11 +322,11 @@ export default function ScheduleAssignModal({
           <button
             type="button"
             className="btn btn--primary"
-            disabled={!crewId || !startDate || !timesValid || saving}
+            disabled={!crewIds.length || !startDate || !timesValid || saving}
             onClick={() => {
-              if (!crewId) return
+              if (!crewIds.length) return
               onSubmit({
-                crewId,
+                crewIds,
                 startDate,
                 endDate,
                 dailyStartTime,
@@ -291,7 +336,7 @@ export default function ScheduleAssignModal({
               })
             }}
           >
-            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Assign Crew'}
+            {submitLabel()}
           </button>
         </div>
       </div>

@@ -5,6 +5,8 @@ import { Icon } from './icons'
 export interface DropdownOption {
   id: string
   label: ReactNode
+  /** What the search box matches when `label` isn't plain text. */
+  searchText?: string
 }
 
 export default function Dropdown({
@@ -85,7 +87,7 @@ export default function Dropdown({
         if (typeof o.label === 'string') {
           return o.label.toLowerCase().includes(search.toLowerCase())
         }
-        const textContent = (o as any).searchText ?? String(o.id)
+        const textContent = o.searchText ?? String(o.id)
         return textContent.toLowerCase().includes(search.toLowerCase())
       })
     : options

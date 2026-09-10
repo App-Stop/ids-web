@@ -28,21 +28,29 @@ export interface Pagination {
   totalPages: number
 }
 
-/**
- * One crew's stint, as accepted inline by POST /jobs. `startDate` and
- * `excludeWeekends` are both required per entry; omitting `endDate` makes the
- * stint cover the rest of the job's own duration.
- */
-export interface CrewAssignmentPayloadItem {
-  crewId: string
+/** A stint's date/time window — shared by every crew named alongside it. */
+export interface CrewAssignmentWindow {
   startDate: string
   endDate?: string
   /** "HH:mm" 24h. Send both or neither — neither means the stint runs 24/7. */
   dailyStartTime?: string
   dailyEndTime?: string
   excludeWeekends: boolean
-  note?: string
 }
+
+/**
+ * Who a stint is for: one crew, or several sharing the same window. For
+ * `crewIds` the server creates one assignment per crew, all or none. Never both.
+ */
+export type CrewTarget = { crewId: string; crewIds?: never } | { crewIds: string[]; crewId?: never }
+
+/**
+ * One stint, as accepted inline by POST /jobs and PATCH /jobs/:id. `startDate`
+ * and `excludeWeekends` are both required per entry; omitting `endDate` makes
+ * the stint cover the rest of the job's own duration. There is no `note` here —
+ * the job endpoints don't accept one per stint.
+ */
+export type CrewAssignmentPayloadItem = CrewAssignmentWindow & CrewTarget
 
 export interface CreateJobPayload {
   jobIdNumber?: number
@@ -180,8 +188,7 @@ export interface CrewAssignment {
   updatedAt: string
 }
 
-export interface CreateCrewAssignmentPayload {
-  crewId: string
+interface CrewAssignmentFields {
   startDate: string
   endDate?: string
   /** Send both or neither; omitting both assigns the crew for the whole day. */
@@ -193,9 +200,17 @@ export interface CreateCrewAssignmentPayload {
   note?: string
 }
 
-export type UpdateCrewAssignmentPayload = Partial<
-  Omit<CreateCrewAssignmentPayload, 'endDate'>
-> & {
+/**
+ * One crew, or several sharing one window (one assignment per crew, all or
+ * none). The server rejects a `laborCost` override for several crews at once.
+ */
+export type CreateCrewAssignmentPayload =
+  | (CrewAssignmentFields & { crewId: string; crewIds?: never })
+  | (Omit<CrewAssignmentFields, 'laborCost'> & { crewIds: string[]; crewId?: never; laborCost?: never })
+
+export type UpdateCrewAssignmentPayload = Partial<Omit<CrewAssignmentFields, 'endDate'>> & {
+  /** A saved stint belongs to one crew — this endpoint rejects `crewIds`. */
+  crewId?: string
   /** Explicit null clears the end date, making the stint open-ended. */
   endDate?: string | null
 }
