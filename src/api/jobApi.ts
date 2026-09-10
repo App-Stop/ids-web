@@ -272,6 +272,19 @@ export interface GetScheduleParams {
   search?: string
   jobId?: string
   status?: string
+  /** 1-based. Backend clamps to the last page. */
+  page?: number
+  /** 1–100, backend default 20. */
+  limit?: number
+}
+
+export interface SchedulePagination {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPrevPage: boolean
 }
 
 export interface ScheduleJobRow extends JobItem {
@@ -289,6 +302,7 @@ export interface GetScheduleResponse {
   message: string
   data: {
     range: { from: string; to: string }
+    pagination: SchedulePagination
     jobs: ScheduleJobRow[]
   }
 }

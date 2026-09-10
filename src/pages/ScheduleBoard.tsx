@@ -64,6 +64,7 @@ import {
 } from '../lib/scheduleData'
 import { useSidebarCollapsed } from '../hooks/useSidebarCollapsed'
 import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
+import './JobsManagement.css'
 import './ScheduleBoard.css'
 
 type DragKind = 'extend' | 'move'
@@ -741,18 +742,30 @@ export default function ScheduleBoard() {
   // never re-requests it.
   const { data: crews = [], error: crewsError } = useCrewsSummary()
 
+  // The backend orders rows by "has a crew in this window", so any change to
+  // the window or filters invalidates the page — it snaps back to 1 by keying
+  // the stored page to the filters instead of resetting it in an effect.
+  const [limit, setLimit] = useState(20)
+  const filterKey = `${rangeStart}|${viewMode}|${search}|${jobFilter ?? ''}|${limit}`
+  const [pageState, setPageState] = useState({ key: filterKey, page: 1 })
+  const page = pageState.key === filterKey ? pageState.page : 1
+  const setPage = (next: number) => setPageState({ key: filterKey, page: next })
+
   const scheduleParams = useMemo(
     () => ({
       startDate: rangeStart,
       view: viewMode,
+      page,
+      limit,
       ...(search ? { search } : {}),
       ...(jobFilter ? { jobId: jobFilter } : {}),
     }),
-    [rangeStart, viewMode, search, jobFilter],
+    [rangeStart, viewMode, page, limit, search, jobFilter],
   )
 
   const scheduleQuery = useScheduleData(scheduleParams)
   const rows: ScheduleJobRow[] = useMemo(() => scheduleQuery.data?.jobs ?? [], [scheduleQuery.data])
+  const pagination = scheduleQuery.data?.pagination
   const loading = scheduleQuery.isPending
 
   /**
@@ -1755,6 +1768,48 @@ export default function ScheduleBoard() {
             )}
           </DragOverlay>
         </DndContext>
+
+        <div className="jm-pagination-bar">
+          <div className="jm-pagination-limit">
+            <span>Show:</span>
+            <Dropdown
+              placement="top"
+              value={String(limit)}
+              onChange={(v) => setLimit(Number(v))}
+              options={[
+                { id: '10', label: '10 per page' },
+                { id: '20', label: '20 per page' },
+                { id: '50', label: '50 per page' },
+                { id: '100', label: '100 per page' },
+              ]}
+            />
+          </div>
+
+          <div className="jm-pagination-controls">
+            <span className="jm-pagination-info">
+              Page {pagination?.page ?? page} of {pagination?.totalPages ?? 1}
+              {pagination ? ` · ${pagination.total} Jobs` : ''}
+            </span>
+            <div className="jm-pagination-btns">
+              <button
+                type="button"
+                className="btn btn--outline jm-page-btn"
+                disabled={loading || !pagination?.hasPrevPage}
+                onClick={() => setPage(Math.max(1, (pagination?.page ?? page) - 1))}
+              >
+                <CaretLeft size={16} /> Previous
+              </button>
+              <button
+                type="button"
+                className="btn btn--outline jm-page-btn"
+                disabled={loading || !pagination?.hasNextPage}
+                onClick={() => setPage((pagination?.page ?? page) + 1)}
+              >
+                Next <CaretRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
       </main>
 
       {crewHover && (
