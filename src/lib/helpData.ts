@@ -317,12 +317,12 @@ export const helpArticles: HelpArticle[] = [
   },
   {
     id: 'profile-team',
-    title: 'Your Profile & Team',
-    summary: 'Update your details, manage team access, and choose your notifications.',
+    title: 'Your Profile',
+    summary: 'Update your details and change your password.',
     category: 'Account',
     icon: 'profile',
-    minutes: 3,
-    intro: 'The Profile screen holds three tabs: your own settings, the team who can sign in, and notification preferences.',
+    minutes: 2,
+    intro: 'The Profile screen holds your own account settings and password.',
     steps: [
       {
         title: 'Update your details',
@@ -334,18 +334,7 @@ export const helpArticles: HelpArticle[] = [
         body: 'Enter your current password, then the new one twice, and save.',
         media: 'Screenshot — Change password fields',
       },
-      {
-        title: 'Manage the team',
-        body: 'Admins can add a member with their name, email and role — Super Admin, Controller or Ops Manager — and edit or remove people later.',
-        media: 'Screenshot — Manage Team tab',
-      },
-      {
-        title: 'Set notifications',
-        body: 'Choose in-app or email alerts for budget overruns, schedule changes, new assignments, daily briefings and cost logs.',
-        media: 'Screenshot — Notification preferences',
-      },
     ],
-    tips: ['Removing a team member revokes their access immediately.'],
   },
 ]
 
