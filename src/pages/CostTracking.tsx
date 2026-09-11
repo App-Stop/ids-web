@@ -13,7 +13,6 @@ import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZ
 import { AddDailyDumpsterCountModal, EditCostAdjustmentModal } from '../components/dashboard/CostTrackingModals'
 import {
   useCrewsSummary,
-  useJobsList,
   useCostTrackingReport,
   useInvalidateServerState,
 } from '../hooks/useQueryHooks'
@@ -275,7 +274,6 @@ export default function CostTracking() {
 
   // Both dropdowns read the shared crew/job caches the other screens fill.
   const { data: crewsList = [] } = useCrewsSummary()
-  const { data: jobsList = [] } = useJobsList({ limit: 100 })
   const { invalidateAll } = useInvalidateServerState()
 
   // Any change to the range, view or filters snaps back to page 1 — the stored
@@ -318,6 +316,22 @@ export default function CostTracking() {
 
       return params
   }, [range, startDate, endDate, tab, search, jobFilter, crewFilter, page, limit])
+
+  // The job filter lists the jobs the report has for this date range. It is
+  // its own request, without the job filter, search or page: built from the
+  // table's rows it would shrink to the one picked job, or to a single page.
+  const jobOptionParams = useMemo<CostTrackingReportParams>(() => {
+    const { dateFilter, dateFrom, dateTo, startDate: rangeStart } = reportParams
+    return {
+      dateFilter,
+      ...(dateFrom ? { dateFrom } : {}),
+      ...(dateTo ? { dateTo } : {}),
+      ...(rangeStart ? { startDate: rangeStart } : {}),
+      groupBy: 'jobs',
+      limit: 100,
+    }
+  }, [reportParams])
+  const jobOptionsQuery = useCostTrackingReport(jobOptionParams, tab === 'jobs')
 
   const reportQuery = useCostTrackingReport(reportParams)
   const pagination = reportQuery.data?.pagination
@@ -431,8 +445,11 @@ export default function CostTracking() {
   }
 
   const jobFilterOptions = useMemo(
-    () => jobsList.map((job) => ({ id: job._id, label: job.name })),
-    [jobsList],
+    () =>
+      (jobOptionsQuery.data?.success ? jobOptionsQuery.data.data.groups : [])
+        .filter((grp) => grp.jobId)
+        .map((grp) => ({ id: grp.jobId as string, label: grp.jobName || 'Unnamed Job' })),
+    [jobOptionsQuery.data],
   )
   const crewOptions = useMemo(
     () =>

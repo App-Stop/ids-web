@@ -443,7 +443,7 @@ export default function JobsManagement() {
                                 }}
                               >
                                 {STATUS_LABELS[job.status]}
-                                <Icon.ChevronDown width={12} height={12} style={{ opacity: 0.7 }} />
+                                
                               </span>
                             }
                             onChange={(v) => handleStatusChange(job.rawId || job.id, v as JobStatus)}

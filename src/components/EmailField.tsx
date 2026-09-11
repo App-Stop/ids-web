@@ -20,7 +20,7 @@ export default function EmailField({
           autoComplete="username"
           required
         />
-        <span>{DOMAIN}</span>
+        <span>@idsdemo.com</span>
       </div>
     </div>
   )
