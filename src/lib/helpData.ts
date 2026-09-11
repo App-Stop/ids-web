@@ -31,7 +31,7 @@ export const helpArticles: HelpArticle[] = [
     icon: 'signIn',
     minutes: 2,
     intro:
-      'Every user gets their own account. Your role decides what you can change — admins can manage the team, while other roles work day to day in the schedule, crew and timesheet screens.',
+      'Every user gets their own account. Your role decides what you can change — admins can manage the team, while other roles work day to day in the schedule and crew screens.',
     steps: [
       {
         title: 'Sign in',
@@ -66,7 +66,7 @@ export const helpArticles: HelpArticle[] = [
     steps: [
       {
         title: 'Use the sidebar',
-        body: 'Navigation is split into Operations (Dashboard, Schedule Board, Jobs Management, Cost Tracking) and Management (Crew, Timesheet). Your profile sits at the bottom.',
+        body: 'Navigation is split into Operations (Dashboard, Schedule Board, Jobs Management, Cost Tracking) and Management (Crew). Your profile sits at the bottom.',
         media: 'Screenshot — Expanded sidebar',
       },
       {
@@ -284,6 +284,7 @@ export const helpArticles: HelpArticle[] = [
       'Filter the Crew tab by job to see who is on a particular site.',
     ],
   },
+  /* Timesheet is hidden for now — uncomment to bring the article back.
   {
     id: 'timesheet',
     title: 'Logging Attendance',
@@ -315,6 +316,7 @@ export const helpArticles: HelpArticle[] = [
       },
     ],
   },
+  */
   {
     id: 'profile-team',
     title: 'Your Profile',

@@ -6,7 +6,7 @@ import ScheduleBoard from './pages/ScheduleBoard'
 import JobsManagement from './pages/JobManagement'
 import Crew from './pages/Crew'
 import CostTracking from './pages/CostTracking'
-import Timesheet from './pages/Timesheet'
+// import Timesheet from './pages/Timesheet'
 import Profile from './pages/Profile'
 import HelpCenter from './pages/HelpCenter'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -28,7 +28,8 @@ function App() {
       <Route path="/jobs-management" element={<ProtectedRoute><JobsManagement /></ProtectedRoute>} />
       <Route path="/cost-tracking" element={<ProtectedRoute><CostTracking /></ProtectedRoute>} />
       <Route path="/crew-management" element={<ProtectedRoute><Crew /></ProtectedRoute>} />
-      <Route path="/timesheet" element={<ProtectedRoute><Timesheet /></ProtectedRoute>} />
+      {/* Timesheet is hidden for now — restore this route and the sidebar entry to bring it back. */}
+      {/* <Route path="/timesheet" element={<ProtectedRoute><Timesheet /></ProtectedRoute>} /> */}
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
       <Route path="/help-center" element={<HelpCenter />} />

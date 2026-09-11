@@ -4,7 +4,7 @@ import {
   Hammer,
   CurrencyCircleDollar,
   Users,
-  ListChecks,
+  // ListChecks,
   SidebarSimple,
   GearSix,
   User,
@@ -26,7 +26,7 @@ const OPERATIONS = [
 
 const MANAGEMENT = [
   { label: "Crew Management", icon: Users, path: "/crew-management" },
-  { label: "Timesheet", icon: ListChecks, path: "/timesheet" },
+  // { label: "Timesheet", icon: ListChecks, path: "/timesheet" },
 ];
 
 const SUPPORT = [
