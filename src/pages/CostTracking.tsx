@@ -29,6 +29,12 @@ import './Dashboard.css'
 import './JobsManagement.css'
 import './CostTracking.css'
 
+/**
+ * Cost Tracking is view-only for now. Adding and editing entries is hidden
+ * behind this flag (not removed) — flip to `false` to re-enable it.
+ */
+const READ_ONLY = true
+
 type ViewMode = 'jobs' | 'crew'
 type RangeMode = 'Custom Range' | 'Weekly' | 'Monthly' | 'All Time'
 type ModalMode = 'none' | 'add' | 'edit'
@@ -740,10 +746,12 @@ export default function CostTracking() {
               )}
             </div>
 
-            <button type="button" className="btn btn--primary ct-add-btn" onClick={openAddModal}>
-              <Plus size={16} weight="bold" />
-              Add Entry
-            </button>
+            {!READ_ONLY && (
+              <button type="button" className="btn btn--primary ct-add-btn" onClick={openAddModal}>
+                <Plus size={16} weight="bold" />
+                Add Entry
+              </button>
+            )}
           </div>
         </div>
 
@@ -807,7 +815,9 @@ export default function CostTracking() {
                   ? 'Nothing matches your current search and filters. Clear them to see every entry in this date range.'
                   : rangeLabel
                     ? `There are no cost entries between ${rangeLabel}. Pick a different date range to see more.`
-                    : 'There are no cost entries yet. Add one to start tracking costs.'}
+                    : READ_ONLY
+                      ? 'There are no cost entries yet.'
+                      : 'There are no cost entries yet. Add one to start tracking costs.'}
               </p>
               <div className="ct-empty__actions">
                 {hasActiveFilters ? (
@@ -821,10 +831,12 @@ export default function CostTracking() {
                     </button>
                   )
                 )}
-                <button type="button" className="btn btn--primary" onClick={openAddModal}>
-                  <Plus size={16} weight="bold" />
-                  Add Entry
-                </button>
+                {!READ_ONLY && (
+                  <button type="button" className="btn btn--primary" onClick={openAddModal}>
+                    <Plus size={16} weight="bold" />
+                    Add Entry
+                  </button>
+                )}
               </div>
             </div>
           ) : tab === 'jobs' ? (
@@ -931,11 +943,13 @@ export default function CostTracking() {
 
                       return (
                         <td key={day.toISOString()} className="ct-grid-cell">
-                          {value != null ? (
+                          {value == null ? null : READ_ONLY ? (
+                            <span className="ct-grid-cell__value ct-grid-cell__value--static">{formatMoney(value)}</span>
+                          ) : (
                             <button type="button" className="ct-grid-cell__value" onClick={() => openEditModal(row, dayStr)}>
                               {formatMoney(value)}
                             </button>
-                          ) : null}
+                          )}
                         </td>
                       )
                     })}
@@ -1075,11 +1089,15 @@ export default function CostTracking() {
           crew={detailsCrew}
           note={detailsNote}
           onDone={() => setJobFlow({ type: 'none' })}
-          onChangeCrew={() => setJobFlow({ type: 'assignCrew', jobId: detailsJob.id })}
-          onRemoveCrew={() => {
-            setJobCrews((prev) => ({ ...prev, [detailsJob.id]: null }))
-            setJobFlow({ type: 'none' })
-          }}
+          onChangeCrew={READ_ONLY ? undefined : () => setJobFlow({ type: 'assignCrew', jobId: detailsJob.id })}
+          onRemoveCrew={
+            READ_ONLY
+              ? undefined
+              : () => {
+                  setJobCrews((prev) => ({ ...prev, [detailsJob.id]: null }))
+                  setJobFlow({ type: 'none' })
+                }
+          }
         />
       )}
 

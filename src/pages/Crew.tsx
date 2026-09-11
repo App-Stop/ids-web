@@ -32,6 +32,16 @@ import './Crew.css'
 import './Dashboard.css'
 import './JobsManagement.css'
 
+/**
+ * Crew and Roster are view-only for now. Every create/edit/assign/remove
+ * control is hidden behind this flag (not removed) — flip to `false` to
+ * re-enable them.
+ */
+const READ_ONLY = true
+
+/** Roster tab is hidden for now (not removed) — flip to `false` to bring it back. */
+const HIDE_ROSTER = true
+
 type Tab = 'crew' | 'roster'
 type SortKey = 'name-asc' | 'name-desc' | 'rate-desc' | 'rate-asc'
 
@@ -491,14 +501,17 @@ export default function Crew() {
               : `${rosterPagination.totalCount} Total Members`}
           </span>
 
-          <div className="sb-toggle crew-tab-toggle">
-            <button type="button" className={tab === 'crew' ? 'is-active' : ''} onClick={() => changeTab('crew')}>
-              Crew
-            </button>
-            <button type="button" className={tab === 'roster' ? 'is-active' : ''} onClick={() => changeTab('roster')}>
-              Roster
-            </button>
-          </div>
+          {/* With Roster hidden there's only one tab, so the toggle itself is hidden. */}
+          {!HIDE_ROSTER && (
+            <div className="sb-toggle crew-tab-toggle">
+              <button type="button" className={tab === 'crew' ? 'is-active' : ''} onClick={() => changeTab('crew')}>
+                Crew
+              </button>
+              <button type="button" className={tab === 'roster' ? 'is-active' : ''} onClick={() => changeTab('roster')}>
+                Roster
+              </button>
+            </div>
+          )}
 
           {tab === 'crew' ? (
             <MenuDropdown
@@ -553,14 +566,16 @@ export default function Crew() {
             align="right"
           />
 
-          <button
-            type="button"
-            className="btn btn--primary crew-add-btn"
-            onClick={() => setFlow({ type: 'addNewChooser' })}
-          >
-            <Icon.Plus width={16} height={16} />
-            Add New
-          </button>
+          {!READ_ONLY && (
+            <button
+              type="button"
+              className="btn btn--primary crew-add-btn"
+              onClick={() => setFlow({ type: 'addNewChooser' })}
+            >
+              <Icon.Plus width={16} height={16} />
+              Add New
+            </button>
+          )}
         </div>
 
         <div className="crew-table-wrap" ref={tableWrapRef}>
@@ -571,7 +586,7 @@ export default function Crew() {
                 <col style={{ width: '44%' }} />
                 <col style={{ width: '12%' }} />
                 <col style={{ width: '14%' }} />
-                <col style={{ width: '12%' }} />
+                {!READ_ONLY && <col style={{ width: '12%' }} />}
               </colgroup>
               <thead>
                 <tr>
@@ -584,19 +599,19 @@ export default function Crew() {
                       <ArrowDown size={14} weight="regular" />
                     </span>
                   </th>
-                  <th className="crew-center">Action</th>
+                  {!READ_ONLY && <th className="crew-center">Action</th>}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="crew-empty-cell">
+                    <td colSpan={READ_ONLY ? 4 : 5} className="crew-empty-cell">
                       Loading crew data...
                     </td>
                   </tr>
                 ) : visibleCrewRows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="crew-empty-cell">
+                    <td colSpan={READ_ONLY ? 4 : 5} className="crew-empty-cell">
                       No crews found
                     </td>
                   </tr>
@@ -665,17 +680,19 @@ export default function Crew() {
                       <td className="crew-center">
                         <StatusPill status={row.status} />
                       </td>
-                      <td className="crew-center">
-                        <button
-                          type="button"
-                          className="btn btn--primary crew-edit-action-btn"
-                          onClick={() => setFlow({ type: 'editCrew', crew: row })}
-                        >
-                          <PenIcon size={16} />
-                          <span>Edit</span>
-                          {row.status === 'Unassigned' && <span className="crew-edit-btn__dot" />}
-                        </button>
-                      </td>
+                      {!READ_ONLY && (
+                        <td className="crew-center">
+                          <button
+                            type="button"
+                            className="btn btn--primary crew-edit-action-btn"
+                            onClick={() => setFlow({ type: 'editCrew', crew: row })}
+                          >
+                            <PenIcon size={16} />
+                            <span>Edit</span>
+                            {row.status === 'Unassigned' && <span className="crew-edit-btn__dot" />}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -689,7 +706,7 @@ export default function Crew() {
                 <col style={{ width: '18%' }} />
                 <col style={{ width: '14%' }} />
                 <col style={{ width: '14%' }} />
-                <col style={{ width: '12%' }} />
+                {!READ_ONLY && <col style={{ width: '12%' }} />}
               </colgroup>
               <thead>
                 <tr>
@@ -698,19 +715,19 @@ export default function Crew() {
                   <th className="crew-center">Role</th>
                   <th className="crew-center">Hourly Rate ($)</th>
                   <th className="crew-center">Status</th>
-                  <th className="crew-center">Action</th>
+                  {!READ_ONLY && <th className="crew-center">Action</th>}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="crew-empty-cell">
+                    <td colSpan={READ_ONLY ? 5 : 6} className="crew-empty-cell">
                       Loading roster data...
                     </td>
                   </tr>
                 ) : visibleRosterRows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="crew-empty-cell">
+                    <td colSpan={READ_ONLY ? 5 : 6} className="crew-empty-cell">
                       No members found
                     </td>
                   </tr>
@@ -753,16 +770,18 @@ export default function Crew() {
                       <td className="crew-center">
                         <StatusPill status={row.status} />
                       </td>
-                      <td className="crew-center">
-                        <button
-                          type="button"
-                          className="btn btn--primary crew-edit-action-btn"
-                          onClick={() => setFlow({ type: 'editMember', member: row })}
-                        >
-                          <PenIcon size={16} />
-                          <span>Edit</span>
-                        </button>
-                      </td>
+                      {!READ_ONLY && (
+                        <td className="crew-center">
+                          <button
+                            type="button"
+                            className="btn btn--primary crew-edit-action-btn"
+                            onClick={() => setFlow({ type: 'editMember', member: row })}
+                          >
+                            <PenIcon size={16} />
+                            <span>Edit</span>
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -942,8 +961,12 @@ export default function Crew() {
           crew={activeCrewLead}
           note=""
           onDone={() => setFlow({ type: 'none' })}
-          onChangeCrew={() => setFlow({ type: 'assignCrew', crewId: activeCrew.id, jobIndex: flow.jobIndex })}
-          onRemoveCrew={() => handleRemoveCrewFromJob(activeJob.id, activeCrew.id)}
+          onChangeCrew={
+            READ_ONLY
+              ? undefined
+              : () => setFlow({ type: 'assignCrew', crewId: activeCrew.id, jobIndex: flow.jobIndex })
+          }
+          onRemoveCrew={READ_ONLY ? undefined : () => handleRemoveCrewFromJob(activeJob.id, activeCrew.id)}
         />
       )}
 

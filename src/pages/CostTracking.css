@@ -920,6 +920,15 @@
   background: var(--field-bg);
 }
 
+/* Read-only cell: same look, but not clickable. */
+.ct-grid-cell__value--static {
+  cursor: default;
+}
+
+.ct-grid-cell__value--static:hover {
+  background: none;
+}
+
 .ct-job-title {
   overflow: hidden;
   text-overflow: ellipsis;

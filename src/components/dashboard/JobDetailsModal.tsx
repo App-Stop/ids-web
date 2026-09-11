@@ -21,7 +21,8 @@ export default function JobDetailsModal({
   crew: UnassignedCrew | null
   note: string
   onDone: () => void
-  onChangeCrew: () => void
+  /** Omit to hide the Change/Assign Crew button (read-only views). */
+  onChangeCrew?: () => void
   onRemoveCrew?: () => void
   onDeleteJob?: () => void
   /** When provided, the note section becomes editable inside the modal. */
@@ -238,9 +239,11 @@ export default function JobDetailsModal({
           <span />
         )}
         <div className="modal-actions__group">
-          <button type="button" className="btn btn--outline" onClick={onChangeCrew}>
-            {crew ? 'Change Crew' : 'Assign Crew'}
-          </button>
+          {onChangeCrew && (
+            <button type="button" className="btn btn--outline" onClick={onChangeCrew}>
+              {crew ? 'Change Crew' : 'Assign Crew'}
+            </button>
+          )}
           <button type="button" className="btn btn--primary" onClick={onDone}>
             Done
           </button>
