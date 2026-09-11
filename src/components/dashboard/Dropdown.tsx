@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+
+/** Gap kept between an open menu and the edge of the viewport. */
+const VIEWPORT_GUTTER = 8
 import { createPortal } from 'react-dom'
 import { Icon } from './icons'
 
@@ -69,6 +72,17 @@ export default function Dropdown({
     setOpen((o) => !o)
   }
 
+  // The menu is as wide as its longest option, so opened from a trigger near
+  // the right edge it would run off-screen. Once it has rendered, pull it back
+  // left until it fits — before paint, so it never flashes in the wrong place.
+  useLayoutEffect(() => {
+    if (!open || !menuRef.current) return
+    const width = menuRef.current.getBoundingClientRect().width
+    const maxLeft = window.innerWidth - VIEWPORT_GUTTER - width
+    const clamped = Math.max(VIEWPORT_GUTTER, Math.min(coords.left, maxLeft))
+    if (clamped !== coords.left) setCoords((c) => ({ ...c, left: clamped }))
+  }, [open, coords.left])
+
   const [localSearch, setLocalSearch] = useState('')
   const search = searchValue !== undefined ? searchValue : localSearch
 
@@ -120,6 +134,7 @@ export default function Dropdown({
               bottom: coords.bottom !== undefined ? `${coords.bottom}px` : undefined,
               left: `${coords.left}px`,
               minWidth: `${coords.minWidth}px`,
+              maxWidth: `calc(100vw - ${VIEWPORT_GUTTER * 2}px)`,
               zIndex: 99999,
               background: '#ffffff',
               borderRadius: '8px',

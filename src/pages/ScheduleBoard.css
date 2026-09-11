@@ -85,16 +85,73 @@
   gap: 0.45rem;
 }
 
-.sb-jump__input {
+.sb-jump__pop {
   position: absolute;
   top: calc(100% + 0.4rem);
   left: 0;
   z-index: 100;
-  border: 1px solid var(--border);
-  border-radius: 5px;
+  margin: 0;
   padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   background: var(--card-bg);
   box-shadow: var(--shadow);
+}
+
+.sb-jump__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.sb-jump__text {
+  width: 130px;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 0 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--field-bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.sb-jump__text:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: -1px;
+}
+
+.sb-jump__cal {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 8px;
+}
+
+.sb-jump__go {
+  height: 34px;
+  padding: 0 0.9rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+/* Only here so the calendar button can open the native picker. */
+.sb-jump__native {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sb-jump__error {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: #ef4444;
 }
 
 .sb-search {
@@ -1546,6 +1603,16 @@ td.sb-col-divider {
 }
 
 /* --- Monthly: one lane per concurrent crew ------------------------------- */
+
+/* Add strip under a monthly day's bars — kept clear of the lanes above it. */
+.sb-cell--compact .sb-add--month {
+  top: auto;
+  bottom: calc(4px * var(--table-zoom, 1));
+  left: 4px;
+  right: 4px;
+  height: calc(16px * var(--table-zoom, 1));
+  border-radius: 6px;
+}
 
 .sb-cell--compact .sb-pill-wrap {
   --sb-lane: 0;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MagnifyingGlass, Plus, CalendarBlank } from '@phosphor-icons/react'
+import { MagnifyingGlass, Plus, CalendarBlank, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Dropdown from '../components/dashboard/Dropdown'
 import MenuDropdown from '../components/dashboard/MenuDropdown'
@@ -27,6 +27,7 @@ import {
   type UnassignedCrew,
 } from '../lib/dashboardData'
 import './Dashboard.css'
+import './JobsManagement.css'
 import './CostTracking.css'
 
 type ViewMode = 'jobs' | 'crew'
@@ -213,6 +214,29 @@ function getCurrentWeekRange() {
 
 const DEFAULT_RANGE = getCurrentWeekRange()
 
+/**
+ * The range one step back (`dir` = -1) or forward (+1): a week, a calendar
+ * month, or — for a custom range — a block of the same length.
+ */
+function shiftRange(range: RangeMode, startDate: string, endDate: string, dir: 1 | -1) {
+  const start = parseIsoDate(startDate)
+  if (range === 'Weekly') {
+    const weekStart = addDays(getMonday(start), 7 * dir)
+    return { start: toISO(weekStart), end: toISO(addDays(weekStart, 6)) }
+  }
+  if (range === 'Monthly') {
+    const year = start.getFullYear()
+    const month = start.getMonth() + dir
+    return { start: toISO(new Date(year, month, 1)), end: toISO(new Date(year, month + 1, 0)) }
+  }
+  const [from, to] = getRangeBounds('Custom Range', startDate, endDate) ?? [startDate, endDate]
+  const length = Math.round((parseIsoDate(to).getTime() - parseIsoDate(from).getTime()) / 86_400_000) + 1
+  return {
+    start: toISO(addDays(parseIsoDate(from), length * dir)),
+    end: toISO(addDays(parseIsoDate(to), length * dir)),
+  }
+}
+
 function toDetailsJob(row: JobCostRow, catalog: Job[]): Job {
   const match = catalog.find((j) => j.name === row.jobName)
   const num = row.id.replace(/[^0-9]/g, '') || '1'
@@ -254,6 +278,14 @@ export default function CostTracking() {
   const { data: jobsList = [] } = useJobsList({ limit: 100 })
   const { invalidateAll } = useInvalidateServerState()
 
+  // Any change to the range, view or filters snaps back to page 1 — the stored
+  // page is keyed to them rather than reset in an effect.
+  const [limit, setLimit] = useState(20)
+  const filterKey = `${range}|${startDate}|${endDate}|${tab}|${search}|${jobFilter ?? ''}|${crewFilter ?? ''}|${limit}`
+  const [pageState, setPageState] = useState({ key: filterKey, page: 1 })
+  const page = pageState.key === filterKey ? pageState.page : 1
+  const setPage = (next: number) => setPageState({ key: filterKey, page: next })
+
   const reportParams = useMemo<CostTrackingReportParams>(() => {
       let dateFilterParam: 'allTime' | 'custom' | 'weekly' | 'monthly' = 'allTime'
       if (range === 'Weekly') dateFilterParam = 'weekly'
@@ -263,7 +295,8 @@ export default function CostTracking() {
       const params: CostTrackingReportParams = {
         dateFilter: dateFilterParam,
         groupBy: tab === 'jobs' ? 'jobs' : 'crews',
-        limit: 100,
+        page,
+        limit,
       }
 
       if (dateFilterParam === 'custom') {
@@ -284,9 +317,12 @@ export default function CostTracking() {
       }
 
       return params
-  }, [range, startDate, endDate, tab, search, jobFilter, crewFilter])
+  }, [range, startDate, endDate, tab, search, jobFilter, crewFilter, page, limit])
 
   const reportQuery = useCostTrackingReport(reportParams)
+  const pagination = reportQuery.data?.pagination
+  const totalPages = Math.max(pagination?.totalPages ?? 1, 1)
+  const currentPage = pagination?.page ?? page
   const reportData: CostTrackingReportData | null = reportQuery.data?.success
     ? reportQuery.data.data
     : null
@@ -502,6 +538,12 @@ export default function CostTracking() {
     ? `${formatToolbarDate(parseIsoDate(rangeBounds[0]))} and ${formatToolbarDate(parseIsoDate(rangeBounds[1]))}`
     : null
 
+  function stepRange(dir: 1 | -1) {
+    const next = shiftRange(range, startDate, endDate, dir)
+    setStartDate(next.start)
+    setEndDate(next.end)
+  }
+
   function clearFilters() {
     setSearch('')
     if (tab === 'jobs') {
@@ -594,15 +636,28 @@ export default function CostTracking() {
               <span className="ct-range-label" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted)', alignSelf: 'center', marginLeft: '0.5rem' }}>
                 {range === 'Weekly' ? 'Week of:' : range === 'Monthly' ? 'Month:' : 'From:'}
               </span>
+              <button
+                type="button"
+                className="icon-btn icon-btn--bordered ct-nav-btn"
+                onClick={() => stepRange(-1)}
+                aria-label={`Previous ${range === 'Weekly' ? 'week' : range === 'Monthly' ? 'month' : 'range'}`}
+              >
+                <CaretLeft size={16} weight="bold" />
+              </button>
               {range === 'Monthly' ? (
-                <div className="ct-dd ct-dd--month" style={{ width: '140px', marginLeft: '0.5rem', display: 'inline-block' }}>
+                <div className="ct-dd ct-dd--month" style={{ width: '170px', display: 'inline-block' }}>
                   <Dropdown
                     value={String(parseIsoDate(startDate).getMonth() + 1)}
                     options={MONTH_OPTIONS}
-                    selectedLabel={MONTH_OPTIONS.find(m => m.id === String(parseIsoDate(startDate).getMonth() + 1))?.label ?? 'January'}
+                    selectedLabel={`${
+                      MONTH_OPTIONS.find((m) => m.id === String(parseIsoDate(startDate).getMonth() + 1))?.label ?? 'January'
+                    } ${parseIsoDate(startDate).getFullYear()}`}
                     onChange={(mId) => {
-                      const newMonth = String(mId).padStart(2, '0')
-                      setStartDate(`2026-${newMonth}-01`)
+                      // Keep the year the arrows have moved to.
+                      const year = parseIsoDate(startDate).getFullYear()
+                      const month = Number(mId) - 1
+                      setStartDate(toISO(new Date(year, month, 1)))
+                      setEndDate(toISO(new Date(year, month + 1, 0)))
                     }}
                     placeholder="Select Month"
                   />
@@ -616,6 +671,14 @@ export default function CostTracking() {
                   <DateField value={endDate} onChange={setEndDate} className="ct-range-date" />
                 </>
               )}
+              <button
+                type="button"
+                className="icon-btn icon-btn--bordered ct-nav-btn"
+                onClick={() => stepRange(1)}
+                aria-label={`Next ${range === 'Weekly' ? 'week' : range === 'Monthly' ? 'month' : 'range'}`}
+              >
+                <CaretRight size={16} weight="bold" />
+              </button>
             </>
           )}
 
@@ -848,17 +911,6 @@ export default function CostTracking() {
                     {weekDays.map((day) => {
                       const dayStr = toISO(day)
                       const value = row.dailyCosts ? row.dailyCosts[dayStr] : null
-                      const jobStartIso = row.date ? row.date.slice(0, 10) : null
-                      const isBeforeJobStart = Boolean(jobStartIso && dayStr < jobStartIso)
-
-                      if (isBeforeJobStart) {
-                        return (
-                          <td
-                            key={day.toISOString()}
-                            className="ct-grid-cell ct-grid-cell--disabled"
-                          />
-                        )
-                      }
 
                       return (
                         <td key={day.toISOString()} className="ct-grid-cell">
@@ -919,6 +971,48 @@ export default function CostTracking() {
               </tbody>
             </table>
           )}
+          </div>
+        </div>
+
+        <div className="jm-pagination-bar">
+          <div className="jm-pagination-limit">
+            <span>Show:</span>
+            <Dropdown
+              placement="top"
+              value={String(limit)}
+              onChange={(v) => setLimit(Number(v))}
+              options={[
+                { id: '10', label: '10 per page' },
+                { id: '20', label: '20 per page' },
+                { id: '50', label: '50 per page' },
+                { id: '100', label: '100 per page' },
+              ]}
+            />
+          </div>
+
+          <div className="jm-pagination-controls">
+            <span className="jm-pagination-info">
+              Page {currentPage} of {totalPages}
+              {pagination ? ` · ${pagination.totalCount} ${tab === 'jobs' ? 'Jobs' : 'Crews'}` : ''}
+            </span>
+            <div className="jm-pagination-btns">
+              <button
+                type="button"
+                className="btn btn--outline jm-page-btn"
+                disabled={loadingReport || currentPage <= 1}
+                onClick={() => setPage(Math.max(1, currentPage - 1))}
+              >
+                <CaretLeft size={16} /> Previous
+              </button>
+              <button
+                type="button"
+                className="btn btn--outline jm-page-btn"
+                disabled={loadingReport || currentPage >= totalPages}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                Next <CaretRight size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </main>

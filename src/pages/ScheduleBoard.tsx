@@ -333,13 +333,41 @@ function buildRowMeta(row: ScheduleJobRow, days: string[], rangeEnd: string): Ro
 const WEEKLY_CHIP_H = 36
 const WEEKLY_ADD_H = 20
 const WEEKLY_CELL_PAD = 16
+/** Monthly: strip under the bars that holds a day's Add button. */
+const MONTHLY_ADD_H = 20
 
 function rowHeight(meta: RowMeta, view: ViewMode, zoom: number) {
   const px =
     view === 'monthly'
-      ? Math.max(meta.laneCount, 1) * 22 + 20
+      ? Math.max(meta.laneCount, 1) * 22 + 10 + MONTHLY_ADD_H
       : meta.maxPerDay * WEEKLY_CHIP_H + WEEKLY_ADD_H + WEEKLY_CELL_PAD
   return Math.round(px * zoom)
+}
+
+/**
+ * A date typed into "Jump to date": MM-DD-YYYY (the board's own format),
+ * M/D/YY, or YYYY-MM-DD, with -, / or . between parts. Null if it isn't a
+ * real calendar day.
+ */
+function parseTypedDate(input: string): Date | null {
+  const s = input.trim()
+  let y: number
+  let m: number
+  let d: number
+  const isoMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/)
+  if (isoMatch) {
+    y = Number(isoMatch[1])
+    m = Number(isoMatch[2])
+    d = Number(isoMatch[3])
+  } else {
+    const usMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/)
+    if (!usMatch) return null
+    m = Number(usMatch[1])
+    d = Number(usMatch[2])
+    y = Number(usMatch[3]) + (usMatch[3].length === 2 ? 2000 : 0)
+  }
+  const date = new Date(y, m - 1, d)
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d ? date : null
 }
 
 // --- Resize handle (left = start edge, right = end edge) -------------------
@@ -681,6 +709,10 @@ export default function ScheduleBoard() {
   const [search, setSearch] = useState('')
   const [jobFilter, setJobFilter] = useState<string | null>(null)
   const [jumpOpen, setJumpOpen] = useState(false)
+  const [jumpText, setJumpText] = useState('')
+  const [jumpError, setJumpError] = useState<string | null>(null)
+  const jumpRef = useRef<HTMLDivElement>(null)
+  const jumpPickerRef = useRef<HTMLInputElement>(null)
   const [metaVisible, setMetaVisible] = useState(true)
   const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
   const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
@@ -867,6 +899,36 @@ export default function ScheduleBoard() {
   }
 
   const rangeLabel = formatRangeLabel(visibleDays)
+
+  // The jump popover closes on any click outside it.
+  useEffect(() => {
+    if (!jumpOpen) return
+    function handleDown(e: MouseEvent) {
+      if (!jumpRef.current?.contains(e.target as Node)) setJumpOpen(false)
+    }
+    document.addEventListener('mousedown', handleDown)
+    return () => document.removeEventListener('mousedown', handleDown)
+  }, [jumpOpen])
+
+  function toggleJump() {
+    setJumpText('')
+    setJumpError(null)
+    setJumpOpen((o) => !o)
+  }
+
+  function jumpTo(picked: Date) {
+    setAnchor(viewMode === 'weekly' ? getMonday(picked) : picked)
+    setJumpOpen(false)
+  }
+
+  function submitJump() {
+    const picked = parseTypedDate(jumpText)
+    if (!picked) {
+      setJumpError('Enter a date as MM-DD-YYYY.')
+      return
+    }
+    jumpTo(picked)
+  }
 
   function goPrev() {
     setAnchor(addDays(anchor, viewMode === 'weekly' ? -7 : -30))
@@ -1360,25 +1422,63 @@ export default function ScheduleBoard() {
             <CaretRight size={16} weight='bold'/>
           </button>
 
-          <div className="sb-jump">
-            <button type="button" className="btn btn--outline sb-jump__btn" onClick={() => setJumpOpen((o) => !o)}>
+          <div className="sb-jump" ref={jumpRef}>
+            <button type="button" className="btn btn--outline sb-jump__btn" onClick={toggleJump}>
               <CalendarBlank size={16} weight="regular" />
               Jump to date
             </button>
             {jumpOpen && (
-              <input
-                type="date"
-                className="sb-jump__input"
-                autoFocus
-                onChange={(e) => {
-                  if (e.target.value) {
-                    const picked = fromISO(e.target.value)
-                    setAnchor(viewMode === 'weekly' ? getMonday(picked) : picked)
-                    setJumpOpen(false)
-                  }
+              <form
+                className="sb-jump__pop"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  submitJump()
                 }}
-                onBlur={() => setJumpOpen(false)}
-              />
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setJumpOpen(false)
+                }}
+              >
+                <div className="sb-jump__row">
+                  <input
+                    type="text"
+                    className="sb-jump__text"
+                    placeholder="MM-DD-YYYY"
+                    autoFocus
+                    value={jumpText}
+                    onChange={(e) => {
+                      setJumpText(e.target.value)
+                      setJumpError(null)
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="icon-btn icon-btn--bordered sb-jump__cal"
+                    aria-label="Pick from calendar"
+                    onClick={() => {
+                      const input = jumpPickerRef.current
+                      if (!input) return
+                      if ('showPicker' in input && typeof input.showPicker === 'function') input.showPicker()
+                      else input.click()
+                    }}
+                  >
+                    <CalendarBlank size={16} weight="regular" />
+                  </button>
+                  <input
+                    ref={jumpPickerRef}
+                    type="date"
+                    className="sb-jump__native"
+                    tabIndex={-1}
+                    aria-hidden
+                    onChange={(e) => {
+                      if (e.target.value) jumpTo(fromISO(e.target.value))
+                    }}
+                  />
+                  <button type="submit" className="btn btn--primary sb-jump__go">
+                    Go
+                  </button>
+                </div>
+                {jumpError && <p className="sb-jump__error">{jumpError}</p>}
+              </form>
             )}
           </div>
 
@@ -1624,12 +1724,19 @@ export default function ScheduleBoard() {
                               iso <= dropPreview.end
 
                             // Past days look like any other day but can't take new work.
+                            // Monthly: an empty day is one big add target; a
+                            // day with bars keeps a strip under them so another
+                            // crew can still be added alongside.
                             const addButton = isPast ? null : compact ? (
                               <button
                                 type="button"
-                                className="sb-empty"
+                                className={covering.length > 0 ? 'sb-add sb-add--month' : 'sb-empty'}
+                                title="Add"
+                                aria-label="Add crew"
                                 onClick={() => openAssign(row, iso)}
-                              />
+                              >
+                                <Icon.Plus width={12} height={12} />
+                              </button>
                             ) : (
                               <button
                                 type="button"
@@ -1738,7 +1845,7 @@ export default function ScheduleBoard() {
                                     />
                                   )
                                 })}
-                                {covering.length === 0 ? addButton : null}
+                                {addButton}
                               </DayCell>
                             )
                           })}
