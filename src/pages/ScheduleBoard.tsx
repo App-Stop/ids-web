@@ -150,9 +150,7 @@ const JOBNO_W = 72
 const JOB_W = 230
 const JOB_W_WEEKLY = 180
 const DIVIDER_W = 10
-const META_WIDTHS = [130, 130, 100] as const
 /** Fallback day width when monthly + separator open if we couldn't measure. */
-const MONTH_DAY_META_W = 56
 
 /** Day-string bounds of a stint, clipped to the visible range.
  *  A null endDate is open-ended, so it runs to the end of whatever we render. */
@@ -713,10 +711,8 @@ export default function ScheduleBoard() {
   const [jumpError, setJumpError] = useState<string | null>(null)
   const jumpRef = useRef<HTMLDivElement>(null)
   const jumpPickerRef = useRef<HTMLInputElement>(null)
-  const [metaVisible, setMetaVisible] = useState(true)
   const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
   const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
-  const [lockedMonthDayW, setLockedMonthDayW] = useState<number | null>(null)
   const daysTableRef = useRef<HTMLTableElement>(null)
   const boardScrollRef = useRef<HTMLDivElement>(null)
 
@@ -739,20 +735,8 @@ export default function ScheduleBoard() {
 
   const compact = viewMode === 'monthly'
   const jobColW = viewMode === 'weekly' ? JOB_W_WEEKLY : JOB_W
-  const dayW =
-    viewMode === 'weekly'
-      ? isPhone
-        ? 72
-        : undefined
-      : metaVisible
-        ? isPhone
-          ? 42
-          : lockedMonthDayW ?? MONTH_DAY_META_W
-        : undefined
-  const equalDayColPct =
-    !isPhone && ((viewMode === 'weekly') || (viewMode === 'monthly' && !metaVisible))
-      ? `${100 / Math.max(visibleDays.length, 1)}%`
-      : undefined
+  const dayW = viewMode === 'weekly' && isPhone ? 72 : undefined
+  const equalDayColPct = !isPhone ? `${100 / Math.max(visibleDays.length, 1)}%` : undefined
 
   useEffect(() => {
     function handleResize() {
@@ -866,36 +850,17 @@ export default function ScheduleBoard() {
     if (viewMode !== 'weekly') return
     const scroller = boardScrollRef.current
     if (scroller) scroller.scrollLeft = 0
-  }, [viewMode, sidebarCollapsed, metaVisible, zoom])
+  }, [viewMode, sidebarCollapsed, zoom])
 
   function openMonthly() {
     setViewMode('monthly')
     setSidebarCollapsed(true)
-    setLockedMonthDayW(metaVisible ? MONTH_DAY_META_W : null)
   }
 
-  /** Weekly has room for the full left-hand table, so open it with the meta columns showing. */
   function openWeekly() {
     setViewMode('weekly')
     setAnchor((a) => getMonday(a))
-    setMetaVisible(true)
     setSidebarCollapsed(true)
-    setLockedMonthDayW(null)
-  }
-
-  function toggleMeta() {
-    if (!metaVisible) {
-      if (viewMode === 'monthly') {
-        const th = daysTableRef.current?.querySelector<HTMLElement>('thead th')
-        const measured = th ? Math.round(th.getBoundingClientRect().width) : 0
-        setLockedMonthDayW(measured > 0 ? measured : MONTH_DAY_META_W)
-      }
-      setSidebarCollapsed(true)
-      setMetaVisible(true)
-      return
-    }
-    setMetaVisible(false)
-    setLockedMonthDayW(null)
   }
 
   const rangeLabel = formatRangeLabel(visibleDays)
@@ -1522,7 +1487,7 @@ export default function ScheduleBoard() {
           onDragEnd={handleDragEnd}
         >
           <div
-            className={`sb-board${compact ? ' sb-board--monthly' : ''}${metaVisible ? ' sb-board--meta' : ''}${
+            className={`sb-board${compact ? ' sb-board--monthly' : ''}${
               draggingAssignment ? ' is-dragging' : ''
             }`}
           >
@@ -1538,25 +1503,17 @@ export default function ScheduleBoard() {
                   <colgroup>
                     <col style={{ width: JOBNO_W * zoom }} />
                     <col style={{ width: jobColW * zoom }} />
-                    {metaVisible && META_WIDTHS.map((w, i) => <col key={i} style={{ width: w * zoom }} />)}
                     <col style={{ width: DIVIDER_W * zoom }} />
                   </colgroup>
                   <thead>
                     <tr>
                       <th className="sb-col-jobno">Job ID</th>
                       <th className="sb-col-job">Job</th>
-                      {metaVisible && (
-                        <>
-                          <th className="sb-col-meta">General Contractor</th>
-                          <th className="sb-col-meta">GC Super</th>
-                          <th className="sb-col-meta sb-col-meta--contract">Contract</th>
-                        </>
-                      )}
                       <th className="sb-col-divider" />
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row, rowIndex) => {
+                    {rows.map((row) => {
                       const meta = rowMeta.get(row._id)
                       // The row's colour key is every crew booked on it in this
                       // range, not just whoever happens to be there today.
@@ -1602,41 +1559,10 @@ export default function ScheduleBoard() {
                                   </span>
                                 )}
                               </span>
-                              <Icon.ChevronRight width={14} height={14} />
+                              
                             </div>
                           </td>
-                          {metaVisible && (
-                            <>
-                              <td className="sb-col-meta">{row.generalContractor}</td>
-                              <td className="sb-col-meta">{row.gcSuper}</td>
-                              <td className="sb-col-meta sb-col-meta--contract">
-                                ${(row.contractAmount ?? 0).toLocaleString('en-US')}
-                              </td>
-                            </>
-                          )}
-                          <td className="sb-col-divider">
-                            <div className="sb-divider-inner">
-                              <button
-                                type="button"
-                                className={`sb-divider-btn${metaVisible ? ' is-open' : ''}${
-                                  rowIndex === Math.floor((rows.length - 1) / 2) ? ' is-visible' : ''
-                                }`}
-                                onClick={toggleMeta}
-                                aria-label={metaVisible ? 'Hide job details' : 'Show job details'}
-                              >
-                                <span className="sb-divider-btn__dots" aria-hidden>
-                                  <i /><i /><i />
-                                </span>
-                                <span className="sb-divider-btn__arrow" aria-hidden>
-                                  {metaVisible ? (
-                                    <Icon.ArrowLeft width={14} height={14} />
-                                  ) : (
-                                    <Icon.ArrowRight width={14} height={14} />
-                                  )}
-                                </span>
-                              </button>
-                            </div>
-                          </td>
+                          <td className="sb-col-divider" />
                         </tr>
                       )
                     })}
@@ -1842,6 +1768,7 @@ export default function ScheduleBoard() {
                                       onOpenNote={(dateIso) =>
                                         setFlow({ type: 'dayNote', jobId: row._id, date: dateIso })
                                       }
+                                      onHover={setCrewHover}
                                     />
                                   )
                                 })}

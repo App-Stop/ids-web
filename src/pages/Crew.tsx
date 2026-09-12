@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, PenIcon } from '@phosphor-icons/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { PenIcon } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Avatar from '../components/dashboard/Avatar'
 import { Icon } from '../components/dashboard/icons'
@@ -23,7 +23,7 @@ import {
   useJobMutations,
 } from '../hooks/useQueryHooks'
 import { queryKeys } from '../lib/queryKeys'
-import { getCrewById, type CrewSummaryItem } from '../api/crewApi'
+import { type CrewSummaryItem } from '../api/crewApi'
 import { getCrewAssignments, type JobItem } from '../api/jobApi'
 import { getErrorMessage } from '../lib/errors'
 import type { Job, UnassignedCrew } from '../lib/dashboardData'
@@ -182,8 +182,6 @@ export default function Crew() {
   const [rosterPage, setRosterPage] = useState(1)
   const [rosterLimit, setRosterLimit] = useState(20)
 
-  const [memberNames, setMemberNames] = useState<Record<string, string[]>>({})
-  const [jobHover, setJobHover] = useState<{ x: number; y: number; crewId: string } | null>(null)
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
   const tableWrapRef = useRef<HTMLDivElement>(null)
   useClickDragScroll(tableWrapRef)
@@ -286,33 +284,6 @@ export default function Crew() {
   // Refreshing after a write is one cache invalidation now, instead of a
   // hand-rolled re-fetch of each affected list.
   const refreshServerState = invalidateAll
-
-  /**
-   * GET /crews/summary only returns a member count, so names load on demand.
-   * fetchQuery keeps the per-crew detail in the same cache as everything else,
-   * so re-opening a tooltip after a page revisit costs nothing.
-   */
-  const loadMemberNames = useCallback(
-    async (crewId: string) => {
-      if (memberNames[crewId]) return
-      try {
-        const res = await queryClient.fetchQuery({
-          queryKey: queryKeys.crews.detail(crewId),
-          queryFn: () => getCrewById(crewId),
-        })
-        const members = res.data?.members as Array<{ firstName?: string; lastName?: string }> | undefined
-        const names = Array.isArray(members)
-          ? members
-              .map((m) => (m && typeof m === 'object' ? `${m.firstName ?? ''} ${m.lastName ?? ''}`.trim() : ''))
-              .filter(Boolean)
-          : []
-        setMemberNames((prev) => ({ ...prev, [crewId]: names }))
-      } catch {
-        setMemberNames((prev) => ({ ...prev, [crewId]: [] }))
-      }
-    },
-    [memberNames, queryClient],
-  )
 
   const jobMenuOptions = useMemo(
     () => jobList.map((j) => ({ id: j._id, label: j.name || `Job #${j.jobIdNumber}` })),
@@ -453,8 +424,6 @@ export default function Crew() {
     }
   }
 
-  const hoverNames = jobHover ? (memberNames[jobHover.crewId] ?? null) : null
-
   return (
     <div className="dash">
       <Sidebar active="Crew Management" />
@@ -566,52 +535,39 @@ export default function Crew() {
             align="right"
           />
 
-          {!READ_ONLY && (
-            <button
-              type="button"
-              className="btn btn--primary crew-add-btn"
-              onClick={() => setFlow({ type: 'addNewChooser' })}
-            >
-              <Icon.Plus width={16} height={16} />
-              Add New
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn--primary crew-add-btn"
+            onClick={() => setFlow({ type: 'createCrew' })}
+          >
+            <Icon.Plus width={16} height={16} />
+            Add Crew
+          </button>
         </div>
 
         <div className="crew-table-wrap" ref={tableWrapRef}>
           {tab === 'crew' ? (
             <table className="crew-table crew-table--leads">
               <colgroup>
-                <col style={{ width: '18%' }} />
-                <col style={{ width: '44%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '14%' }} />
-                {!READ_ONLY && <col style={{ width: '12%' }} />}
+                <col style={{ width: '70%' }} />
+                <col style={{ width: '30%' }} />
               </colgroup>
               <thead>
                 <tr>
                   <th>Crew Name</th>
-                  <th>Job Name</th>
-                  <th className="crew-center">Workers</th>
-                  <th className="crew-center">
-                    <span className="crew-th-sort">
-                      Status
-                      <ArrowDown size={14} weight="regular" />
-                    </span>
-                  </th>
-                  {!READ_ONLY && <th className="crew-center">Action</th>}
+                  <th className="crew-center">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={READ_ONLY ? 4 : 5} className="crew-empty-cell">
+                    <td colSpan={2} className="crew-empty-cell">
                       Loading crew data...
                     </td>
                   </tr>
                 ) : visibleCrewRows.length === 0 ? (
                   <tr>
-                    <td colSpan={READ_ONLY ? 4 : 5} className="crew-empty-cell">
+                    <td colSpan={2} className="crew-empty-cell">
                       No crews found
                     </td>
                   </tr>
@@ -639,60 +595,17 @@ export default function Crew() {
                           {row.name}
                         </div>
                       </td>
-                      <td>
-                        {row.jobs.length === 0 ? (
-                          <span className="crew-job-cell">
-                            <span className="crew-job-cell__unassigned">Unassigned</span>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            className="crew-job-cell"
-                            onClick={() =>
-                              row.jobs.length > 1
-                                ? setFlow({ type: 'multipleJobs', crew: row })
-                                : setFlow({ type: 'viewJob', crewId: row.id, jobIndex: 0 })
-                            }
-                          >
-                            <span className="crew-job-cell__name">{row.jobs[0].jobName}</span>
-                            <span className="crew-job-cell__tail">
-                              {row.jobs.length > 1 && (
-                                <span className="crew-job-cell__more">+{row.jobs.length - 1}</span>
-                              )}
-                              <Icon.ChevronRight width={14} height={14} />
-                            </span>
-                          </button>
-                        )}
-                      </td>
                       <td className="crew-center">
-                        <span
-                          className="crew-workers-cell"
-                          onMouseEnter={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            setJobHover({ x: rect.left + rect.width / 2, y: rect.bottom + 8, crewId: row.id })
-                            loadMemberNames(row.id)
-                          }}
-                          onMouseLeave={() => setJobHover(null)}
+                        <button
+                          type="button"
+                          className="btn btn--primary crew-edit-action-btn"
+                          onClick={() => setFlow({ type: 'editCrew', crew: row })}
                         >
-                          {row.workers}
-                        </span>
+                          <PenIcon size={16} />
+                          <span>Edit</span>
+                          {row.status === 'Unassigned' && <span className="crew-edit-btn__dot" />}
+                        </button>
                       </td>
-                      <td className="crew-center">
-                        <StatusPill status={row.status} />
-                      </td>
-                      {!READ_ONLY && (
-                        <td className="crew-center">
-                          <button
-                            type="button"
-                            className="btn btn--primary crew-edit-action-btn"
-                            onClick={() => setFlow({ type: 'editCrew', crew: row })}
-                          >
-                            <PenIcon size={16} />
-                            <span>Edit</span>
-                            {row.status === 'Unassigned' && <span className="crew-edit-btn__dot" />}
-                          </button>
-                        </td>
-                      )}
                     </tr>
                   ))
                 )}
@@ -879,22 +792,6 @@ export default function Crew() {
           }}
           onRemove={handleRemoveCrew}
         />
-      )}
-
-      {jobHover && (
-        <div className="crew-job-tooltip crew-job-tooltip--fixed" style={{ left: jobHover.x, top: jobHover.y }}>
-          {hoverNames === null ? (
-            <span className="crew-job-tooltip__item">Loading…</span>
-          ) : hoverNames.length === 0 ? (
-            <span className="crew-job-tooltip__item">No members</span>
-          ) : (
-            hoverNames.map((name) => (
-              <span key={name} className="crew-job-tooltip__item">
-                {name}
-              </span>
-            ))
-          )}
-        </div>
       )}
 
       {crewHover && (
