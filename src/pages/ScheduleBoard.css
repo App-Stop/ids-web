@@ -447,8 +447,10 @@
   vertical-align: middle;
 }
 
+/* The frozen table's trailing edge is the line to the left of the first day
+   column, so it keeps its border rather than dropping it like the days table. */
 .sb-table--frozen tr > *:last-child {
-  border-right: none;
+  border-right: 1px solid var(--border);
 }
 
 .sb-table--days tr > *:last-child {
