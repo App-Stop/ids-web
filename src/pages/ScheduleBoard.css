@@ -1287,6 +1287,12 @@
   cursor: grabbing;
 }
 
+/* Already started: the bar stays put, so it only opens the details modal. */
+.sb-pill:not(.sb-pill--movable),
+.sb-chip--locked {
+  cursor: pointer;
+}
+
 .sb-pill-wrap.is-moving .sb-pill {
   opacity: 0.35;
 }

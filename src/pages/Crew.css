@@ -750,3 +750,142 @@
     border-radius: 16px;
   }
 }
+
+/* Crew tab: card grid ------------------------------------------------
+   The crew list carries a name and one action, which left a two-column
+   table mostly whitespace. Cards pack the same rows across the width and
+   give the spare room to details that were previously not shown at all. */
+
+.crew-grid-wrap {
+  margin-top: 1.25rem;
+  overflow-y: auto;
+  max-height: calc(100dvh - 220px);
+  overscroll-behavior: contain;
+}
+
+.crew-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.9rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.crew-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem 0.9rem 1.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.crew-card:hover {
+  border-color: #d7dae0;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.07);
+}
+
+/* The crew's colour, same language as the bar the table used. */
+.crew-card__bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.crew-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.crew-card__id {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.crew-card__name {
+  font-weight: 600;
+  font-size: 0.98rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crew-card__status {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.crew-card__status--on {
+  color: #15803d;
+}
+
+.crew-card__status--off {
+  color: #9ca3af;
+}
+
+.crew-card__edit {
+  flex-shrink: 0;
+}
+
+.crew-card__meta {
+  display: flex;
+  gap: 1.25rem;
+  margin: 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f1f2f4;
+  min-width: 0;
+}
+
+.crew-card__meta > div {
+  min-width: 0;
+}
+
+.crew-card__meta > div:last-child {
+  flex: 1;
+}
+
+.crew-card__meta dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.crew-card__meta dd {
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crew-card__more {
+  margin-left: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.crew-grid-empty {
+  margin: 2.5rem 0;
+  text-align: center;
+  color: #8f8f96;
+  font-size: 0.95rem;
+}

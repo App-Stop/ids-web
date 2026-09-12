@@ -172,6 +172,13 @@ function realBounds(assignment: CrewAssignment) {
   return { start: isoDay(assignment.startDate) ?? '', end: isoDay(assignment.endDate) }
 }
 
+/** A stint whose first day is already behind us is locked in place: it can be
+ *  extended further into the future, but never moved or reshaped backwards. */
+function hasStarted(assignment: CrewAssignment) {
+  const start = isoDay(assignment.startDate) ?? ''
+  return start !== '' && start < todayISO()
+}
+
 function addIsoDays(iso: string, n: number) {
   return toISO(addDays(fromISO(iso), n))
 }
@@ -388,6 +395,10 @@ function ResizeHandle({
     data: { type: 'extend' as const, edge, assignment },
   })
 
+  // The start day of a stint that has already begun is history — only its end
+  // edge can still be dragged, and only forwards.
+  if (edge === 'start' && hasStarted(assignment)) return null
+
   return (
     <span
       ref={setNodeRef}
@@ -484,9 +495,13 @@ function AssignmentPill({
 }) {
   const crewName = assignment.crew?.name ?? 'Crew'
   const hours = formatTimeWindow(assignment.dailyStartTime, assignment.dailyEndTime)
+  // A stint that has already started stays where it is: it can only be
+  // extended at its end edge, never picked up and dropped elsewhere.
+  const started = hasStarted(assignment)
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `move-${assignment._id}`,
     data: { type: 'move' as const, assignment },
+    disabled: started,
   })
 
   // Releasing a drag still fires a click on the pill, which would pop the edit
@@ -524,7 +539,7 @@ function AssignmentPill({
       <button
         ref={setNodeRef}
         type="button"
-        className="sb-pill sb-pill--movable"
+        className={`sb-pill${started ? '' : ' sb-pill--movable'}`}
         // Everything the pill has to say comes from the floating crew label.
         // No native title: two tooltips on one target read as a bug, and the
         // note text is not fit to surface raw.
@@ -599,9 +614,13 @@ function WeeklyChip({
 }) {
   const crewName = assignment.crew?.name ?? 'Crew'
   const hours = formatTimeWindow(assignment.dailyStartTime, assignment.dailyEndTime)
+  // A stint that has already started stays where it is: it can only be
+  // extended at its end edge, never picked up and dropped elsewhere.
+  const started = hasStarted(assignment)
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `move-${assignment._id}`,
     data: { type: 'move' as const, assignment },
+    disabled: started,
   })
 
   // Same guard as the monthly pill: the click that ends a drag must not also
@@ -623,7 +642,7 @@ function WeeklyChip({
     <button
       ref={setNodeRef}
       type="button"
-      className={`sb-chip${isDragging ? ' is-moving' : ''}`}
+      className={`sb-chip${isDragging ? ' is-moving' : ''}${started ? ' sb-chip--locked' : ''}`}
       // The chip shows only its hours, so the crew comes from the floating
       // label rather than a native tooltip that would double up with it.
       onMouseMove={(e) =>
@@ -1099,6 +1118,12 @@ export default function ScheduleBoard() {
     if (!source || !target) return
 
     if (kind === 'move') {
+      // Belt and braces: the pill's drag is disabled once it has started, but
+      // a drag begun before midnight could still land here.
+      if (hasStarted(source)) {
+        setBanner('This assignment has already started, so it cannot be moved — extend its end date instead.')
+        return
+      }
       // Nothing is written until the confirm modal is accepted.
       const plan = planMove(source, target.jobId, target.date)
       if (plan) {
@@ -1115,6 +1140,18 @@ export default function ScheduleBoard() {
 
     const { start, end } = stintBounds(source, rangeEnd)
     const { start: realStart, end: realEnd } = realBounds(source)
+
+    // Neither edge may be dragged into the past: a started stint can only grow
+    // forwards, and one that hasn't started can't be backdated either.
+    if (target.date < today) {
+      setBanner('An assignment cannot be extended into the past.')
+      return
+    }
+    if (edge === 'start' && hasStarted(source)) {
+      setBanner('This assignment has already started, so its start date can no longer be changed.')
+      return
+    }
+
     const patch =
       edge === 'start'
         ? { startDate: target.date > end ? end : target.date }
@@ -1882,9 +1919,9 @@ export default function ScheduleBoard() {
           initialDraft={flow.draft}
           error={modalError}
           saving={saving}
-          // The backend refuses to delete a stint that has already started —
-          // trimming its end date is the supported way to close one out.
-          canDelete={(isoDay(editing.startDate) ?? '') > today}
+          // Removal is offered for every stint. Should the server refuse one
+          // that has already started, its message comes back into the modal.
+          canDelete
           onCancel={() => setFlow({ type: 'none' })}
           onSubmit={(draft) => submitStint(flow.jobId, draft, editing._id)}
           onDelete={() =>

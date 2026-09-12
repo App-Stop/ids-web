@@ -545,72 +545,44 @@ export default function Crew() {
           </button>
         </div>
 
-        <div className="crew-table-wrap" ref={tableWrapRef}>
+        <div className={tab === 'crew' ? 'crew-grid-wrap' : 'crew-table-wrap'} ref={tableWrapRef}>
           {tab === 'crew' ? (
-            <table className="crew-table crew-table--leads">
-              <colgroup>
-                <col style={{ width: '70%' }} />
-                <col style={{ width: '30%' }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Crew Name</th>
-                  <th className="crew-center">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={2} className="crew-empty-cell">
-                      Loading crew data...
-                    </td>
-                  </tr>
-                ) : visibleCrewRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={2} className="crew-empty-cell">
-                      No crews found
-                    </td>
-                  </tr>
-                ) : (
-                  visibleCrewRows.map((row) => (
-                    <tr key={row.id}>
-                      <td>
-                        <div className="crew-name-cell" style={{ position: 'relative', paddingLeft: '14px' }}>
-                          <span
-                            className="crew-id-bar-hit"
-                            onMouseEnter={(e) => {
-                              const rect = e.currentTarget.getBoundingClientRect()
-                              setCrewHover({
-                                x: rect.right + 8,
-                                y: rect.top + rect.height / 2,
-                                color: row.color,
-                                names: [row.name],
-                              })
-                            }}
-                            onMouseLeave={() => setCrewHover(null)}
-                          >
-                            <span className="crew-id-bar" style={{ background: row.color }} />
-                          </span>
-                          <Avatar name={row.name} size={28} />
-                          {row.name}
+            /* Two columns of mostly-empty table read as a broken layout, so the
+               crew list is a card grid that reflows to the width available. */
+            loading ? (
+              <p className="crew-grid-empty">Loading crew data...</p>
+            ) : visibleCrewRows.length === 0 ? (
+              <p className="crew-grid-empty">No crews found</p>
+            ) : (
+              <ul className="crew-grid">
+                {visibleCrewRows.map((row) => {
+                  const job = row.jobs[0]
+                  return (
+                    <li key={row.id} className="crew-card">
+                      <span className="crew-card__bar" style={{ background: row.color }} />
+                      <div className="crew-card__head">
+                        <Avatar name={row.name} size={36} />
+                        <div className="crew-card__id">
+                          <span className="crew-card__name" title={row.name}>{row.name}</span>
+                          
                         </div>
-                      </td>
-                      <td className="crew-center">
                         <button
                           type="button"
-                          className="btn btn--primary crew-edit-action-btn"
+                          className="btn btn--primary crew-edit-action-btn crew-card__edit"
+                          aria-label={`Edit ${row.name}`}
                           onClick={() => setFlow({ type: 'editCrew', crew: row })}
                         >
                           <PenIcon size={16} />
                           <span>Edit</span>
                           {row.status === 'Unassigned' && <span className="crew-edit-btn__dot" />}
                         </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                      </div>
+                     
+                    </li>
+                  )
+                })}
+              </ul>
+            )
           ) : (
             <table className="crew-table crew-table--roster">
               <colgroup>
