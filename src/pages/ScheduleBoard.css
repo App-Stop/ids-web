@@ -1558,3 +1558,30 @@
   font-style: italic;
   opacity: 0.85;
 }
+
+/* --- Job cell button ------------------------------------------------------ */
+/* The job cell opens a read-only summary, so it is a button that has to keep
+   looking exactly like the plain cell text it replaced. */
+.sb-job-btn {
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sb-job-btn:hover .sb-job-name,
+.sb-job-btn:focus-visible .sb-job-name {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* --- Read-only job summary ------------------------------------------------ */
+.sb-jobinfo__title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

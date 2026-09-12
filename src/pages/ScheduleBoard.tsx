@@ -31,6 +31,7 @@ import ScheduleConflictModal from '../components/dashboard/ScheduleConflictModal
 import ScheduleExtendModal from '../components/dashboard/ScheduleExtendModal'
 import { Icon } from '../components/dashboard/icons'
 import ConfirmModal from '../components/dashboard/ConfirmModal'
+import JobInfoModal from '../components/dashboard/JobInfoModal'
 import {
   createCrewAssignment,
   updateCrewAssignment,
@@ -110,6 +111,8 @@ type Flow =
   | { type: 'assignCrew'; jobId: string; date: string; draft?: StintDraft }
   | { type: 'editAssignment'; jobId: string; assignmentId: string; draft?: StintDraft }
   | { type: 'dayNote'; jobId: string; date: string }
+  /** Read-only job summary, opened from the job cell. */
+  | { type: 'jobInfo'; jobId: string }
   | { type: 'confirmMove'; plan: MovePlan }
   | { type: 'confirmExtend'; plan: ExtendPlan }
   /** Clicked a day that sits before the job's own start date. */
@@ -1542,7 +1545,11 @@ export default function ScheduleBoard() {
                                 ))}
                               </span>
                             </span>
-                            <div className="sb-job-inner">
+                            <button
+                              type="button"
+                              className="sb-job-inner sb-job-btn"
+                              onClick={() => setFlow({ type: 'jobInfo', jobId: row._id })}
+                            >
                               <span className="sb-job-text">
                                 <span className="sb-job-name" title={row.name ?? ''}>{row.name}</span>
                                 {rowCrews.length > 1 && (
@@ -1554,8 +1561,7 @@ export default function ScheduleBoard() {
                                   </span>
                                 )}
                               </span>
-                              
-                            </div>
+                            </button>
                           </td>
                         </tr>
                       )
@@ -2053,6 +2059,17 @@ export default function ScheduleBoard() {
             onCancel={() => setFlow({ type: 'none' })}
             onSave={(text) => void saveDayNote(flow.jobId, flow.date, text)}
             onDelete={() => void removeDayNote(flow.jobId, flow.date)}
+          />
+        )
+      })()}
+
+      {flow.type === 'jobInfo' && (() => {
+        const targetRow = rows.find((r) => r._id === flow.jobId)
+        if (!targetRow) return null
+        return (
+          <JobInfoModal
+            jobName={targetRow.name || `Job #${targetRow.jobIdNumber}`}
+            onClose={() => setFlow({ type: 'none' })}
           />
         )
       })()}
