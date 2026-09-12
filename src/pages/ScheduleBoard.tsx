@@ -149,7 +149,6 @@ const scheduleCollision: CollisionDetection = (args) => {
 const JOBNO_W = 72
 const JOB_W = 230
 const JOB_W_WEEKLY = 180
-const DIVIDER_W = 10
 /** Fallback day width when monthly + separator open if we couldn't measure. */
 
 /** Day-string bounds of a stint, clipped to the visible range.
@@ -523,10 +522,9 @@ function AssignmentPill({
         ref={setNodeRef}
         type="button"
         className="sb-pill sb-pill--movable"
-        // The crew name comes from the floating label instead of a native
-        // tooltip — two on one target read as a bug, and the native one only
-        // appears after a delay.
-        title={assignment.note || undefined}
+        // Everything the pill has to say comes from the floating crew label.
+        // No native title: two tooltips on one target read as a bug, and the
+        // note text is not fit to surface raw.
         onMouseMove={(e) =>
           onHover?.({
             x: e.clientX + 14,
@@ -625,7 +623,6 @@ function WeeklyChip({
       className={`sb-chip${isDragging ? ' is-moving' : ''}`}
       // The chip shows only its hours, so the crew comes from the floating
       // label rather than a native tooltip that would double up with it.
-      title={assignment.note || undefined}
       onMouseMove={(e) =>
         onHover?.({ x: e.clientX + 14, y: e.clientY, colors: [color], names: [crewName] })
       }
@@ -1503,13 +1500,11 @@ export default function ScheduleBoard() {
                   <colgroup>
                     <col style={{ width: JOBNO_W * zoom }} />
                     <col style={{ width: jobColW * zoom }} />
-                    <col style={{ width: DIVIDER_W * zoom }} />
                   </colgroup>
                   <thead>
                     <tr>
                       <th className="sb-col-jobno">Job ID</th>
                       <th className="sb-col-job">Job</th>
-                      <th className="sb-col-divider" />
                     </tr>
                   </thead>
                   <tbody>
@@ -1562,7 +1557,6 @@ export default function ScheduleBoard() {
                               
                             </div>
                           </td>
-                          <td className="sb-col-divider" />
                         </tr>
                       )
                     })}
