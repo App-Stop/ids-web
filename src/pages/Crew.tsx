@@ -555,9 +555,7 @@ export default function Crew() {
               <p className="crew-grid-empty">No crews found</p>
             ) : (
               <ul className="crew-grid">
-                {visibleCrewRows.map((row) => {
-                  const job = row.jobs[0]
-                  return (
+                {visibleCrewRows.map((row) => (
                     <li key={row.id} className="crew-card">
                       <span className="crew-card__bar" style={{ background: row.color }} />
                       <div className="crew-card__head">
@@ -577,10 +575,8 @@ export default function Crew() {
                           {row.status === 'Unassigned' && <span className="crew-edit-btn__dot" />}
                         </button>
                       </div>
-                     
                     </li>
-                  )
-                })}
+                ))}
               </ul>
             )
           ) : (
