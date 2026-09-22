@@ -873,10 +873,8 @@ export default function JobsManagement() {
                           key={`${job.rawId}-d-${d.getTime()}`}
                           className={`jm-center jm-day-col${isSameDay(d, today) ? ' is-today' : ''}`}
                         >
-                          <StackCell
-                            top={money(day?.laborCost)}
-                            bottom={day ? `${Math.round(day.hoursWorked * 10) / 10}h` : ''}
-                          />
+                          {/* Cost alone — no second line, so no hairline either. */}
+                          <span className="jm-day-cost">{money(day?.laborCost)}</span>
                         </td>
                       )
                     })}

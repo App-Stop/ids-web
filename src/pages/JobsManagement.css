@@ -569,6 +569,19 @@ body.is-col-resizing * {
   background: var(--border);
 }
 
+/* The year strip carries a day's labor cost and nothing else, so it is a
+   single centred value rather than a StackCell's two lines and hairline. The
+   min-height matches .jm-stack so row heights are unaffected. */
+.jm-day-cost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(40px * var(--table-zoom, 1));
+  font-weight: 500;
+  line-height: 1;
+  color: var(--ink);
+}
+
 .jm-month-col,
 .jm-day-col {
   min-width: 0;
