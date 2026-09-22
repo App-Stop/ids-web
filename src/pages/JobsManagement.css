@@ -155,6 +155,7 @@
    on the right. Each scrolls horizontally on its own; only vertical scroll is
    synced (in JS), so panning the days does not drag the table with it. */
 .jm-sheet {
+  --jm-name-w: calc(210px * var(--table-zoom, 1));
   display: flex;
   align-items: stretch;
   margin-top: 1.25rem;
@@ -169,24 +170,39 @@
   overscroll-behavior: contain;
   cursor: grab;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+}
+
+.jm-table-wrap::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.jm-table-wrap::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 3px;
+}
+
+.jm-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.jm-table-wrap::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .jm-pane--main {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: var(--jm-name-w);
   border-radius: 14px 0 0 14px;
   border-right: none;
-  transition: flex 0.2s ease;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: width;
 }
 
 .jm-pane--main.is-collapsed {
-  flex: 0 0 auto;
-  width: var(--jm-name-w);
   overflow-x: hidden;
-}
-
-.jm-pane--main.is-collapsed .jm-table {
-  min-width: var(--jm-name-w);
 }
 
 .jm-pane--days {
@@ -194,35 +210,39 @@
   min-width: 0;
   border-radius: 0 14px 14px 0;
   border-left: none;
-  transition: flex 0.2s ease;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: width;
 }
 
-.jm-pane--days.is-expanded {
-  flex: 1 1 auto;
-  width: auto !important;
+body.is-col-resizing .jm-pane--main,
+body.is-col-resizing .jm-pane--days {
+  transition: none !important;
 }
 
 /* Drag handle / collapse toggle between the panes */
 .jm-pane-grip {
   position: relative;
-  flex: 0 0 auto;
+  flex: 0 0 14px;
   width: 14px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
   max-height: calc(100dvh - 220px);
-  background: #f5f5f7;
+  background: #c1c1c1;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
   cursor: pointer;
   touch-action: none;
   user-select: none;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
   z-index: 10;
 }
 
 .jm-pane-grip:hover {
-  background: #ececf0;
+  background: #a8a8a8;
 }
 
 .jm-pane-grip:focus-visible {
@@ -242,8 +262,8 @@
   height: 32px;
   border-radius: 4px;
   background: #ffffff;
-  border: 1px solid var(--border);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.16);
   color: var(--ink);
   opacity: 0;
   pointer-events: none;
@@ -448,10 +468,65 @@ body.is-col-resizing * {
   text-underline-offset: 2px;
 }
 
+/* --- Row hover & selection across both panes ---------------------------- */
+
+.jm-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.jm-row:hover td,
+.jm-row.is-hovered td,
 .jm-row:hover .jm-sticky,
 .jm-row:hover .jm-sticky--name,
-.jm-row:hover .jm-name-cell {
-  background: #fafafa;
+.jm-row:hover .jm-name-cell,
+.jm-row.is-hovered .jm-sticky,
+.jm-row.is-hovered .jm-sticky--name,
+.jm-row.is-hovered .jm-name-cell {
+  background: #f8fafc;
+}
+
+.jm-row:hover .jm-day-col.is-today,
+.jm-row.is-hovered .jm-day-col.is-today {
+  background: #edf0f5;
+}
+
+/* Selected row highlight: distinct, elegant light blue tint */
+.jm-row.is-selected td,
+.jm-row.is-selected .jm-sticky,
+.jm-row.is-selected .jm-sticky--name,
+.jm-row.is-selected .jm-name-cell {
+  background: #edf5ff !important;
+  border-bottom-color: #cbdcf7;
+}
+
+.jm-row.is-selected .jm-day-col.is-today {
+  background: #e2edfd !important;
+}
+
+.jm-row.is-selected:hover td,
+.jm-row.is-selected.is-hovered td,
+.jm-row.is-selected:hover .jm-sticky,
+.jm-row.is-selected:hover .jm-sticky--name,
+.jm-row.is-selected:hover .jm-name-cell,
+.jm-row.is-selected.is-hovered .jm-sticky,
+.jm-row.is-selected.is-hovered .jm-sticky--name,
+.jm-row.is-selected.is-hovered .jm-name-cell {
+  background: #e3efff !important;
+}
+
+.jm-row.is-selected:hover .jm-day-col.is-today,
+.jm-row.is-selected.is-hovered .jm-day-col.is-today {
+  background: #d8e7fc !important;
+}
+
+.jm-row.is-selected .jm-name-inner span:first-child {
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.jm-row.is-selected .jm-name-inner svg {
+  color: #2563eb;
 }
 
 .jm-id-cell input {
@@ -618,10 +693,10 @@ body.is-col-resizing * {
   width: 4px;
   height: 16px;
   margin: 0 auto;
-  background-image: radial-gradient(circle, var(--muted) 1.4px, transparent 1.6px);
+  background-image: radial-gradient(circle, #3f3f46 1.4px, transparent 1.6px);
   background-size: 4px 6px;
   background-repeat: repeat-y;
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
 .jm-name-inner svg {

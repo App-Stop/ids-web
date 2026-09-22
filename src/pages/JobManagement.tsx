@@ -300,6 +300,8 @@ export default function JobsManagement() {
   const [flow, setFlow] = useState<Flow>({ type: 'none' })
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(20)
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
+  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null)
 
   const today = useMemo(() => new Date(), [])
   // The strip is the cost-tracking year, so it spans the calendar year today
@@ -378,7 +380,7 @@ export default function JobsManagement() {
     })
   }, [jobs])
   /** Columns in the left pane only — the day strip is its own table now. */
-  const columnCount = leftCollapsed ? 1 : 10 + months.length
+  const columnCount = 11 + months.length
   const pagination = jobsQuery.data?.pagination ?? { page, limit, totalCount: 0, totalPages: 1 }
   const loading = jobsQuery.isPending
   const apiError =
@@ -388,7 +390,7 @@ export default function JobsManagement() {
 
   const mainTableRef = useRef<HTMLTableElement>(null)
   // [0] is the header row; job i is at [i + 1].
-  const rowHeights = useSyncedRowHeights(mainTableRef, [jobs, zoom, months.length, loading, leftCollapsed])
+  const rowHeights = useSyncedRowHeights(mainTableRef, [jobs, zoom, months.length, loading])
 
   // Vertical only, and guarded so the echo from setting the other pane's
   // scrollTop doesn't bounce straight back.
@@ -408,8 +410,8 @@ export default function JobsManagement() {
   function toggleLeftCollapse() {
     setLeftCollapsed((prev) => {
       const next = !prev
-      if (next && mainPaneRef.current) {
-        mainPaneRef.current.scrollLeft = 0
+      if (next && mainPaneRef.current && mainPaneRef.current.scrollLeft > 0) {
+        mainPaneRef.current.scrollTo({ left: 0, behavior: 'smooth' })
       }
       return next
     })
@@ -442,7 +444,10 @@ export default function JobsManagement() {
     e.preventDefault()
     const startX = e.clientX
     const startY = e.clientY
-    const startWidth = dayPaneWidth
+    const startWidth =
+      leftCollapsed && dayPaneRef.current
+        ? dayPaneRef.current.getBoundingClientRect().width
+        : dayPaneWidth
     let moved = false
 
     const onMove = (ev: PointerEvent) => {
@@ -505,6 +510,7 @@ export default function JobsManagement() {
     setActionError('')
     try {
       await deleteJobMutation.mutateAsync(jobId)
+      if (selectedRowId === jobId) setSelectedRowId(null)
       setFlow({ type: 'none' })
     } catch (err: any) {
       setActionError(getErrorMessage(err, 'Failed to delete job.'))
@@ -591,9 +597,14 @@ export default function JobsManagement() {
 
         {apiError && <p className="field-error" style={{ margin: '12px 0' }}>{apiError}</p>}
 
-        <div className="jm-sheet">
+        <div className="jm-sheet" style={sheetZoomStyle(zoom)}>
         <div
           className={`jm-table-wrap jm-pane--main${leftCollapsed ? ' is-collapsed' : ''}`}
+          style={
+            leftCollapsed
+              ? { width: 'var(--jm-name-w)' }
+              : { width: `calc(100% - ${dayPaneWidth}px - 14px)` }
+          }
           ref={mainPaneRef}
           onScroll={() => syncVertical('main')}
         >
@@ -601,68 +612,60 @@ export default function JobsManagement() {
           <table className="jm-table" ref={mainTableRef}>
             <colgroup>
               <col className="jm-col-name-w" />
-              {!leftCollapsed && (
-                <>
-                  <col className="jm-col-xs" />
-                  <col className="jm-col-xs" />
-                  <col className="jm-col-sm" />
-                  <col className="jm-col-md" />
-                  <col className="jm-col-sm" />
-                  <col className="jm-col-stack" />
-                  <col className="jm-col-stack" />
-                  <col className="jm-col-stack" />
-                  <col className="jm-col-stack-lg" />
-                  {months.map((m) => (
-                    <col key={`c-m-${m.key}`} className="jm-col-month" />
-                  ))}
-                </>
-              )}
+              <col className="jm-col-xs" />
+              <col className="jm-col-xs" />
+              <col className="jm-col-sm" />
+              <col className="jm-col-md" />
+              <col className="jm-col-sm" />
+              <col className="jm-col-stack" />
+              <col className="jm-col-stack" />
+              <col className="jm-col-stack" />
+              <col className="jm-col-stack-lg" />
+              {months.map((m) => (
+                <col key={`c-m-${m.key}`} className="jm-col-month" />
+              ))}
             </colgroup>
             <thead>
               <tr>
                 <th className="jm-sticky jm-sticky--name">Job Name</th>
-                {!leftCollapsed && (
-                  <>
-                    <th>Job #</th>
-                    <th>Bid #</th>
-                    <th>Estimator</th>
-                    <th>Assigned to</th>
-                    <th>Contractor</th>
-                    <th className="jm-center">
-                      <span className="jm-th-stack jm-th-stack--split">
-                        <span>Contract Amt</span>
-                        <span className="jm-th-stack__rule" />
-                        <span>Budgeted Labor</span>
-                      </span>
-                    </th>
-                    <th className="jm-center">
-                      <span className="jm-th-stack jm-th-stack--split">
-                        <span>Budgeted Days</span>
-                        <span className="jm-th-stack__rule" />
-                        <span>Balance to Spend</span>
-                      </span>
-                    </th>
-                    <th className="jm-center">
-                      <span className="jm-th-stack jm-th-stack--split">
-                        <span>Revenue per Day</span>
-                        <span className="jm-th-stack__rule" />
-                        <span>Percent of Total</span>
-                      </span>
-                    </th>
-                    <th className="jm-center">
-                      <span className="jm-th-stack jm-th-stack--split">
-                        <span>Cumulative Revenue</span>
-                        <span className="jm-th-stack__rule" />
-                        <span>Cumulative Labor Cost</span>
-                      </span>
-                    </th>
-                    {months.map((m) => (
-                      <th key={`h-m-${m.key}`} className="jm-center jm-month-col" title={m.label}>
-                        {MONTH_SHORT[Number(m.key.slice(5, 7)) - 1] ?? m.label}
-                      </th>
-                    ))}
-                  </>
-                )}
+                <th>Job #</th>
+                <th>Bid #</th>
+                <th>Estimator</th>
+                <th>Assigned to</th>
+                <th>Contractor</th>
+                <th className="jm-center">
+                  <span className="jm-th-stack jm-th-stack--split">
+                    <span>Contract Amt</span>
+                    <span className="jm-th-stack__rule" />
+                    <span>Budgeted Labor</span>
+                  </span>
+                </th>
+                <th className="jm-center">
+                  <span className="jm-th-stack jm-th-stack--split">
+                    <span>Budgeted Days</span>
+                    <span className="jm-th-stack__rule" />
+                    <span>Balance to Spend</span>
+                  </span>
+                </th>
+                <th className="jm-center">
+                  <span className="jm-th-stack jm-th-stack--split">
+                    <span>Revenue per Day</span>
+                    <span className="jm-th-stack__rule" />
+                    <span>Percent of Total</span>
+                  </span>
+                </th>
+                <th className="jm-center">
+                  <span className="jm-th-stack jm-th-stack--split">
+                    <span>Cumulative Revenue</span>
+                    <span className="jm-th-stack__rule" />
+                    <span>Cumulative Labor Cost</span>
+                  </span>
+                </th>
+                {months.map((m) => (
+                  <th key={`h-m-${m.key}`} className="jm-center jm-month-col" title={m.label}>
+                    {MONTH_SHORT[Number(m.key.slice(5, 7)) - 1] ?? m.label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -680,6 +683,9 @@ export default function JobsManagement() {
                 </tr>
               ) : (
                 jobs.map((job) => {
+                  const rowId = job.rawId || job.id
+                  const isSelected = selectedRowId === rowId
+                  const isHovered = hoveredRowId === rowId
                   const stripes = job.crews.length
                     ? job.crews
                     : [{ id: 'none', name: 'Unassigned', color: '#94a3b8' }]
@@ -697,10 +703,17 @@ export default function JobsManagement() {
                       : null
                   const monthsByKey = new Map((fin?.fourMonths ?? []).map((m) => [m.month, m]))
                   return (
-                    <tr key={job.rawId || job.id} className="jm-row">
+                    <tr
+                      key={rowId}
+                      className={`jm-row${isSelected ? ' is-selected' : ''}${isHovered ? ' is-hovered' : ''}`}
+                      onClick={() => setSelectedRowId((prev) => (prev === rowId ? null : rowId))}
+                      onMouseEnter={() => setHoveredRowId(rowId)}
+                      onMouseLeave={() => setHoveredRowId(null)}
+                    >
                       <td className="jm-name-cell jm-sticky jm-sticky--name">
                         <span
                           className="jm-color-bar-hit"
+                          onClick={(e) => e.stopPropagation()}
                           onMouseEnter={(e) => {
                             const rect = e.currentTarget.getBoundingClientRect()
                             setCrewHover({
@@ -721,7 +734,11 @@ export default function JobsManagement() {
                         <button
                           type="button"
                           className="jm-name-btn"
-                          onClick={() => setFlow({ type: 'details', jobId: job.rawId || job.id })}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedRowId(rowId)
+                            setFlow({ type: 'details', jobId: rowId })
+                          }}
                         >
                           <span className="jm-name-inner">
                             <span>{job.name}</span>
@@ -729,60 +746,56 @@ export default function JobsManagement() {
                           </span>
                         </button>
                       </td>
-                      {!leftCollapsed && (
-                        <>
-                          <td>{job.jobNo}</td>
-                          <td>{job.bidNo}</td>
-                          <td>{job.estimator}</td>
-                          <td className="jm-crew-cell">
-                            <span className="jm-crew-list">
-                              {job.crews.length === 0 ? (
-                                <span className="jm-crew-chip">
-                                  <i style={{ background: '#94a3b8' }} />
-                                  Unassigned
-                                </span>
-                              ) : (
-                                job.crews.map((c) => (
-                                  <span key={c.id} className="jm-crew-chip">
-                                    <i style={{ background: c.color }} />
-                                    {c.name}
-                                  </span>
-                                ))
-                              )}
+                      <td>{job.jobNo}</td>
+                      <td>{job.bidNo}</td>
+                      <td>{job.estimator}</td>
+                      <td className="jm-crew-cell">
+                        <span className="jm-crew-list">
+                          {job.crews.length === 0 ? (
+                            <span className="jm-crew-chip">
+                              <i style={{ background: '#94a3b8' }} />
+                              Unassigned
                             </span>
-                          </td>
-                          <td>{job.gc}</td>
-                          <td className="jm-center">
-                            <StackCell top={money(job.contract)} bottom={money(job.laborBudgetTotal)} />
-                          </td>
-                          <td className="jm-center">
+                          ) : (
+                            job.crews.map((c) => (
+                              <span key={c.id} className="jm-crew-chip">
+                                <i style={{ background: c.color }} />
+                                {c.name}
+                              </span>
+                            ))
+                          )}
+                        </span>
+                      </td>
+                      <td>{job.gc}</td>
+                      <td className="jm-center">
+                        <StackCell top={money(job.contract)} bottom={money(job.laborBudgetTotal)} />
+                      </td>
+                      <td className="jm-center">
+                        <StackCell
+                          top={job.budgetedDays === null ? '' : String(job.budgetedDays)}
+                          bottom={money(balanceToSpend)}
+                        />
+                      </td>
+                      <td className="jm-center">
+                        <StackCell top={money(fin?.revenuePerDay)} bottom={percent(percentOfTotal)} />
+                      </td>
+                      <td className="jm-center">
+                        <StackCell
+                          top={money(fin?.cumulativeRevenue)}
+                          bottom={money(fin?.cumulativeLaborCost)}
+                        />
+                      </td>
+                      {months.map((m) => {
+                        const bucket = monthsByKey.get(m.key)
+                        return (
+                          <td key={`${job.rawId}-m-${m.key}`} className="jm-center jm-month-col">
                             <StackCell
-                              top={job.budgetedDays === null ? '' : String(job.budgetedDays)}
-                              bottom={money(balanceToSpend)}
+                              top={money(bucket?.revenueParked)}
+                              bottom={money(bucket?.totalLaborCost)}
                             />
                           </td>
-                          <td className="jm-center">
-                            <StackCell top={money(fin?.revenuePerDay)} bottom={percent(percentOfTotal)} />
-                          </td>
-                          <td className="jm-center">
-                            <StackCell
-                              top={money(fin?.cumulativeRevenue)}
-                              bottom={money(fin?.cumulativeLaborCost)}
-                            />
-                          </td>
-                          {months.map((m) => {
-                            const bucket = monthsByKey.get(m.key)
-                            return (
-                              <td key={`${job.rawId}-m-${m.key}`} className="jm-center jm-month-col">
-                                <StackCell
-                                  top={money(bucket?.revenueParked)}
-                                  bottom={money(bucket?.totalLaborCost)}
-                                />
-                              </td>
-                            )
-                          })}
-                        </>
-                      )}
+                        )
+                      })}
                     </tr>
                   )
                 })
@@ -821,7 +834,11 @@ export default function JobsManagement() {
             columns where they are. Only vertical scroll is shared. */}
         <div
           className={`jm-table-wrap jm-pane--days${leftCollapsed ? ' is-expanded' : ''}`}
-          style={leftCollapsed ? undefined : { width: `${dayPaneWidth}px` }}
+          style={
+            leftCollapsed
+              ? { width: 'calc(100% - var(--jm-name-w) - 14px)' }
+              : { width: `${dayPaneWidth}px` }
+          }
           ref={dayPaneRef}
           onScroll={() => syncVertical('day')}
         >
@@ -858,14 +875,21 @@ export default function JobsManagement() {
                   <td colSpan={days.length} className="crew-empty-cell" style={{ padding: '32px 0' }} />
                 </tr>
               ) : (
-                jobs.map((job, rowIndex) => (
-                  <tr
-                    key={job.rawId || job.id}
-                    className="jm-row"
-                    style={
-                      rowHeights[rowIndex + 1] ? { height: `${rowHeights[rowIndex + 1]}px` } : undefined
-                    }
-                  >
+                jobs.map((job, rowIndex) => {
+                  const rowId = job.rawId || job.id
+                  const isSelected = selectedRowId === rowId
+                  const isHovered = hoveredRowId === rowId
+                  return (
+                    <tr
+                      key={rowId}
+                      className={`jm-row${isSelected ? ' is-selected' : ''}${isHovered ? ' is-hovered' : ''}`}
+                      style={
+                        rowHeights[rowIndex + 1] ? { height: `${rowHeights[rowIndex + 1]}px` } : undefined
+                      }
+                      onClick={() => setSelectedRowId((prev) => (prev === rowId ? null : rowId))}
+                      onMouseEnter={() => setHoveredRowId(rowId)}
+                      onMouseLeave={() => setHoveredRowId(null)}
+                    >
                     {days.map((d) => {
                       const day = job.costByDate[isoDay(d)]
                       return (
@@ -879,8 +903,9 @@ export default function JobsManagement() {
                       )
                     })}
                   </tr>
-                ))
-              )}
+                )
+              })
+            )}
             </tbody>
           </table>
           </div>
