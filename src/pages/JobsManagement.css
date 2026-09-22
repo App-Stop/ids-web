@@ -451,8 +451,10 @@ body.is-col-resizing * {
 }
 
 .jm-name-btn {
-  display: block;
-  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  max-width: 100%;
   border: none;
   background: transparent;
   padding: 0;

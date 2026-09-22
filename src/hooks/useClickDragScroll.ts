@@ -60,12 +60,6 @@ export function useClickDragScroll(
       originLeft = el!.scrollLeft
       originTop = el!.scrollTop
       originHLeft = horizontalTarget?.current?.scrollLeft ?? 0
-      el!.classList.add('is-panning')
-      try {
-        el!.setPointerCapture(e.pointerId)
-      } catch {
-        /* ignore */
-      }
     }
 
     function onPointerMove(e: PointerEvent) {
@@ -73,7 +67,15 @@ export function useClickDragScroll(
       const dx = e.clientX - startX
       const dy = e.clientY - startY
       if (!moved && dx * dx + dy * dy < 16) return
-      moved = true
+      if (!moved) {
+        moved = true
+        el!.classList.add('is-panning')
+        try {
+          el!.setPointerCapture(pointerId)
+        } catch {
+          /* ignore */
+        }
+      }
       e.preventDefault()
 
       el!.scrollTop = originTop - dy
@@ -87,6 +89,14 @@ export function useClickDragScroll(
 
     function endPan(e: PointerEvent) {
       if (!active || (pointerId !== -1 && e.pointerId !== pointerId)) return
+      if (moved) {
+        const captureClick = (clickEvent: MouseEvent) => {
+          clickEvent.stopPropagation()
+          clickEvent.preventDefault()
+          window.removeEventListener('click', captureClick, true)
+        }
+        window.addEventListener('click', captureClick, true)
+      }
       active = false
       pointerId = -1
       el!.classList.remove('is-panning')
