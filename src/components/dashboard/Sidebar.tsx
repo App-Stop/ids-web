@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CalendarBlank,
@@ -5,13 +6,11 @@ import {
   CurrencyCircleDollar,
   Users,
   // ListChecks,
-  SidebarSimple,
   GearSix,
   User,
   Question,
 } from "@phosphor-icons/react";
 import logo from "../../assets/sidebar logo.png";
-import { useSidebarCollapsed } from "../../hooks/useSidebarCollapsed";
 
 const OPERATIONS = [
   // { label: "Dashboard", icon: SquaresFour, path: "/dashboard" },
@@ -40,40 +39,38 @@ const MOBILE_NAV = [
   { label: "Profile", icon: User, path: "/profile" },
 ];
 
+/**
+ * The icon rail is the sidebar's only resting state: it reserves a 60px column
+ * and the full panel unfurls *over* the page on hover, so nothing below it
+ * reflows. `collapsed` / `onCollapsedChange` are still accepted because some
+ * pages pass them, but they no longer drive the sidebar.
+ */
 export default function Sidebar({
   active,
-  collapsed: collapsedProp,
-  onCollapsedChange,
 }: {
   active: string;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
 }) {
-  const [internalCollapsed, setInternalCollapsed] = useSidebarCollapsed();
-  const collapsed = collapsedProp ?? internalCollapsed;
-  const setCollapsed = (next: boolean) => {
-    if (collapsedProp === undefined) setInternalCollapsed(next);
-    onCollapsedChange?.(next);
-  };
+  const [open, setOpen] = useState(false);
+  const collapsed = !open;
   const navigate = useNavigate();
 
   return (
     <>
-      <aside className={`sidebar ${collapsed ? "is-collapsed" : ""}`}>
+      <aside
+        className={`sidebar ${collapsed ? "is-collapsed" : "is-open"}`}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+        }}
+      >
+        <div className="sidebar__floating">
         {collapsed ? (
           <>
             <div className="sidebar__rail">
-              <button
-                type="button"
-                className="sidebar__icon-btn"
-                onClick={() => setCollapsed(false)}
-                aria-label="Expand sidebar"
-              >
-                <SidebarSimple size={20} weight="regular" />
-              </button>
-
-              <div className="sidebar__rail-sep" />
-
               {OPERATIONS.map(({ label, icon: IconCmp, path }) => (
                 <button
                   key={label}
@@ -143,14 +140,6 @@ export default function Sidebar({
                   <img src={logo} alt="IDS Demolition" />
                   <h2 className="sidebar_text">IDS Demolition</h2>
                 </div>
-                <button
-                  type="button"
-                  className="sidebar__icon-btn sidebar__collapse-btn"
-                  onClick={() => setCollapsed(true)}
-                  aria-label="Collapse sidebar"
-                >
-                  <SidebarSimple size={20} weight="regular" />
-                </button>
               </div>
 
               <nav className="sidebar__nav">
@@ -220,6 +209,7 @@ export default function Sidebar({
             </button>
           </>
         )}
+        </div>
       </aside>
 
       <nav className="sidebar-mobile-nav" aria-label="Mobile navigation">

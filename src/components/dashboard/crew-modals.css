@@ -652,3 +652,51 @@
     max-width: none;
   }
 }
+
+/* Status pill under the job title in the details modal. The pill itself is
+   styled by .jm-status in JobsManagement.css. */
+.job-head__status {
+  margin: 0.5rem 0 0.25rem;
+  display: inline-block;
+  text-align: left;
+}
+
+.job-head__status .dd__trigger {
+  border: none;
+  background: none;
+  padding: 0;
+  height: auto;
+  gap: 0.35rem;
+}
+
+.job-head__status .jm-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  border: 1.5px solid;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: transparent;
+  user-select: none;
+}
+
+/* Actions footer inside JobDetailsModal */
+.job-details-modal__actions {
+  margin-top: 1.75rem !important;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.job-details-modal__actions .modal-actions__group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.job-details-modal__actions .btn--primary {
+  min-width: 88px;
+}
+

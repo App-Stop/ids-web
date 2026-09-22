@@ -1,19 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { MagnifyingGlass, Plus, CaretLeft, CaretRight, PenIcon } from '@phosphor-icons/react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { MagnifyingGlass, Plus, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
-import Topbar from '../components/dashboard/Topbar'
 import Dropdown from '../components/dashboard/Dropdown'
-import Avatar from '../components/dashboard/Avatar'
 import ZoomControl from '../components/dashboard/ZoomControl'
 import CreateJobModal, { type JobFormData } from '../components/dashboard/CreateJobModal'
 import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
-import { assignableCrews, formatMoney, type Job, type UnassignedCrew } from '../lib/dashboardData'
-import { STATUS_COLORS, STATUS_LABELS, type JobStatus, type ManagedJob } from '../lib/jobsManagementData'
+import { assignableCrews, type Job, type UnassignedCrew } from '../lib/dashboardData'
+import { type JobStatus, type ManagedJob } from '../lib/jobsManagementData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import { useAppStore } from '../lib/store'
-import { type JobItem } from '../api/jobApi'
+import { type JobItem, type JobFinancials, type JobDayCost } from '../api/jobApi'
 import { type UserItem } from '../api/crewApi'
 import { crewColorFor } from '../lib/scheduleData'
 import { getErrorMessage } from '../lib/errors'
@@ -21,7 +19,119 @@ import { useCrewsSummary, useJobsPaged, useJobMutations } from '../hooks/useQuer
 import './JobsManagement.css'
 
 type SortKey = 'newest' | 'oldest' | 'rateLowHigh' | 'rateHighLow' | 'workers' | 'ascending' | 'descending'
-type Row = ManagedJob & { rawId: string; note?: string }
+
+/** One crew on the job, as the "Assigned to" cell and the name stripe show it. */
+type CrewChip = { id: string; name: string; color: string }
+
+type Row = ManagedJob & {
+  rawId: string
+  note?: string
+  /** Every crew scheduled on the job now or later, from `assignedTo`. */
+  crews: CrewChip[]
+  jobNo: string
+  bidNo: string
+  estimator: string
+  budgetedDays: number | null
+  /** Budget/revenue rollups; absent if the server didn't compute them. */
+  financials?: JobFinancials
+  /** `yearCostTracking` keyed by "YYYY-MM-DD" for O(1) lookup per day column. */
+  costByDate: Record<string, JobDayCost>
+}
+
+/** Monday-based week containing `from`, seven days long. */
+function weekDays(from = new Date()): Date[] {
+  const monday = new Date(from)
+  monday.setHours(0, 0, 0, 0)
+  const offset = monday.getDay() === 0 ? -6 : 1 - monday.getDay()
+  monday.setDate(monday.getDate() + offset)
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + i)
+    return d
+  })
+}
+
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec']
+
+function shortDate(d: Date) {
+  return `${d.getMonth() + 1}-${d.getDate()}-${String(d.getFullYear()).slice(2)}`
+}
+
+/** Local "YYYY-MM-DD" — the key shape `yearCostTracking` uses. */
+function isoDay(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()
+  )
+}
+
+/** Short money for the dense right-hand columns: $4,213, never $4,213.00. */
+function money(value: number | null | undefined): string {
+  if (value === null || value === undefined) return ''
+  return `$${Math.round(value).toLocaleString()}`
+}
+
+function percent(value: number | null | undefined): string {
+  if (value === null || value === undefined) return ''
+  return `${value.toFixed(1)}%`
+}
+
+/** Day-pane width in px: default (~5 columns visible), and its drag bounds. */
+const DAY_PANE_DEFAULT_W = 520
+const DAY_PANE_MIN_W = 180
+const DAY_PANE_MAX_W = 1100
+
+/**
+ * Every row height of `source`, header row first, kept live.
+ *
+ * The two panes are separate `<table>`s so they can scroll apart, which means
+ * nothing lines their rows up on its own — a job with four crews is taller on
+ * the left than its (uniform) day cells are on the right. The left table owns
+ * the heights and the right one is told what they are, index for index: both
+ * render one header row followed by the same jobs in the same order.
+ */
+function useSyncedRowHeights(
+  source: React.RefObject<HTMLTableElement | null>,
+  deps: unknown[],
+): number[] {
+  const [heights, setHeights] = useState<number[]>([])
+
+  useLayoutEffect(() => {
+    const table = source.current
+    if (!table) return
+
+    const measure = () => {
+      const next = Array.from(table.rows).map((r) => r.getBoundingClientRect().height)
+      setHeights((prev) =>
+        prev.length === next.length && prev.every((h, i) => Math.abs(h - next[i]) < 0.5) ? prev : next,
+      )
+    }
+
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(table)
+    for (const row of Array.from(table.rows)) observer.observe(row)
+    return () => observer.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
+
+  return heights
+}
+
+/** A two-line cell: top value, hairline, bottom value. Blanks stay blank. */
+function StackCell({ top, bottom }: { top?: string; bottom?: string }) {
+  return (
+    <div className="jm-stack">
+      <span className="jm-stack__val">{top ?? ''}</span>
+      <span className="jm-stack__rule" />
+      <span className="jm-stack__val">{bottom ?? ''}</span>
+    </div>
+  )
+}
 
 type Flow =
   | { type: 'none' }
@@ -50,10 +160,10 @@ function toJob(row: Row): Job {
     id: row.rawId || row.id,
     name: row.name,
     color: row.color,
-    bidNo: String(1000 + Number(num)),
+    bidNo: row.bidNo.replace('#', ''),
     jobNo: num,
     gc: row.gc,
-    estimator: row.idsSuper,
+    estimator: row.estimator || row.idsSuper,
     startDate: row.startDate,
     endDate: row.endDate,
     contractAmount: row.contract,
@@ -131,11 +241,35 @@ function toRow(j: JobItem): Row {
     }
   }
 
+  // `assignedTo` is every crew scheduled now or later; `currentCrew` only
+  // covers today, so it is just the fallback for a response without it.
+  const crews: CrewChip[] = Array.isArray(j.assignedTo)
+    ? j.assignedTo.map((c, i) => ({
+        id: c.crewId || `${j._id}-${i}`,
+        name: c.name || 'Unassigned',
+        color: c.crewColor || '#3b82f6',
+      }))
+    : crewObj
+      ? [{ id: crewObj._id || j._id, name: crewObj.name || 'Unassigned', color: crewColor }]
+      : []
+
+  const costByDate: Record<string, JobDayCost> = {}
+  for (const day of j.financials?.yearCostTracking ?? []) {
+    costByDate[day.date] = day
+  }
+
   return {
+    financials: j.financials,
+    costByDate,
     id: `#${numStr}`,
     rawId: j._id,
     name: j.name,
     color: crewColor,
+    crews,
+    jobNo: `#${numStr}`,
+    bidNo: j.bidNumber === null || j.bidNumber === undefined ? '' : `#${j.bidNumber}`,
+    estimator: j.estimator || '',
+    budgetedDays: typeof j.budgetedDays === 'number' ? j.budgetedDays : null,
     crewName: crewObj ? crewObj.name : 'Unassigned',
     gc: j.generalContractor || '-',
     gcSuper: gcSuperVal,
@@ -165,8 +299,17 @@ export default function JobsManagement() {
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(20)
 
-  const tableWrapRef = useRef<HTMLDivElement>(null)
-  useClickDragScroll(tableWrapRef)
+  const days = useMemo(() => weekDays(), [])
+  const today = useMemo(() => new Date(), [])
+
+  // The sheet is two panes that scroll independently: the job columns on the
+  // left, the day strip on the right. Only their vertical scroll is kept in
+  // step, so the day strip pans sideways without dragging the table with it.
+  const mainPaneRef = useRef<HTMLDivElement>(null)
+  const dayPaneRef = useRef<HTMLDivElement>(null)
+  useClickDragScroll(mainPaneRef)
+  useClickDragScroll(dayPaneRef)
+  const [dayPaneWidth, setDayPaneWidth] = useState(DAY_PANE_DEFAULT_W)
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
   const { assignCrew } = useAppStore()
 
@@ -198,12 +341,69 @@ export default function JobsManagement() {
   })
 
   const jobs = useMemo(() => (jobsQuery.data?.items ?? []).map(toRow), [jobsQuery.data])
+
+  // Every job's `fourMonths` covers the same four months (current + next 3),
+  // so the first row that has them defines the header. With no rows — or on a
+  // response predating the rollup — the same run is derived locally.
+  const months = useMemo(() => {
+    const fromApi = jobs.find((j) => j.financials?.fourMonths?.length)?.financials?.fourMonths
+    if (fromApi?.length) return fromApi.map((m) => ({ key: m.month, label: m.label }))
+    const now = new Date()
+    return Array.from({ length: 4 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+      return {
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: `${MONTH_SHORT[d.getMonth()]} ${d.getFullYear()}`,
+      }
+    })
+  }, [jobs])
+  /** Columns in the left pane only — the day strip is its own table now. */
+  const columnCount = 10 + months.length
   const pagination = jobsQuery.data?.pagination ?? { page, limit, totalCount: 0, totalPages: 1 }
   const loading = jobsQuery.isPending
   const apiError =
     actionError || (jobsQuery.error ? getErrorMessage(jobsQuery.error, 'Failed to fetch jobs listing.') : '')
 
   const { updateJobMutation, deleteJobMutation, invalidateAll } = useJobMutations()
+
+  const mainTableRef = useRef<HTMLTableElement>(null)
+  // [0] is the header row; job i is at [i + 1].
+  const rowHeights = useSyncedRowHeights(mainTableRef, [jobs, zoom, months.length, loading])
+
+  // Vertical only, and guarded so the echo from setting the other pane's
+  // scrollTop doesn't bounce straight back.
+  const syncingRef = useRef(false)
+  const syncVertical = useCallback((from: 'main' | 'day') => {
+    if (syncingRef.current) return
+    const source = from === 'main' ? mainPaneRef.current : dayPaneRef.current
+    const target = from === 'main' ? dayPaneRef.current : mainPaneRef.current
+    if (!source || !target || target.scrollTop === source.scrollTop) return
+    syncingRef.current = true
+    target.scrollTop = source.scrollTop
+    requestAnimationFrame(() => {
+      syncingRef.current = false
+    })
+  }, [])
+
+  /** Drag the grip to give the day strip more or less room. */
+  function startPaneResize(e: React.PointerEvent<HTMLDivElement>) {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = dayPaneWidth
+    const onMove = (ev: PointerEvent) => {
+      // Dragging left widens the strip, since it is pinned to the right edge.
+      const next = startWidth + (startX - ev.clientX)
+      setDayPaneWidth(Math.min(DAY_PANE_MAX_W, Math.max(DAY_PANE_MIN_W, next)))
+    }
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      document.body.classList.remove('is-col-resizing')
+    }
+    document.body.classList.add('is-col-resizing')
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
 
 
   const editingJob = editingId ? jobs.find((j) => j.id === editingId) : undefined
@@ -247,28 +447,25 @@ export default function JobsManagement() {
       <Sidebar active="Jobs Management" />
 
       <main className="dash__main jm-main">
-        <Topbar
-          extra={
+        <div className="jm-header-row">
+          <div>
+            <h1 className="dash__title">Jobs</h1>
+            <p className="dash__subtitle">All jobs &amp; revenue</p>
+          </div>
+          <div className="page-header__right">
+            <div className="sb-legend">
+              {crewsList.map((crew) => (
+                <span key={crew._id} className="sb-legend__item">
+                  <i style={{ background: crewColorFor(crew._id, crew.crewColor) }} />
+                  {crew.name}
+                </span>
+              ))}
+            </div>
             <ZoomControl
               zoom={zoom}
               onZoomIn={() => setZoom((z) => stepSheetZoom(z, 1))}
               onZoomOut={() => setZoom((z) => stepSheetZoom(z, -1))}
             />
-          }
-        />
-
-        <div className="jm-header-row">
-          <div>
-            <h1 className="dash__title">Jobs</h1>
-            <p className="dash__subtitle">Master list of all projects</p>
-          </div>
-          <div className="sb-legend">
-            {crewsList.map((crew) => (
-              <span key={crew._id} className="sb-legend__item">
-                <i style={{ background: crewColorFor(crew._id, crew.crewColor) }} />
-                {crew.name}
-              </span>
-            ))}
           </div>
         </div>
 
@@ -288,6 +485,22 @@ export default function JobsManagement() {
           <span className="jm-count">{pagination.totalCount || jobs.length} Total Jobs</span>
 
           <div className="jm-toolbar__right">
+            <div className="jm-dd jm-dd--status">
+              <Dropdown
+                value={statusFilter ?? '__all'}
+                selectedLabel={
+                  statusFilter ? `${STATUS_OPTIONS.find((s) => s.id === statusFilter)?.label}` : 'Status'
+                }
+                onChange={(v) => {
+                  setStatusFilter(v === '__all' ? null : (v as JobStatus))
+                  setPage(1)
+                }}
+                options={[
+                  { id: '__all', label: 'All Statuses' },
+                  ...STATUS_OPTIONS.map((s) => ({ id: s.id, label: s.label })),
+                ]}
+              />
+            </div>
 
             <div className="jm-dd jm-dd--sort">
               <Dropdown
@@ -309,99 +522,121 @@ export default function JobsManagement() {
 
         {apiError && <p className="field-error" style={{ margin: '12px 0' }}>{apiError}</p>}
 
-        <div className="jm-table-wrap" ref={tableWrapRef}>
+        <div className="jm-sheet">
+        <div className="jm-table-wrap jm-pane--main" ref={mainPaneRef} onScroll={() => syncVertical('main')}>
           <div className="jm-table-zoom" style={sheetZoomStyle(zoom)}>
-          <table className="jm-table">
+          <table className="jm-table" ref={mainTableRef}>
             <colgroup>
-              <col className="jm-col-id-w" />
               <col className="jm-col-name-w" />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
+              <col className="jm-col-xs" />
+              <col className="jm-col-xs" />
+              <col className="jm-col-sm" />
+              <col className="jm-col-md" />
+              <col className="jm-col-sm" />
+              <col className="jm-col-stack" />
+              <col className="jm-col-stack" />
+              <col className="jm-col-stack" />
+              <col className="jm-col-stack-lg" />
+              {months.map((m) => (
+                <col key={`c-m-${m.key}`} className="jm-col-month" />
+              ))}
             </colgroup>
             <thead>
               <tr>
-                <th className="jm-sticky jm-sticky--id">
-                  <div className="jm-id-cell">
-                    <span>Job ID</span>
-                  </div>
-                </th>
                 <th className="jm-sticky jm-sticky--name">Job Name</th>
-                <th>Crew Assigned</th>
-                <th>GC</th>
-                <th className="jm-center">GC Super</th>
-                <th className="jm-center">Contract</th>
-                <th className="jm-center">Duration</th>
+                <th>Job #</th>
+                <th>Bid #</th>
+                <th>Estimator</th>
+                <th>Assigned to</th>
+                <th>Contractor</th>
                 <th className="jm-center">
-                  {(pagination.totalCount || jobs.length > 0 || statusFilter !== null) ? (
-                    <div style={{ display: 'inline-block', textAlign: 'left' }}>
-                      <Dropdown
-                        value={statusFilter ?? '__all'}
-                        selectedLabel={statusFilter ? `${STATUS_OPTIONS.find((s) => s.id === statusFilter)?.label}` : 'Status'}
-                        onChange={(v) => {
-                          setStatusFilter(v === '__all' ? null : (v as JobStatus))
-                          setPage(1)
-                        }}
-                        options={[{ id: '__all', label: 'All Statuses' }, ...STATUS_OPTIONS.map((s) => ({ id: s.id, label: s.label }))]}
-                      />
-                    </div>
-                  ) : (
-                    'Status'
-                  )}
+                  <span className="jm-th-stack jm-th-stack--split">
+                    <span>Contract Amt</span>
+                    <span className="jm-th-stack__rule" />
+                    <span>Budgeted Labor</span>
+                  </span>
                 </th>
-                <th className="jm-center">Labor Budget</th>
-                <th className="jm-center">Action</th>
+                <th className="jm-center">
+                  <span className="jm-th-stack jm-th-stack--split">
+                    <span>Budgeted Days</span>
+                    <span className="jm-th-stack__rule" />
+                    <span>Balance to Spend</span>
+                  </span>
+                </th>
+                <th className="jm-center">
+                  <span className="jm-th-stack jm-th-stack--split">
+                    <span>Revenue per Day</span>
+                    <span className="jm-th-stack__rule" />
+                    <span>Percent of Total</span>
+                  </span>
+                </th>
+                <th className="jm-center">
+                  <span className="jm-th-stack jm-th-stack--split">
+                    <span>Cumulative Revenue</span>
+                    <span className="jm-th-stack__rule" />
+                    <span>Cumulative Labor Cost</span>
+                  </span>
+                </th>
+                {months.map((m) => (
+                  <th key={`h-m-${m.key}`} className="jm-center jm-month-col" title={m.label}>
+                    {MONTH_SHORT[Number(m.key.slice(5, 7)) - 1] ?? m.label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="crew-empty-cell" style={{ textAlign: 'center', padding: '32px 0' }}>
+                  <td colSpan={columnCount} className="crew-empty-cell" style={{ textAlign: 'center', padding: '32px 0' }}>
                     Loading jobs...
                   </td>
                 </tr>
               ) : jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="crew-empty-cell" style={{ textAlign: 'center', padding: '32px 0' }}>
+                  <td colSpan={columnCount} className="crew-empty-cell" style={{ textAlign: 'center', padding: '32px 0' }}>
                     No jobs found
                   </td>
                 </tr>
               ) : (
                 jobs.map((job) => {
-                  const overBudget = job.laborBudgetUsed > job.laborBudgetTotal
-                  const pct = Math.min(100, Math.round((job.laborBudgetUsed / Math.max(1, job.laborBudgetTotal)) * 100))
-                  const barColor = overBudget ? '#ef4444' : job.status === 'awarded' ? '#f97316' : '#22c55e'
-                  const barPct = overBudget ? 100 : Math.max(8, pct)
-                  const stripeColor = job.color
+                  const stripes = job.crews.length
+                    ? job.crews
+                    : [{ id: 'none', name: 'Unassigned', color: '#94a3b8' }]
+                  const fin = job.financials
+                  // The server's laborBudgetRemaining, or the same subtraction
+                  // locally when a response predates the financials rollup.
+                  const balanceToSpend =
+                    fin?.laborBudgetRemaining ?? job.laborBudgetTotal - job.laborBudgetUsed
+                  // "Percent of Total": one day's revenue as a share of the
+                  // whole contract. The API has no such field, so it is derived
+                  // from the two it does return.
+                  const percentOfTotal =
+                    fin?.revenuePerDay && job.contract > 0
+                      ? (fin.revenuePerDay / job.contract) * 100
+                      : null
+                  const monthsByKey = new Map((fin?.fourMonths ?? []).map((m) => [m.month, m]))
                   return (
                     <tr key={job.rawId || job.id} className="jm-row">
-                      <td className="jm-sticky jm-sticky--id">
-                        <div className="jm-id-cell">
-                          <span className="jm-id">{job.id}</span>
-                        </div>
+                      <td className="jm-name-cell jm-sticky jm-sticky--name">
                         <span
                           className="jm-color-bar-hit"
                           onMouseEnter={(e) => {
-                            const isUnassigned = !job.crewName || job.crewName === 'Unassigned'
                             const rect = e.currentTarget.getBoundingClientRect()
                             setCrewHover({
-                              x: rect.right + 8,
+                              x: rect.right + 14,
                               y: rect.top + rect.height / 2,
-                              color: isUnassigned ? '#94a3b8' : stripeColor,
-                              names: [isUnassigned ? 'Unassigned' : job.crewName],
+                              color: stripes[0].color,
+                              names: stripes.map((c) => c.name),
                             })
                           }}
                           onMouseLeave={() => setCrewHover(null)}
                         >
-                          <span className="jm-color-bar" style={{ background: !job.crewName || job.crewName === 'Unassigned' ? '#94a3b8' : stripeColor }} />
+                          <span className="jm-color-bar">
+                            {stripes.map((c) => (
+                              <span key={c.id} className="jm-color-bar__seg" style={{ background: c.color }} />
+                            ))}
+                          </span>
                         </span>
-                      </td>
-                      <td className="jm-name-cell jm-sticky jm-sticky--name">
                         <button
                           type="button"
                           className="jm-name-btn"
@@ -409,73 +644,60 @@ export default function JobsManagement() {
                         >
                           <span className="jm-name-inner">
                             <span>{job.name}</span>
+                            <CaretRight size={16} />
                           </span>
                         </button>
                       </td>
+                      <td>{job.jobNo}</td>
+                      <td>{job.bidNo}</td>
+                      <td>{job.estimator}</td>
                       <td className="jm-crew-cell">
-                        <span className="jm-crew">
-                          <Avatar
-                            name={job.crewName}
-                            background={!job.crewName || job.crewName === 'Unassigned' ? '#94a3b8' : stripeColor}
-                            size={24}
-                          />
-                          {job.crewName}
+                        <span className="jm-crew-list">
+                          {job.crews.length === 0 ? (
+                            <span className="jm-crew-chip">
+                              <i style={{ background: '#94a3b8' }} />
+                              Unassigned
+                            </span>
+                          ) : (
+                            job.crews.map((c) => (
+                              <span key={c.id} className="jm-crew-chip">
+                                <i style={{ background: c.color }} />
+                                {c.name}
+                              </span>
+                            ))
+                          )}
                         </span>
                       </td>
                       <td>{job.gc}</td>
-                      <td className="jm-center">{job.gcSuper}</td>
-                      <td className="jm-center jm-contract">{formatMoney(job.contract)}</td>
-                      <td className="jm-center jm-duration">
-                        <div>{job.startDate}</div>
-                        <div>{job.endDate}</div>
+                      <td className="jm-center">
+                        <StackCell top={money(job.contract)} bottom={money(job.laborBudgetTotal)} />
                       </td>
                       <td className="jm-center">
-                        <div style={{ display: 'inline-block', textAlign: 'left' }}>
-                          <Dropdown
-                            value={job.status}
-                            selectedLabel={
-                              <span
-                                className="jm-status"
-                                style={{
-                                  color: STATUS_COLORS[job.status],
-                                  borderColor: STATUS_COLORS[job.status],
-                                }}
-                              >
-                                {STATUS_LABELS[job.status]}
-                                
-                              </span>
-                            }
-                            onChange={(v) => handleStatusChange(job.rawId || job.id, v as JobStatus)}
-                            options={STATUS_OPTIONS.map((s) => ({ id: s.id, label: s.label }))}
-                          />
-                        </div>
+                        <StackCell
+                          top={job.budgetedDays === null ? '' : String(job.budgetedDays)}
+                          bottom={money(balanceToSpend)}
+                        />
                       </td>
                       <td className="jm-center">
-                        <div className="jm-labor">
-                          <div className="jm-labor__label">
-                            {overBudget && <span className="jm-labor__badge">!</span>}
-                            <span className={overBudget ? 'jm-labor__text jm-labor__text--danger' : 'jm-labor__text'}>
-                              {formatMoney(job.laborBudgetUsed)}/{formatMoney(job.laborBudgetTotal)}
-                            </span>
-                          </div>
-                          <span className="jm-labor__bar">
-                            <span className="jm-labor__fill" style={{ width: `${barPct}%`, background: barColor }} />
-                          </span>
-                        </div>
+                        <StackCell top={money(fin?.revenuePerDay)} bottom={percent(percentOfTotal)} />
                       </td>
                       <td className="jm-center">
-                        <div className="jm-action-cell">
-                          <button
-                            type="button"
-                            className="btn btn--primary"
-                            onClick={() => setEditingId(job.id)}
-                            aria-label={`Edit job ${job.name}`}
-                          >
-                            <PenIcon size={16} />
-                            <p>Edit</p>
-                          </button>
-                        </div>
+                        <StackCell
+                          top={money(fin?.cumulativeRevenue)}
+                          bottom={money(fin?.cumulativeLaborCost)}
+                        />
                       </td>
+                      {months.map((m) => {
+                        const bucket = monthsByKey.get(m.key)
+                        return (
+                          <td key={`${job.rawId}-m-${m.key}`} className="jm-center jm-month-col">
+                            <StackCell
+                              top={money(bucket?.revenueParked)}
+                              bottom={money(bucket?.totalLaborCost)}
+                            />
+                          </td>
+                        )
+                      })}
                     </tr>
                   )
                 })
@@ -483,6 +705,88 @@ export default function JobsManagement() {
             </tbody>
           </table>
           </div>
+        </div>
+
+        <div
+          className="jm-pane-grip"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the day strip"
+          onPointerDown={startPaneResize}
+        >
+          <span className="jm-grip" />
+        </div>
+
+        {/* Its own scroller: panning the day strip sideways leaves the job
+            columns where they are. Only vertical scroll is shared. */}
+        <div
+          className="jm-table-wrap jm-pane--days"
+          style={{ width: `${dayPaneWidth}px` }}
+          ref={dayPaneRef}
+          onScroll={() => syncVertical('day')}
+        >
+          <div className="jm-table-zoom" style={sheetZoomStyle(zoom)}>
+          <table className="jm-table jm-table--days">
+            <colgroup>
+              {days.map((d) => (
+                <col key={`c-d-${d.getTime()}`} className="jm-col-day" />
+              ))}
+            </colgroup>
+            <thead>
+              <tr style={rowHeights[0] ? { height: `${rowHeights[0]}px` } : undefined}>
+                {days.map((d) => {
+                  const isToday = isSameDay(d, today)
+                  return (
+                    <th
+                      key={`h-d-${d.getTime()}`}
+                      className={`jm-center jm-day-col${isToday ? ' is-today' : ''}`}
+                    >
+                      <span className="jm-th-stack">
+                        <span>
+                          {isToday ? `Today, ${WEEKDAY_SHORT[d.getDay()]}` : WEEKDAY_SHORT[d.getDay()]}
+                        </span>
+                        <span className="jm-day-col__date">{shortDate(d)}</span>
+                      </span>
+                    </th>
+                  )
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {loading || jobs.length === 0 ? (
+                <tr>
+                  <td colSpan={days.length} className="crew-empty-cell" style={{ padding: '32px 0' }} />
+                </tr>
+              ) : (
+                jobs.map((job, rowIndex) => (
+                  <tr
+                    key={job.rawId || job.id}
+                    className="jm-row"
+                    style={
+                      rowHeights[rowIndex + 1] ? { height: `${rowHeights[rowIndex + 1]}px` } : undefined
+                    }
+                  >
+                    {days.map((d) => {
+                      const day = job.costByDate[isoDay(d)]
+                      return (
+                        <td
+                          key={`${job.rawId}-d-${d.getTime()}`}
+                          className={`jm-center jm-day-col${isSameDay(d, today) ? ' is-today' : ''}`}
+                        >
+                          <StackCell
+                            top={money(day?.laborCost)}
+                            bottom={day ? `${Math.round(day.hoursWorked * 10) / 10}h` : ''}
+                          />
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+          </div>
+        </div>
         </div>
 
         <div className="jm-pagination-bar">
@@ -551,7 +855,13 @@ export default function JobsManagement() {
           job={toJob(activeRow)}
           crew={toCrew(activeRow)}
           note={activeRow.note ?? ''}
+          status={activeRow.status}
           onDone={() => setFlow({ type: 'none' })}
+          onChangeStatus={(next) => handleStatusChange(activeRow.rawId || activeRow.id, next)}
+          onEditJob={() => {
+            setFlow({ type: 'none' })
+            setEditingId(activeRow.id)
+          }}
           onChangeCrew={() => setFlow({ type: 'assignCrew', jobId: activeRow.rawId || activeRow.id })}
           onSaveNote={(text: string) => {
             updateJobMutation

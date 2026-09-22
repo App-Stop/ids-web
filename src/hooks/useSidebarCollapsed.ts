@@ -1,31 +1,19 @@
 import { useCallback, useState } from 'react'
 
-const STORAGE_KEY = 'ids-sidebar-collapsed'
-
+/**
+ * The sidebar no longer has an open/closed state: it rests as a 60px icon rail
+ * and unfurls over the page on hover, so the layout is always laid out as if
+ * it were collapsed. Pages still read this to recompute grid widths, so it
+ * keeps its shape and simply always reports `true`.
+ */
 export function readSidebarCollapsed(): boolean {
-  try {
-    return localStorage.getItem(STORAGE_KEY) === '1'
-  } catch {
-    return false
-  }
+  return true
 }
 
-function writeSidebarCollapsed(collapsed: boolean) {
-  try {
-    localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0')
-  } catch {
-    /* ignore quota / private mode */
-  }
-}
-
-/** Persists across routes and resizes; only changes when set explicitly. */
 export function useSidebarCollapsed() {
-  const [collapsed, setCollapsedState] = useState(readSidebarCollapsed)
-
-  const setCollapsed = useCallback((next: boolean) => {
-    writeSidebarCollapsed(next)
-    setCollapsedState(next)
-  }, [])
-
+  const [collapsed] = useState(true)
+  // Kept as a setter so existing callers still type-check; the sidebar is
+  // hover-driven now, so there is nothing to store.
+  const setCollapsed = useCallback((next: boolean) => void next, [])
   return [collapsed, setCollapsed] as const
 }

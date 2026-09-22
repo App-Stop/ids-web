@@ -437,6 +437,9 @@ export default function CreateJobModal({
 }) {
   const isEdit = !!job
   const [jobIdNumber, setJobIdNumber] = useState<number | ''>('')
+  const [bidNumber, setBidNumber] = useState<number | ''>('')
+  const [estimator, setEstimator] = useState('')
+  const [budgetedDays, setBudgetedDays] = useState<number | ''>('')
   const [name, setName] = useState(job?.name ?? '')
   const [siteAddress, setSiteAddress] = useState('')
   const [gc, setGc] = useState(job?.gc ?? '')
@@ -490,6 +493,9 @@ export default function CreateJobModal({
           if (jobRes && jobRes.success && jobRes.data) {
             const j = jobRes.data
             if (j.jobIdNumber !== undefined && j.jobIdNumber !== null) setJobIdNumber(j.jobIdNumber)
+            if (typeof j.bidNumber === 'number') setBidNumber(j.bidNumber)
+            if (j.estimator) setEstimator(String(j.estimator))
+            if (j.budgetedDays !== undefined && j.budgetedDays !== null) setBudgetedDays(j.budgetedDays)
             setName(j.name || '')
             setSiteAddress(j.siteAddress || '')
             setGc(j.generalContractor || '')
@@ -705,6 +711,9 @@ export default function CreateJobModal({
       if (!isEdit) {
         const payload: CreateJobPayload = {
           jobIdNumber: Number(jobIdNumber),
+          bidNumber: bidNumber === '' ? undefined : Number(bidNumber),
+          estimator: estimator.trim() || undefined,
+          budgetedDays: budgetedDays === '' ? undefined : Number(budgetedDays),
           name: name.trim(),
           generalContractor: gc.trim(),
           gcSuper: gcSuper.trim() || undefined,
@@ -734,6 +743,9 @@ export default function CreateJobModal({
         if (!job?.id) return
         const patchPayload: UpdateJobPayload = {
           jobIdNumber: Number(jobIdNumber),
+          bidNumber: bidNumber === '' ? null : Number(bidNumber),
+          estimator: estimator.trim() || null,
+          budgetedDays: budgetedDays === '' ? null : Number(budgetedDays),
           name: name.trim(),
           generalContractor: gc.trim(),
           gcSuper: gcSuper.trim() || null,
@@ -822,7 +834,7 @@ export default function CreateJobModal({
 
             <div className="field-row">
               <div style={{ flex: '0 0 160px' }}>
-                <label className="field-label">Job ID Number*</label>
+                <label className="field-label">Job #*</label>
                 <input
                   type="number"
                   className={`field-input${fieldErrors.jobIdNumber ? ' field-input--error' : ''}`}
@@ -844,6 +856,34 @@ export default function CreateJobModal({
                   onChange={(e) => setName(e.target.value)}
                 />
                 {fieldErrors.name && <span className="field-error-text">{fieldErrors.name}</span>}
+              </div>
+            </div>
+
+            <div className="field-row">
+              <div style={{ flex: '0 0 160px' }}>
+                <label className="field-label">
+                  Bid # <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span>
+                </label>
+                <input
+                  type="number"
+                  className={`field-input${fieldErrors.bidNumber ? ' field-input--error' : ''}`}
+                  placeholder="e.g. 48271"
+                  value={bidNumber}
+                  onChange={(e) => setBidNumber(e.target.value === '' ? '' : Number(e.target.value))}
+                />
+                {fieldErrors.bidNumber && <span className="field-error-text">{fieldErrors.bidNumber}</span>}
+              </div>
+              <div style={{ flex: 1 }}>
+                <label className="field-label">
+                  Estimator <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span>
+                </label>
+                <input
+                  className={`field-input${fieldErrors.estimator ? ' field-input--error' : ''}`}
+                  placeholder="Enter Estimator Name"
+                  value={estimator}
+                  onChange={(e) => setEstimator(e.target.value)}
+                />
+                {fieldErrors.estimator && <span className="field-error-text">{fieldErrors.estimator}</span>}
               </div>
             </div>
 
@@ -895,7 +935,7 @@ export default function CreateJobModal({
             <div className="field-row job-form-modal__money-row">
               <div>
                 <label className="field-label">
-                  Contract Amount <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span>
+                  Contracted Amount <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span>
                 </label>
                 <div className={`field-money${fieldErrors.contractAmount ? ' field-money--error' : ''}`}>
                   <span>$</span>
@@ -932,6 +972,19 @@ export default function CreateJobModal({
                 {fieldErrors.laborBudget && <span className="field-error-text">{fieldErrors.laborBudget}</span>}
               </div>
             </div>
+
+            <label className="field-label">
+              Budgeted Days <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              className={`field-input${fieldErrors.budgetedDays ? ' field-input--error' : ''}`}
+              placeholder="e.g. 48"
+              value={budgetedDays}
+              onChange={(e) => setBudgetedDays(e.target.value === '' ? '' : Number(e.target.value))}
+            />
+            {fieldErrors.budgetedDays && <span className="field-error-text">{fieldErrors.budgetedDays}</span>}
 
             <div style={{ marginTop: '0.85rem' }}>
               <label className="field-label">Status*</label>

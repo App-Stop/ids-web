@@ -8,24 +8,36 @@
   align-items: flex-start;
 }
 
-/* Sidebar — expanded: nav panel + profile card as separate pieces */
+/* Sidebar — the rail's 60px is the only space it ever takes in the layout;
+   the expanded panel floats over the page on hover so nothing reflows. */
 .sidebar {
-  width: 248px;
+  width: 60px;
   flex-shrink: 0;
   border: none;
   border-radius: 0;
   background: transparent;
-  display: flex;
-  flex-direction: column;
   padding: 0;
-  gap: 0.75rem;
   box-shadow: none;
-  transition: width 0.2s ease;
   position: sticky;
   top: 0.85rem;
   height: calc(100svh - 1.7rem);
   max-height: calc(100svh - 1.7rem);
-  overflow: hidden;
+  overflow: visible;
+  z-index: 60;
+}
+
+.sidebar__floating {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: width 0.18s ease;
+}
+
+.sidebar.is-open .sidebar__floating {
+  width: 248px;
 }
 
 .sidebar__panel {
@@ -223,17 +235,8 @@
 }
 
 /* Sidebar — collapsed floating pill rail */
-.sidebar.is-collapsed {
-  width: 60px;
-  height: calc(100svh - 1.7rem);
-  max-height: calc(100svh - 1.7rem);
-  padding: 0;
-  border: none;
-  background: transparent;
-  box-shadow: none;
+.sidebar.is-collapsed .sidebar__floating {
   align-items: center;
-  gap: 0.75rem;
-  border-radius: 0;
 }
 
 .sidebar.is-collapsed .sidebar__rail {

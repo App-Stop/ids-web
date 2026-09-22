@@ -21,7 +21,6 @@ import {
   MagnifyingGlass,
 } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
-import Topbar from '../components/dashboard/Topbar'
 import Dropdown from '../components/dashboard/Dropdown'
 import ZoomControl from '../components/dashboard/ZoomControl'
 import NoteModal from '../components/dashboard/NoteModal'
@@ -1383,28 +1382,25 @@ export default function ScheduleBoard() {
       />
 
       <main className="dash__main sb-main">
-        <Topbar
-          extra={
-            <ZoomControl
-              zoom={zoom}
-              onZoomIn={() => setZoom((z) => stepSheetZoom(z, 1))}
-              onZoomOut={() => setZoom((z) => stepSheetZoom(z, -1))}
-            />
-          }
-        />
-
         <div className="sb-header-row">
           <div>
             <h1 className="dash__title">Job Schedules</h1>
             <p className="dash__subtitle">{viewMode === 'weekly' ? 'Weekly' : 'Monthly'} crew assignments</p>
           </div>
-          <div className="sb-legend">
-            {crews.map((crew) => (
-              <span key={crew._id} className="sb-legend__item">
-                <i style={{ background: crewColorFor(crew._id, crew.crewColor) }} />
-                {crew.name}
-              </span>
-            ))}
+          <div className="page-header__right">
+            <div className="sb-legend">
+              {crews.map((crew) => (
+                <span key={crew._id} className="sb-legend__item">
+                  <i style={{ background: crewColorFor(crew._id, crew.crewColor) }} />
+                  {crew.name}
+                </span>
+              ))}
+            </div>
+            <ZoomControl
+              zoom={zoom}
+              onZoomIn={() => setZoom((z) => stepSheetZoom(z, 1))}
+              onZoomOut={() => setZoom((z) => stepSheetZoom(z, -1))}
+            />
           </div>
         </div>
 

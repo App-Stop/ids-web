@@ -1,8 +1,59 @@
 import api from './axiosInstance'
 
+/** One crew on a job, from `assignedTo` — every scheduled, not-yet-ended stint. */
+export interface AssignedCrew {
+  crewId: string
+  name: string | null
+  crewColor: string | null
+}
+
+/** One of the four forward months in `financials.fourMonths`. */
+export interface JobMonthFinancials {
+  /** "YYYY-MM" */
+  month: string
+  /** e.g. "September 2026" */
+  label: string
+  totalLaborCost: number
+  /** revenuePerDay x work-days that month; null when revenuePerDay is null. */
+  revenueParked: number | null
+}
+
+/** One day in `financials.yearCostTracking`. Sparse — only days with activity. */
+export interface JobDayCost {
+  /** "YYYY-MM-DD" */
+  date: string
+  laborCost: number
+  hoursWorked: number
+  entryCount: number
+}
+
+/**
+ * Budget/revenue rollups. Present on the list and detail responses only —
+ * create/update return the raw fields without it. Money figures are labor
+ * cost only; materials and dumpsters live in the cost-tracking report.
+ */
+export interface JobFinancials {
+  cumulativeLaborCost: number
+  cumulativeRevenue: number | null
+  laborBudgetRemaining: number | null
+  percentLaborBudgetRemaining: number | null
+  /** contractAmount / budgetedDays; null when either is unset. */
+  revenuePerDay: number | null
+  /** Always 4 entries: the current calendar month plus the next three. */
+  fourMonths: JobMonthFinancials[]
+  yearCostTracking: JobDayCost[]
+}
+
 export interface JobItem {
   _id: string
   jobIdNumber: number
+  bidNumber?: number | null
+  estimator?: string | null
+  budgetedDays?: number | null
+  /** Every crew scheduled on the job now or later — broader than currentCrew. */
+  assignedTo?: AssignedCrew[]
+  /** Omitted on create/update responses. */
+  financials?: JobFinancials
   name: string
   generalContractor: string
   gcSuper?: string | null
@@ -54,6 +105,10 @@ export type CrewAssignmentPayloadItem = CrewAssignmentWindow & CrewTarget
 
 export interface CreateJobPayload {
   jobIdNumber?: number
+  bidNumber?: number | null
+  estimator?: string | null
+  /** Whole number ≥ 1 — the server rejects 0 and fractions. */
+  budgetedDays?: number | null
   name?: string
   generalContractor: string
   gcSuper?: string | null

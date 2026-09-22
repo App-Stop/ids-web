@@ -2,24 +2,39 @@ import { useEffect, useState } from 'react'
 import Modal from './Modal'
 import Avatar from './Avatar'
 import ConfirmModal from './ConfirmModal'
+import Dropdown from './Dropdown'
 import { Icon } from './icons'
+import { STATUS_COLORS, STATUS_LABELS, type JobStatus } from '../../lib/jobsManagementData'
 import { formatMoney, type Job, type UnassignedCrew } from '../../lib/dashboardData'
 import { getJobById, getCrewAssignments, type JobItem, type CrewAssignment } from '../../api/jobApi'
 import { crewColorFor, formatTimeWindow, formatMdy } from '../../lib/scheduleData'
+import '../../pages/Dashboard.css'
+import './crew-modals.css'
+
+const STATUS_OPTIONS: { id: JobStatus; label: string }[] = [
+  { id: 'awarded', label: 'Awarded' },
+  { id: 'in-progress', label: 'In Progress' },
+  { id: 'completed', label: 'Completed' },
+]
 
 export default function JobDetailsModal({
   job,
   crew,
   note,
+  status,
   onDone,
   onChangeCrew,
   onRemoveCrew,
   onDeleteJob,
   onSaveNote,
+  onChangeStatus,
+  onEditJob,
 }: {
   job: Job
   crew: UnassignedCrew | null
   note: string
+  /** Current status. With `onChangeStatus`, it renders as an editable pill. */
+  status?: JobStatus
   onDone: () => void
   /** Omit to hide the Change/Assign Crew button (read-only views). */
   onChangeCrew?: () => void
@@ -27,11 +42,16 @@ export default function JobDetailsModal({
   onDeleteJob?: () => void
   /** When provided, the note section becomes editable inside the modal. */
   onSaveNote?: (text: string) => void
+  /** When provided, the status pill becomes a dropdown. */
+  onChangeStatus?: (next: JobStatus) => void
+  /** When provided, an "Edit Job" button opens the full job form. */
+  onEditJob?: () => void
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [editingNote, setEditingNote] = useState(false)
   const [noteDraft, setNoteDraft] = useState(note)
   const [fetchedJob, setFetchedJob] = useState<JobItem | null>(null)
+  const [statusDraft, setStatusDraft] = useState<JobStatus | undefined>(status)
   /** Every crew booked on this job, with the hours each one works. */
   const [assignments, setAssignments] = useState<CrewAssignment[]>([])
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(Boolean(job.id && !job.id.startsWith('#tmp')))
@@ -53,6 +73,8 @@ export default function JobDetailsModal({
           if (res.data.note) {
             setNoteDraft(res.data.note)
           }
+          const s = res.data.status
+          if (s === 'awarded' || s === 'in-progress' || s === 'completed') setStatusDraft(s)
         }
         if (assignmentsRes?.data) {
           setAssignments(assignmentsRes.data.filter((a) => a.status !== 'cancelled'))
@@ -87,6 +109,10 @@ export default function JobDetailsModal({
 
   const displayNote = fetchedJob?.note ?? note
 
+  // The fetch runs once per job, so a status the user picks here is held
+  // locally rather than waiting for a refetch to come back around.
+  const displayStatus: JobStatus | undefined = statusDraft ?? status
+
   const handleDelete = onDeleteJob || onRemoveCrew
 
   if (confirmingDelete) {
@@ -102,7 +128,7 @@ export default function JobDetailsModal({
   }
 
   return (
-    <Modal onClose={onDone} width={460}>
+    <Modal onClose={onDone} width={560}>
       {isLoadingDetails && (
         <div style={{ padding: '0.5rem 0', color: '#6b7280', fontSize: '0.875rem', fontStyle: 'italic' }}>
           Loading latest job details…
@@ -115,6 +141,36 @@ export default function JobDetailsModal({
       <h2 className="modal-title" style={{ marginTop: '0.25rem' }}>
         {displayJob.name}
       </h2>
+
+      {displayStatus && (
+        <div className="job-head__status">
+          {onChangeStatus ? (
+            <Dropdown
+              value={displayStatus}
+              selectedLabel={
+                <span
+                  className="jm-status"
+                  style={{ color: STATUS_COLORS[displayStatus], borderColor: STATUS_COLORS[displayStatus] }}
+                >
+                  {STATUS_LABELS[displayStatus]}
+                </span>
+              }
+              onChange={(v) => {
+                setStatusDraft(v as JobStatus)
+                onChangeStatus(v as JobStatus)
+              }}
+              options={STATUS_OPTIONS}
+            />
+          ) : (
+            <span
+              className="jm-status"
+              style={{ color: STATUS_COLORS[displayStatus], borderColor: STATUS_COLORS[displayStatus] }}
+            >
+              {STATUS_LABELS[displayStatus]}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="detail-grid">
         <div>
@@ -180,8 +236,8 @@ export default function JobDetailsModal({
 
       {(displayNote || onSaveNote) && (
         <>
-          <div className="note-section__head">
-            <span className="detail-label" style={{marginTop:20}}>Note</span>
+          <div className="note-section__head" style={{ marginTop: '1.25rem' }}>
+            <span className="detail-label">Note</span>
             {onSaveNote && !editingNote && (
               <button
                 type="button"
@@ -229,19 +285,25 @@ export default function JobDetailsModal({
         </>
       )}
 
-      <div className="modal-actions modal-actions--split">
-        {handleDelete ? (
+      <div
+        className={`modal-actions ${handleDelete ? 'modal-actions--split' : ''} job-details-modal__actions`}
+      >
+        {handleDelete && (
           <button type="button" className="btn btn--danger" onClick={() => setConfirmingDelete(true)}>
             <Icon.Trash width={16} height={16} />
             Delete Job
           </button>
-        ) : (
-          <span />
         )}
         <div className="modal-actions__group">
           {onChangeCrew && (
             <button type="button" className="btn btn--outline" onClick={onChangeCrew}>
               {crew ? 'Change Crew' : 'Assign Crew'}
+            </button>
+          )}
+          {onEditJob && (
+            <button type="button" className="btn btn--outline" onClick={onEditJob}>
+              <Icon.Edit width={16} height={16} />
+              Edit Job
             </button>
           )}
           <button type="button" className="btn btn--primary" onClick={onDone}>
