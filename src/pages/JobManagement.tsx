@@ -38,17 +38,19 @@ type Row = ManagedJob & {
   costByDate: Record<string, JobDayCost>
 }
 
-/** Monday-based week containing `from`, seven days long. */
-function weekDays(from = new Date()): Date[] {
-  const monday = new Date(from)
-  monday.setHours(0, 0, 0, 0)
-  const offset = monday.getDay() === 0 ? -6 : 1 - monday.getDay()
-  monday.setDate(monday.getDate() + offset)
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday)
-    d.setDate(monday.getDate() + i)
-    return d
-  })
+/**
+ * Every day of `year`, Jan 1 through Dec 31 — the span `yearCostTracking`
+ * covers, and what the right-hand strip is for. Leap years come out at 366 by
+ * construction rather than by a rule.
+ */
+function yearDays(year: number): Date[] {
+  const out: Date[] = []
+  const d = new Date(year, 0, 1)
+  while (d.getFullYear() === year) {
+    out.push(new Date(d))
+    d.setDate(d.getDate() + 1)
+  }
+  return out
 }
 
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -299,8 +301,10 @@ export default function JobsManagement() {
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(20)
 
-  const days = useMemo(() => weekDays(), [])
   const today = useMemo(() => new Date(), [])
+  // The strip is the cost-tracking year, so it spans the calendar year today
+  // falls in rather than the current week.
+  const days = useMemo(() => yearDays(today.getFullYear()), [today])
 
   // The sheet is two panes that scroll independently: the job columns on the
   // left, the day strip on the right. Only their vertical scroll is kept in
@@ -310,6 +314,22 @@ export default function JobsManagement() {
   useClickDragScroll(mainPaneRef)
   useClickDragScroll(dayPaneRef)
   const [dayPaneWidth, setDayPaneWidth] = useState(DAY_PANE_DEFAULT_W)
+  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('jm_left_collapsed') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('jm_left_collapsed', String(leftCollapsed))
+    } catch {
+      // ignore
+    }
+  }, [leftCollapsed])
+
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
   const { assignCrew } = useAppStore()
 
@@ -358,7 +378,7 @@ export default function JobsManagement() {
     })
   }, [jobs])
   /** Columns in the left pane only — the day strip is its own table now. */
-  const columnCount = 10 + months.length
+  const columnCount = leftCollapsed ? 1 : 10 + months.length
   const pagination = jobsQuery.data?.pagination ?? { page, limit, totalCount: 0, totalPages: 1 }
   const loading = jobsQuery.isPending
   const apiError =
@@ -368,7 +388,7 @@ export default function JobsManagement() {
 
   const mainTableRef = useRef<HTMLTableElement>(null)
   // [0] is the header row; job i is at [i + 1].
-  const rowHeights = useSyncedRowHeights(mainTableRef, [jobs, zoom, months.length, loading])
+  const rowHeights = useSyncedRowHeights(mainTableRef, [jobs, zoom, months.length, loading, leftCollapsed])
 
   // Vertical only, and guarded so the echo from setting the other pane's
   // scrollTop doesn't bounce straight back.
@@ -385,22 +405,71 @@ export default function JobsManagement() {
     })
   }, [])
 
-  /** Drag the grip to give the day strip more or less room. */
+  function toggleLeftCollapse() {
+    setLeftCollapsed((prev) => {
+      const next = !prev
+      if (next && mainPaneRef.current) {
+        mainPaneRef.current.scrollLeft = 0
+      }
+      return next
+    })
+  }
+
+  // A year of columns opens on Jan 1, which is rarely what anyone wants to see.
+  // Park today a little in from the left edge, once, as soon as the strip has
+  // been laid out. Later widths/zooms leave the user's own position alone.
+  const didScrollToTodayRef = useRef(false)
+  useLayoutEffect(() => {
+    if (didScrollToTodayRef.current || loading || jobs.length === 0) return
+    const pane = dayPaneRef.current
+    if (!pane) return
+    const column = pane.querySelector<HTMLElement>('thead .jm-day-col.is-today')
+    if (!column) return
+    didScrollToTodayRef.current = true
+    // Measured rather than read off offsetLeft, which is relative to whichever
+    // ancestor happens to be positioned.
+    const paneRect = pane.getBoundingClientRect()
+    const columnRect = column.getBoundingClientRect()
+    pane.scrollLeft = Math.max(
+      0,
+      pane.scrollLeft + columnRect.left - paneRect.left - columnRect.width,
+    )
+  }, [loading, jobs.length])
+
+  /** Drag the grip to resize, or click to toggle collapse of left columns. */
   function startPaneResize(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return
     e.preventDefault()
     const startX = e.clientX
+    const startY = e.clientY
     const startWidth = dayPaneWidth
+    let moved = false
+
     const onMove = (ev: PointerEvent) => {
-      // Dragging left widens the strip, since it is pinned to the right edge.
-      const next = startWidth + (startX - ev.clientX)
-      setDayPaneWidth(Math.min(DAY_PANE_MAX_W, Math.max(DAY_PANE_MIN_W, next)))
+      if (!moved) {
+        if (Math.abs(ev.clientX - startX) > 4 || Math.abs(ev.clientY - startY) > 4) {
+          moved = true
+          document.body.classList.add('is-col-resizing')
+        }
+      }
+      if (moved) {
+        if (leftCollapsed) {
+          setLeftCollapsed(false)
+        }
+        const next = startWidth + (startX - ev.clientX)
+        setDayPaneWidth(Math.min(DAY_PANE_MAX_W, Math.max(DAY_PANE_MIN_W, next)))
+      }
     }
+
     const onUp = () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       document.body.classList.remove('is-col-resizing')
+      if (!moved) {
+        toggleLeftCollapse()
+      }
     }
-    document.body.classList.add('is-col-resizing')
+
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
   }
@@ -523,65 +592,77 @@ export default function JobsManagement() {
         {apiError && <p className="field-error" style={{ margin: '12px 0' }}>{apiError}</p>}
 
         <div className="jm-sheet">
-        <div className="jm-table-wrap jm-pane--main" ref={mainPaneRef} onScroll={() => syncVertical('main')}>
+        <div
+          className={`jm-table-wrap jm-pane--main${leftCollapsed ? ' is-collapsed' : ''}`}
+          ref={mainPaneRef}
+          onScroll={() => syncVertical('main')}
+        >
           <div className="jm-table-zoom" style={sheetZoomStyle(zoom)}>
           <table className="jm-table" ref={mainTableRef}>
             <colgroup>
               <col className="jm-col-name-w" />
-              <col className="jm-col-xs" />
-              <col className="jm-col-xs" />
-              <col className="jm-col-sm" />
-              <col className="jm-col-md" />
-              <col className="jm-col-sm" />
-              <col className="jm-col-stack" />
-              <col className="jm-col-stack" />
-              <col className="jm-col-stack" />
-              <col className="jm-col-stack-lg" />
-              {months.map((m) => (
-                <col key={`c-m-${m.key}`} className="jm-col-month" />
-              ))}
+              {!leftCollapsed && (
+                <>
+                  <col className="jm-col-xs" />
+                  <col className="jm-col-xs" />
+                  <col className="jm-col-sm" />
+                  <col className="jm-col-md" />
+                  <col className="jm-col-sm" />
+                  <col className="jm-col-stack" />
+                  <col className="jm-col-stack" />
+                  <col className="jm-col-stack" />
+                  <col className="jm-col-stack-lg" />
+                  {months.map((m) => (
+                    <col key={`c-m-${m.key}`} className="jm-col-month" />
+                  ))}
+                </>
+              )}
             </colgroup>
             <thead>
               <tr>
                 <th className="jm-sticky jm-sticky--name">Job Name</th>
-                <th>Job #</th>
-                <th>Bid #</th>
-                <th>Estimator</th>
-                <th>Assigned to</th>
-                <th>Contractor</th>
-                <th className="jm-center">
-                  <span className="jm-th-stack jm-th-stack--split">
-                    <span>Contract Amt</span>
-                    <span className="jm-th-stack__rule" />
-                    <span>Budgeted Labor</span>
-                  </span>
-                </th>
-                <th className="jm-center">
-                  <span className="jm-th-stack jm-th-stack--split">
-                    <span>Budgeted Days</span>
-                    <span className="jm-th-stack__rule" />
-                    <span>Balance to Spend</span>
-                  </span>
-                </th>
-                <th className="jm-center">
-                  <span className="jm-th-stack jm-th-stack--split">
-                    <span>Revenue per Day</span>
-                    <span className="jm-th-stack__rule" />
-                    <span>Percent of Total</span>
-                  </span>
-                </th>
-                <th className="jm-center">
-                  <span className="jm-th-stack jm-th-stack--split">
-                    <span>Cumulative Revenue</span>
-                    <span className="jm-th-stack__rule" />
-                    <span>Cumulative Labor Cost</span>
-                  </span>
-                </th>
-                {months.map((m) => (
-                  <th key={`h-m-${m.key}`} className="jm-center jm-month-col" title={m.label}>
-                    {MONTH_SHORT[Number(m.key.slice(5, 7)) - 1] ?? m.label}
-                  </th>
-                ))}
+                {!leftCollapsed && (
+                  <>
+                    <th>Job #</th>
+                    <th>Bid #</th>
+                    <th>Estimator</th>
+                    <th>Assigned to</th>
+                    <th>Contractor</th>
+                    <th className="jm-center">
+                      <span className="jm-th-stack jm-th-stack--split">
+                        <span>Contract Amt</span>
+                        <span className="jm-th-stack__rule" />
+                        <span>Budgeted Labor</span>
+                      </span>
+                    </th>
+                    <th className="jm-center">
+                      <span className="jm-th-stack jm-th-stack--split">
+                        <span>Budgeted Days</span>
+                        <span className="jm-th-stack__rule" />
+                        <span>Balance to Spend</span>
+                      </span>
+                    </th>
+                    <th className="jm-center">
+                      <span className="jm-th-stack jm-th-stack--split">
+                        <span>Revenue per Day</span>
+                        <span className="jm-th-stack__rule" />
+                        <span>Percent of Total</span>
+                      </span>
+                    </th>
+                    <th className="jm-center">
+                      <span className="jm-th-stack jm-th-stack--split">
+                        <span>Cumulative Revenue</span>
+                        <span className="jm-th-stack__rule" />
+                        <span>Cumulative Labor Cost</span>
+                      </span>
+                    </th>
+                    {months.map((m) => (
+                      <th key={`h-m-${m.key}`} className="jm-center jm-month-col" title={m.label}>
+                        {MONTH_SHORT[Number(m.key.slice(5, 7)) - 1] ?? m.label}
+                      </th>
+                    ))}
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -648,56 +729,60 @@ export default function JobsManagement() {
                           </span>
                         </button>
                       </td>
-                      <td>{job.jobNo}</td>
-                      <td>{job.bidNo}</td>
-                      <td>{job.estimator}</td>
-                      <td className="jm-crew-cell">
-                        <span className="jm-crew-list">
-                          {job.crews.length === 0 ? (
-                            <span className="jm-crew-chip">
-                              <i style={{ background: '#94a3b8' }} />
-                              Unassigned
+                      {!leftCollapsed && (
+                        <>
+                          <td>{job.jobNo}</td>
+                          <td>{job.bidNo}</td>
+                          <td>{job.estimator}</td>
+                          <td className="jm-crew-cell">
+                            <span className="jm-crew-list">
+                              {job.crews.length === 0 ? (
+                                <span className="jm-crew-chip">
+                                  <i style={{ background: '#94a3b8' }} />
+                                  Unassigned
+                                </span>
+                              ) : (
+                                job.crews.map((c) => (
+                                  <span key={c.id} className="jm-crew-chip">
+                                    <i style={{ background: c.color }} />
+                                    {c.name}
+                                  </span>
+                                ))
+                              )}
                             </span>
-                          ) : (
-                            job.crews.map((c) => (
-                              <span key={c.id} className="jm-crew-chip">
-                                <i style={{ background: c.color }} />
-                                {c.name}
-                              </span>
-                            ))
-                          )}
-                        </span>
-                      </td>
-                      <td>{job.gc}</td>
-                      <td className="jm-center">
-                        <StackCell top={money(job.contract)} bottom={money(job.laborBudgetTotal)} />
-                      </td>
-                      <td className="jm-center">
-                        <StackCell
-                          top={job.budgetedDays === null ? '' : String(job.budgetedDays)}
-                          bottom={money(balanceToSpend)}
-                        />
-                      </td>
-                      <td className="jm-center">
-                        <StackCell top={money(fin?.revenuePerDay)} bottom={percent(percentOfTotal)} />
-                      </td>
-                      <td className="jm-center">
-                        <StackCell
-                          top={money(fin?.cumulativeRevenue)}
-                          bottom={money(fin?.cumulativeLaborCost)}
-                        />
-                      </td>
-                      {months.map((m) => {
-                        const bucket = monthsByKey.get(m.key)
-                        return (
-                          <td key={`${job.rawId}-m-${m.key}`} className="jm-center jm-month-col">
+                          </td>
+                          <td>{job.gc}</td>
+                          <td className="jm-center">
+                            <StackCell top={money(job.contract)} bottom={money(job.laborBudgetTotal)} />
+                          </td>
+                          <td className="jm-center">
                             <StackCell
-                              top={money(bucket?.revenueParked)}
-                              bottom={money(bucket?.totalLaborCost)}
+                              top={job.budgetedDays === null ? '' : String(job.budgetedDays)}
+                              bottom={money(balanceToSpend)}
                             />
                           </td>
-                        )
-                      })}
+                          <td className="jm-center">
+                            <StackCell top={money(fin?.revenuePerDay)} bottom={percent(percentOfTotal)} />
+                          </td>
+                          <td className="jm-center">
+                            <StackCell
+                              top={money(fin?.cumulativeRevenue)}
+                              bottom={money(fin?.cumulativeLaborCost)}
+                            />
+                          </td>
+                          {months.map((m) => {
+                            const bucket = monthsByKey.get(m.key)
+                            return (
+                              <td key={`${job.rawId}-m-${m.key}`} className="jm-center jm-month-col">
+                                <StackCell
+                                  top={money(bucket?.revenueParked)}
+                                  bottom={money(bucket?.totalLaborCost)}
+                                />
+                              </td>
+                            )
+                          })}
+                        </>
+                      )}
                     </tr>
                   )
                 })
@@ -708,20 +793,35 @@ export default function JobsManagement() {
         </div>
 
         <div
-          className="jm-pane-grip"
+          className={`jm-pane-grip${leftCollapsed ? ' is-collapsed' : ''}`}
           role="separator"
+          tabIndex={0}
           aria-orientation="vertical"
-          aria-label="Resize the day strip"
+          aria-label={leftCollapsed ? 'Expand columns' : 'Collapse columns'}
+          title={leftCollapsed ? 'Click to expand columns' : 'Click to collapse columns'}
           onPointerDown={startPaneResize}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              toggleLeftCollapse()
+            }
+          }}
         >
+          <div className="jm-pane-grip__toggle" aria-hidden>
+            {leftCollapsed ? (
+              <CaretRight size={13} weight="bold" />
+            ) : (
+              <CaretLeft size={13} weight="bold" />
+            )}
+          </div>
           <span className="jm-grip" />
         </div>
 
         {/* Its own scroller: panning the day strip sideways leaves the job
             columns where they are. Only vertical scroll is shared. */}
         <div
-          className="jm-table-wrap jm-pane--days"
-          style={{ width: `${dayPaneWidth}px` }}
+          className={`jm-table-wrap jm-pane--days${leftCollapsed ? ' is-expanded' : ''}`}
+          style={leftCollapsed ? undefined : { width: `${dayPaneWidth}px` }}
           ref={dayPaneRef}
           onScroll={() => syncVertical('day')}
         >

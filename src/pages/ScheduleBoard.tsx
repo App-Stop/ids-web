@@ -62,6 +62,7 @@ import {
   rangesOverlap,
   type ViewMode,
 } from '../lib/scheduleData'
+import { formatMoney } from '../lib/dashboardData'
 import { useSidebarCollapsed } from '../hooks/useSidebarCollapsed'
 import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import './JobsManagement.css'
@@ -148,10 +149,56 @@ const scheduleCollision: CollisionDetection = (args) => {
   return hits.length > 0 ? hits : closestCenter(args)
 }
 
-const JOBNO_W = 72
 const JOB_W = 230
 const JOB_W_WEEKLY = 180
 /** Fallback day width when monthly + separator open if we couldn't measure. */
+
+/**
+ * The job detail columns the divider handle folds away, in the order the design
+ * lays them out. Widths are unzoomed px — the colgroup scales them.
+ */
+const META_COLS = [
+  { key: 'bidNo', label: 'Bid #', width: 62 },
+  { key: 'jobNo', label: 'Job #', width: 62 },
+  { key: 'estimator', label: 'Estimator', width: 104 },
+  { key: 'contractor', label: 'Contractor', width: 124 },
+  { key: 'idsSuper', label: 'IDS Super', width: 110 },
+  { key: 'contract', label: 'Contract Amount', width: 112 },
+] as const
+
+/** Width of the collapse divider column, unzoomed. */
+const DIVIDER_W = 10
+
+/** Day width used once the meta columns push the sheet past the viewport. */
+const DAY_W_META = 150
+
+/**
+ * The detail values for a job row, formatted for display.
+ *
+ * `idsSuper` may arrive as a populated user object or as a bare string. Unlike
+ * Job Management this row carries no populated crew lead, only the crew's own
+ * name, so that is the fallback rather than the preferred value — a crew name
+ * under "IDS Super" would read as a person who isn't there.
+ */
+function metaValues(row: ScheduleJobRow): Record<(typeof META_COLS)[number]['key'], string> {
+  let idsSuper = '-'
+  if (row.idsSuper) {
+    idsSuper =
+      typeof row.idsSuper === 'object'
+        ? `${row.idsSuper.firstName || ''} ${row.idsSuper.lastName || ''}`.trim() || '-'
+        : String(row.idsSuper)
+  }
+  if (idsSuper === '-') idsSuper = row.assignedTo?.[0]?.name || '-'
+
+  return {
+    bidNo: row.bidNumber === null || row.bidNumber === undefined ? '-' : `#${row.bidNumber}`,
+    jobNo: row.jobIdNumber === undefined ? '-' : `#${String(row.jobIdNumber).padStart(3, '0')}`,
+    estimator: row.estimator || '-',
+    contractor: row.generalContractor || '-',
+    idsSuper,
+    contract: typeof row.contractAmount === 'number' ? formatMoney(row.contractAmount) : '-',
+  }
+}
 
 /** Day-string bounds of a stint, clipped to the visible range.
  *  A null endDate is open-ended, so it runs to the end of whatever we render. */
@@ -730,6 +777,9 @@ export default function ScheduleBoard() {
   const jumpRef = useRef<HTMLDivElement>(null)
   const jumpPickerRef = useRef<HTMLInputElement>(null)
   const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
+  // The job detail columns start open, as the design shows them; the divider
+  // handle folds them away when the calendar needs the room.
+  const [metaVisible, setMetaVisible] = useState(true)
   const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
   const daysTableRef = useRef<HTMLTableElement>(null)
   const boardScrollRef = useRef<HTMLDivElement>(null)
@@ -753,8 +803,12 @@ export default function ScheduleBoard() {
 
   const compact = viewMode === 'monthly'
   const jobColW = viewMode === 'weekly' ? JOB_W_WEEKLY : JOB_W
-  const dayW = viewMode === 'weekly' && isPhone ? 72 : undefined
-  const equalDayColPct = !isPhone ? `${100 / Math.max(visibleDays.length, 1)}%` : undefined
+  // Open meta columns push the sheet past the viewport, so the day columns stop
+  // sharing the leftover width and take a fixed one to pan across instead.
+  const dayW =
+    viewMode === 'weekly' && isPhone ? 72 : metaVisible ? DAY_W_META : undefined
+  const equalDayColPct =
+    !isPhone && !metaVisible ? `${100 / Math.max(visibleDays.length, 1)}%` : undefined
 
   useEffect(() => {
     function handleResize() {
@@ -869,6 +923,15 @@ export default function ScheduleBoard() {
     const scroller = boardScrollRef.current
     if (scroller) scroller.scrollLeft = 0
   }, [viewMode, sidebarCollapsed, zoom])
+
+  /** Folding the detail columns open steals width, so the sidebar gives way. */
+  function toggleMeta() {
+    setMetaVisible((current) => {
+      const next = !current
+      if (next) setSidebarCollapsed(true)
+      return next
+    })
+  }
 
   function openMonthly() {
     setViewMode('monthly')
@@ -1521,8 +1584,8 @@ export default function ScheduleBoard() {
         >
           <div
             className={`sb-board${compact ? ' sb-board--monthly' : ''}${
-              draggingAssignment ? ' is-dragging' : ''
-            }`}
+              metaVisible ? ' sb-board--meta' : ''
+            }${draggingAssignment ? ' is-dragging' : ''}`}
           >
             {loading && <div className="sb-board__loading">Loading schedule…</div>}
             {!loading && rows.length === 0 && (
@@ -1534,18 +1597,29 @@ export default function ScheduleBoard() {
               <div className="sb-board__frozen">
                 <table className="sb-table sb-table--frozen">
                   <colgroup>
-                    <col style={{ width: JOBNO_W * zoom }} />
                     <col style={{ width: jobColW * zoom }} />
+                    {metaVisible &&
+                      META_COLS.map((col) => (
+                        <col key={col.key} style={{ width: col.width * zoom }} />
+                      ))}
+                    <col style={{ width: DIVIDER_W * zoom }} />
                   </colgroup>
                   <thead>
                     <tr>
-                      <th className="sb-col-jobno">Job ID</th>
                       <th className="sb-col-job">Job</th>
+                      {metaVisible &&
+                        META_COLS.map((col) => (
+                          <th key={col.key} className="sb-col-meta">
+                            {col.label}
+                          </th>
+                        ))}
+                      <th className="sb-divider-col" />
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row) => {
+                    {rows.map((row, rowIndex) => {
                       const meta = rowMeta.get(row._id)
+                      const meta_ = metaValues(row)
                       // The row's colour key is every crew booked on it in this
                       // range, not just whoever happens to be there today.
                       const rowCrews = meta?.crews ?? []
@@ -1554,7 +1628,6 @@ export default function ScheduleBoard() {
 
                       return (
                         <tr key={row._id} className="sb-row" style={{ height: heightOf(row._id) }}>
-                          <td className="sb-col-jobno">{row.jobIdNumber}</td>
                           <td className="sb-col-job">
                             <span
                               className="sb-row-bar-hit"
@@ -1594,7 +1667,47 @@ export default function ScheduleBoard() {
                                   </span>
                                 )}
                               </span>
+                              <span className="sb-job-chevron" aria-hidden>
+                                <Icon.ChevronRight width={16} height={16} />
+                              </span>
                             </button>
+                          </td>
+                          {metaVisible &&
+                            META_COLS.map((col) => (
+                              <td
+                                key={col.key}
+                                className={`sb-col-meta${
+                                  col.key === 'contract' ? ' sb-col-meta--contract' : ''
+                                }`}
+                                title={meta_[col.key]}
+                              >
+                                {meta_[col.key]}
+                              </td>
+                            ))}
+                          <td className="sb-divider-col">
+                            <div className="sb-divider__inner">
+                              <button
+                                type="button"
+                                className={`sb-divider__toggle${metaVisible ? ' is-open' : ''}${
+                                  rowIndex === Math.floor((rows.length - 1) / 2) ? ' is-visible' : ''
+                                }`}
+                                onClick={toggleMeta}
+                                aria-label={
+                                  metaVisible ? 'Hide job detail columns' : 'Show job detail columns'
+                                }
+                              >
+                                <span className="sb-divider__dots" aria-hidden>
+                                  <i /><i /><i />
+                                </span>
+                                <span className="sb-divider__arrow" aria-hidden>
+                                  {metaVisible ? (
+                                    <Icon.ArrowLeft width={14} height={14} />
+                                  ) : (
+                                    <Icon.ArrowRight width={14} height={14} />
+                                  )}
+                                </span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )

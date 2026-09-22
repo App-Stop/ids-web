@@ -407,14 +407,27 @@
   max-width: none;
 }
 
-/* Monthly + meta: allow horizontal pan across fixed day widths */
+/* Meta open: the job detail columns push the sheet past the viewport in either
+   view, so the grid pans at fixed day widths rather than squeezing the days. */
+.sb-board--meta .sb-board__zoom {
+  width: max-content !important;
+  max-width: none;
+  min-width: 100%;
+}
+
+.sb-board--meta .sb-board__scroll,
 .sb-board--monthly.sb-board--meta .sb-board__scroll {
+  flex: 0 0 auto;
   overflow: visible;
 }
 
-.sb-board--monthly.sb-board--meta .sb-table--days {
-  width: max-content;
-  min-width: 100%;
+.sb-board--meta .sb-board__scroll > .sb-table--days,
+.sb-board--meta .sb-table--days {
+  display: table;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: none;
+  table-layout: fixed;
 }
 
 .sb-table {
@@ -457,9 +470,9 @@
   vertical-align: middle;
 }
 
-/* The frozen table's trailing edge is the line to the left of the first day
-   column, so it keeps its border rather than dropping it like the days table. */
-.sb-table--frozen tr > *:last-child {
+/* The frozen table's trailing edge is the divider column, which paints its own
+   grey seam — so it drops the border the other frozen cells keep. */
+.sb-table--frozen tr > *:last-child:not(.sb-divider-col) {
   border-right: 1px solid var(--border);
 }
 
@@ -510,20 +523,8 @@
   overflow: hidden;
 }
 
-.sb-table thead th.sb-col-jobno,
 .sb-table thead th.sb-col-meta {
   text-align: center;
-}
-
-.sb-col-jobno {
-  width: calc(72px * var(--table-zoom, 1));
-  padding: calc(0.35rem * var(--table-zoom, 1)) calc(0.5rem * var(--table-zoom, 1)) !important;
-  font-size: calc(0.85rem * var(--table-zoom, 1));
-  font-weight: 600;
-  color: var(--ink);
-  text-align: center;
-  background: var(--card-bg);
-  position: relative;
 }
 
 .sb-col-job {
@@ -562,19 +563,124 @@
   color: var(--ink);
 }
 
+.sb-job-chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--muted);
+  transition: color 0.15s ease;
+}
+
+.sb-row:hover .sb-job-chevron {
+  color: var(--ink);
+}
+
+/* --- Job detail columns, folded away by the divider handle ---------------- */
+
 .sb-col-meta {
-  width: calc(130px * var(--table-zoom, 1));
-  padding: calc(0.35rem * var(--table-zoom, 1)) calc(0.5rem * var(--table-zoom, 1));
+  padding: calc(0.35rem * var(--table-zoom, 1)) calc(0.5rem * var(--table-zoom, 1)) !important;
   font-size: calc(14px * var(--table-zoom, 1));
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink);
   text-align: center;
   background: var(--card-bg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sb-col-meta--contract {
-  font-weight: 700;
-  width: calc(100px * var(--table-zoom, 1));
+  font-weight: 600;
+}
+
+/* --- Collapse divider ----------------------------------------------------- */
+/* A grey seam between the job columns and the calendar. Its handle stays
+   invisible until the seam is hovered, apart from one row's, which advertises
+   that the seam is a control at all. */
+
+.sb-divider-col {
+  position: relative;
+  padding: 0 !important;
+  background: #c1c1c1 !important;
+  border: none !important;
+}
+
+.sb-divider__inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sb-divider__toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(24px * var(--table-zoom, 1));
+  height: calc(40px * var(--table-zoom, 1));
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #3f3f46;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.sb-divider__dots,
+.sb-divider__arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sb-divider__dots {
+  flex-direction: column;
+  gap: 2.5px;
+}
+
+.sb-divider__dots i {
+  display: block;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.sb-divider__arrow {
+  display: none;
+}
+
+.sb-divider-col:hover .sb-divider__toggle,
+.sb-divider__toggle:focus-visible,
+.sb-divider__toggle.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sb-divider-col:hover .sb-divider__toggle,
+.sb-divider__toggle:focus-visible {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.sb-divider-col:hover .sb-divider__dots,
+.sb-divider__toggle:focus-visible .sb-divider__dots {
+  display: none;
+}
+
+.sb-divider-col:hover .sb-divider__arrow,
+.sb-divider__toggle:focus-visible .sb-divider__arrow {
+  display: inline-flex;
 }
 
 .sb-table--days thead th.sb-day-head {
