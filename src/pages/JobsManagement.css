@@ -170,26 +170,15 @@
   overscroll-behavior: contain;
   cursor: grab;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+  /* No visible scrollbars — the wheel and click-drag panning do the scrolling. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .jm-table-wrap::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.jm-table-wrap::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.18);
-  border-radius: 3px;
-}
-
-.jm-table-wrap::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.28);
-}
-
-.jm-table-wrap::-webkit-scrollbar-track {
-  background: transparent;
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .jm-pane--main {

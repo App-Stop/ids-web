@@ -333,6 +333,21 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  cursor: grab;
+  /* No visible scrollbars — the wheel and click-drag panning do the scrolling. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sb-board__frame::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.sb-board__frame.is-panning {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .sb-board__zoom {
@@ -1481,6 +1496,14 @@
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .sb-board::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
   }
 
   .sb-board__frame {

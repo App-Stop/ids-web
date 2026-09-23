@@ -41,6 +41,7 @@ import {
   type ScheduleJobRow,
 } from '../api/jobApi'
 import { createDayNote, updateDayNote, deleteDayNote, type DayNote } from '../api/noteApi'
+import { useClickDragScroll } from '../hooks/useClickDragScroll'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCrewsSummary, useJobsList, useScheduleData, useDayNotesData } from '../hooks/useQueryHooks'
 import { queryKeys } from '../lib/queryKeys'
@@ -783,6 +784,7 @@ export default function ScheduleBoard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
   const daysTableRef = useRef<HTMLTableElement>(null)
   const boardScrollRef = useRef<HTMLDivElement>(null)
+  const boardFrameRef = useRef<HTMLDivElement>(null)
 
   const [actionBanner, setBanner] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -917,6 +919,10 @@ export default function ScheduleBoard() {
     () => allJobs.map((j) => ({ id: j._id, label: j.name ?? `Job ${j.jobIdNumber}` })),
     [allJobs],
   )
+
+  // Scrollbars are hidden on the board, so the wheel and click-drag panning
+  // are how the grid is moved around.
+  useClickDragScroll(boardFrameRef)
 
   useEffect(() => {
     if (viewMode !== 'weekly') return
@@ -1592,7 +1598,7 @@ export default function ScheduleBoard() {
               <div className="sb-board__empty">No jobs match this range.</div>
             )}
 
-            <div className="sb-board__frame">
+            <div className="sb-board__frame" ref={boardFrameRef}>
               <div className="sb-board__zoom" style={sheetZoomStyle(zoom)}>
               <div className="sb-board__frozen">
                 <table className="sb-table sb-table--frozen">
