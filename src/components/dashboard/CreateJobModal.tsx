@@ -49,6 +49,42 @@ function toIsoDate(mdy: string) {
   return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
 }
 
+/**
+ * The patch payload the edit form would produce for a job nobody has touched.
+ *
+ * Every field is normalised exactly the way `handleSubmit` normalises the
+ * corresponding form state, so a field that was only loaded and never edited
+ * compares equal and is dropped from the request.
+ */
+function baselineFromJob(j: JobItem): UpdateJobPayload {
+  return {
+    jobIdNumber: typeof j.jobIdNumber === 'number' ? j.jobIdNumber : undefined,
+    bidNumber: typeof j.bidNumber === 'number' ? j.bidNumber : null,
+    estimator: (j.estimator ? String(j.estimator) : '').trim() || null,
+    budgetedDays: j.budgetedDays ?? null,
+    name: (j.name || '').trim(),
+    generalContractor: (j.generalContractor || '').trim(),
+    gcSuper: (j.gcSuper || '').trim() || null,
+    idsSuper: j.idsSuper || null,
+    siteAddress: (j.siteAddress || '').trim() || undefined,
+    startDate: j.startDate ? j.startDate.slice(0, 10) : undefined,
+    endDate: j.endDate ? j.endDate.slice(0, 10) : undefined,
+    contractAmount: j.contractAmount ?? undefined,
+    laborBudget: j.laborBudget ?? undefined,
+    note: (j.note || '').trim() || undefined,
+    status: j.status || 'awarded',
+  }
+}
+
+/** The entries of `next` that differ from `baseline` — what the PATCH sends. */
+function changedFields(baseline: UpdateJobPayload, next: UpdateJobPayload): UpdateJobPayload {
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(next) as (keyof UpdateJobPayload)[]) {
+    if (next[key] !== baseline[key]) out[key] = next[key]
+  }
+  return out as UpdateJobPayload
+}
+
 function toMdyDate(iso: string) {
   if (!iso) return ''
   if (/^\d{2}-\d{2}-\d{4}$/.test(iso)) return iso
@@ -454,6 +490,10 @@ export default function CreateJobModal({
   const [assignments, setAssignments] = useState<AssignmentDraft[]>([])
   /** Stints loaded from the server, so save can tell removals from additions. */
   const [originalAssignmentIds, setOriginalAssignmentIds] = useState<string[]>([])
+  // What the job looked like when the form opened, for the edit path: the
+  // PATCH carries only the fields whose value actually moved away from this.
+  const baselineRef = useRef<UpdateJobPayload | null>(null)
+  const loadedJobRef = useRef<JobItem | null>(null)
   const [presetId, setPresetId] = useState<string>('')
   const [availableCrews, setAvailableCrews] = useState<AvailableCrewItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -506,6 +546,8 @@ export default function CreateJobModal({
             setLaborBudgetTotal(j.laborBudget !== undefined && j.laborBudget !== null ? j.laborBudget : '')
             if (j.note) setNote(j.note)
             if (j.status) setStatus(j.status)
+            loadedJobRef.current = j
+            baselineRef.current = baselineFromJob(j)
           }
 
           const rows = assignmentsRes?.data ?? []
@@ -758,8 +800,19 @@ export default function CreateJobModal({
           note: note.trim() || undefined,
           status,
         }
-        const res = await updateJob(job.id, patchPayload)
-        savedJob = res.data
+        // Only what changed goes over the wire — a field the user never
+        // touched is left out rather than echoed back at its loaded value.
+        const baseline = baselineRef.current
+        const changed = baseline ? changedFields(baseline, patchPayload) : patchPayload
+        const loaded = loadedJobRef.current
+        if (loaded && Object.keys(changed).length === 0) {
+          // Nothing on the job itself moved; the stints still may have, so only
+          // this request is skipped, not the save.
+          savedJob = loaded
+        } else {
+          const res = await updateJob(job.id, changed)
+          savedJob = res.data
+        }
       }
 
       // On create the stints travelled with the job; only an edit has to
