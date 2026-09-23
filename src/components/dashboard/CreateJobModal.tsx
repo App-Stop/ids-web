@@ -59,13 +59,13 @@ function toIsoDate(mdy: string) {
 function baselineFromJob(j: JobItem): UpdateJobPayload {
   return {
     jobIdNumber: typeof j.jobIdNumber === 'number' ? j.jobIdNumber : undefined,
-    bidNumber: typeof j.bidNumber === 'number' ? j.bidNumber : null,
-    estimator: (j.estimator ? String(j.estimator) : '').trim() || null,
-    budgetedDays: j.budgetedDays ?? null,
+    bidNumber: (j.bidNumber ?? '').toString().trim() || undefined,
+    estimator: (j.estimator ? String(j.estimator) : '').trim() || undefined,
+    budgetedDays: j.budgetedDays ?? undefined,
     name: (j.name || '').trim(),
-    generalContractor: (j.generalContractor || '').trim(),
-    gcSuper: (j.gcSuper || '').trim() || null,
-    idsSuper: j.idsSuper || null,
+    generalContractor: (j.generalContractor || '').trim() || undefined,
+    gcSuper: (j.gcSuper || '').trim() || undefined,
+    idsSuper: j.idsSuper || undefined,
     siteAddress: (j.siteAddress || '').trim() || undefined,
     startDate: j.startDate ? j.startDate.slice(0, 10) : undefined,
     endDate: j.endDate ? j.endDate.slice(0, 10) : undefined,
@@ -74,6 +74,17 @@ function baselineFromJob(j: JobItem): UpdateJobPayload {
     note: (j.note || '').trim() || undefined,
     status: j.status || 'awarded',
   }
+}
+
+/** Whether a stint's date/time window differs from how it was loaded. */
+function windowChanged(a: AssignmentDraft, b: AssignmentDraft) {
+  return (
+    a.startDate !== b.startDate ||
+    a.endDate !== b.endDate ||
+    a.dailyStartTime !== b.dailyStartTime ||
+    a.dailyEndTime !== b.dailyEndTime ||
+    a.excludeWeekends !== b.excludeWeekends
+  )
 }
 
 /** The entries of `next` that differ from `baseline` — what the PATCH sends. */
@@ -473,7 +484,8 @@ export default function CreateJobModal({
 }) {
   const isEdit = !!job
   const [jobIdNumber, setJobIdNumber] = useState<number | ''>('')
-  const [bidNumber, setBidNumber] = useState<number | ''>('')
+  // Free text, not a number: the server stores bidNumber as a String.
+  const [bidNumber, setBidNumber] = useState('')
   const [estimator, setEstimator] = useState('')
   const [budgetedDays, setBudgetedDays] = useState<number | ''>('')
   const [name, setName] = useState(job?.name ?? '')
@@ -493,6 +505,9 @@ export default function CreateJobModal({
   // What the job looked like when the form opened, for the edit path: the
   // PATCH carries only the fields whose value actually moved away from this.
   const baselineRef = useRef<UpdateJobPayload | null>(null)
+  // Each saved stint as it was loaded, keyed by its id, so save can PATCH only
+  // the rows someone actually touched.
+  const originalAssignmentsRef = useRef<Map<string, AssignmentDraft>>(new Map())
   const loadedJobRef = useRef<JobItem | null>(null)
   const [presetId, setPresetId] = useState<string>('')
   const [availableCrews, setAvailableCrews] = useState<AvailableCrewItem[]>([])
@@ -533,7 +548,7 @@ export default function CreateJobModal({
           if (jobRes && jobRes.success && jobRes.data) {
             const j = jobRes.data
             if (j.jobIdNumber !== undefined && j.jobIdNumber !== null) setJobIdNumber(j.jobIdNumber)
-            if (typeof j.bidNumber === 'number') setBidNumber(j.bidNumber)
+            if (j.bidNumber !== undefined && j.bidNumber !== null) setBidNumber(String(j.bidNumber))
             if (j.estimator) setEstimator(String(j.estimator))
             if (j.budgetedDays !== undefined && j.budgetedDays !== null) setBudgetedDays(j.budgetedDays)
             setName(j.name || '')
@@ -553,24 +568,24 @@ export default function CreateJobModal({
           const rows = assignmentsRes?.data ?? []
           if (rows.length) {
             setOriginalAssignmentIds(rows.map((a) => a._id))
-            setAssignments(
-              rows.map((a) => {
-                draftKeySeq += 1
-                return {
-                  key: `existing-${a._id}`,
-                  id: a._id,
-                  crewIds: [a.crewId],
-                  savedCrewId: a.crewId,
-                  startDate: a.startDate.slice(0, 10),
-                  endDate: a.endDate ? a.endDate.slice(0, 10) : '',
-                  // A stint stored without a window runs all day, which shows
-                  // here as the equal times that wrap round the clock.
-                  dailyStartTime: a.dailyStartTime ?? '00:00',
-                  dailyEndTime: a.dailyEndTime ?? '00:00',
-                  excludeWeekends: false,
-                }
-              }),
-            )
+            const drafts: AssignmentDraft[] = rows.map((a) => {
+              draftKeySeq += 1
+              return {
+                key: `existing-${a._id}`,
+                id: a._id,
+                crewIds: [a.crewId],
+                savedCrewId: a.crewId,
+                startDate: a.startDate.slice(0, 10),
+                endDate: a.endDate ? a.endDate.slice(0, 10) : '',
+                // A stint stored without a window runs all day, which shows
+                // here as the equal times that wrap round the clock.
+                dailyStartTime: a.dailyStartTime ?? '00:00',
+                dailyEndTime: a.dailyEndTime ?? '00:00',
+                excludeWeekends: false,
+              }
+            })
+            originalAssignmentsRef.current = new Map(drafts.map((d) => [d.id as string, d]))
+            setAssignments(drafts)
           }
         }
       } catch (err) {
@@ -585,7 +600,10 @@ export default function CreateJobModal({
 
   const filledAssignments = assignments.filter((a) => a.crewIds.length > 0)
   const firstCrew = availableCrews.find((c) => c.id === filledAssignments[0]?.crewIds[0])
-  const jobIdValid = typeof jobIdNumber === 'number' && jobIdNumber >= 10000 && jobIdNumber <= 99999
+  // The server treats jobIdNumber as optional, so an empty box is fine; a
+  // filled one still has to be the 5 digits the server's range check wants.
+  const jobIdValid =
+    jobIdNumber === '' || (jobIdNumber >= 10000 && jobIdNumber <= 99999)
   // Two rows booking the same crew over the same slot can't be saved — the
   // server would reject them and, on create, take the whole job down with them.
   const hasDuplicateCrew = filledAssignments.some((draft) => duplicateCrewIds(draft).length > 0)
@@ -703,7 +721,12 @@ export default function CreateJobModal({
         // assignment sharing the same window.
         const kept =
           draft.savedCrewId && draft.crewIds.includes(draft.savedCrewId) ? draft.savedCrewId : draft.crewIds[0]
-        await updateCrewAssignment(jobId, draft.id, { ...assignmentWindow(draft), crewId: kept })
+        // A row nobody touched is left alone — only the stints whose window or
+        // crew actually moved are patched.
+        const original = originalAssignmentsRef.current.get(draft.id)
+        if (!original || original.savedCrewId !== kept || windowChanged(original, draft)) {
+          await updateCrewAssignment(jobId, draft.id, { ...assignmentWindow(draft), crewId: kept })
+        }
         const extras = draft.crewIds.filter((id) => id !== kept)
         if (extras.length) {
           await createCrewAssignment(jobId, { ...assignmentWindow(draft), crewIds: extras })
@@ -752,12 +775,12 @@ export default function CreateJobModal({
       let savedJob: JobItem
       if (!isEdit) {
         const payload: CreateJobPayload = {
-          jobIdNumber: Number(jobIdNumber),
-          bidNumber: bidNumber === '' ? undefined : Number(bidNumber),
+          jobIdNumber: jobIdNumber === '' ? undefined : Number(jobIdNumber),
+          bidNumber: bidNumber.trim() || undefined,
           estimator: estimator.trim() || undefined,
           budgetedDays: budgetedDays === '' ? undefined : Number(budgetedDays),
           name: name.trim(),
-          generalContractor: gc.trim(),
+          generalContractor: gc.trim() || undefined,
           gcSuper: gcSuper.trim() || undefined,
           idsSuper: derivedIdsSuper,
           siteAddress: siteAddress.trim() || undefined,
@@ -784,14 +807,19 @@ export default function CreateJobModal({
       } else {
         if (!job?.id) return
         const patchPayload: UpdateJobPayload = {
-          jobIdNumber: Number(jobIdNumber),
-          bidNumber: bidNumber === '' ? null : Number(bidNumber),
-          estimator: estimator.trim() || null,
-          budgetedDays: budgetedDays === '' ? null : Number(budgetedDays),
+          jobIdNumber: jobIdNumber === '' ? undefined : Number(jobIdNumber),
+          bidNumber: bidNumber.trim() || undefined,
+          estimator: estimator.trim() || undefined,
+          // Cleared optional fields go out as undefined, not null: every
+          // optional field in UpdateJobValidator rejects a null number and
+          // treats a null string as "not provided" anyway.
+          budgetedDays: budgetedDays === '' ? undefined : Number(budgetedDays),
           name: name.trim(),
-          generalContractor: gc.trim(),
-          gcSuper: gcSuper.trim() || null,
-          idsSuper: derivedIdsSuper,
+          generalContractor: gc.trim() || undefined,
+          gcSuper: gcSuper.trim() || undefined,
+          // Only sent when a crew is actually assigned; the "Unassigned"
+          // placeholder must not overwrite a super the job already has.
+          idsSuper: firstCrew?.leadName || undefined,
           siteAddress: siteAddress.trim() || undefined,
           startDate: toIsoDate(startDate) || undefined,
           endDate: toIsoDate(endDate) || undefined,
@@ -887,7 +915,9 @@ export default function CreateJobModal({
 
             <div className="field-row">
               <div style={{ flex: '0 0 160px' }}>
-                <label className="field-label">Job #*</label>
+                <label className="field-label">
+                  Job # <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span>
+                </label>
                 <input
                   type="number"
                   className={`field-input${fieldErrors.jobIdNumber ? ' field-input--error' : ''}`}
@@ -898,6 +928,7 @@ export default function CreateJobModal({
                 <span style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '3px', display: 'block', lineHeight: 1.2 }}>
                   5 digit ID
                 </span>
+
                 {fieldErrors.jobIdNumber && <span className="field-error-text">{fieldErrors.jobIdNumber}</span>}
               </div>
               <div style={{ flex: 1 }}>
@@ -918,11 +949,10 @@ export default function CreateJobModal({
                   Bid # <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span>
                 </label>
                 <input
-                  type="number"
                   className={`field-input${fieldErrors.bidNumber ? ' field-input--error' : ''}`}
-                  placeholder="e.g. 48271"
+                  placeholder="e.g. 48271-A"
                   value={bidNumber}
-                  onChange={(e) => setBidNumber(e.target.value === '' ? '' : Number(e.target.value))}
+                  onChange={(e) => setBidNumber(e.target.value)}
                 />
                 {fieldErrors.bidNumber && <span className="field-error-text">{fieldErrors.bidNumber}</span>}
               </div>
@@ -974,7 +1004,7 @@ export default function CreateJobModal({
 
             <div className="field-row job-form-modal__date-row">
               <div className={fieldErrors.startDate ? 'field-date--error' : ''}>
-                <label className="field-label">Start Date*</label>
+                <label className="field-label">Start Date <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
                 <DatePickerField value={startDate} onChange={setStartDate} />
                 {fieldErrors.startDate && <span className="field-error-text">{fieldErrors.startDate}</span>}
               </div>
@@ -1040,7 +1070,7 @@ export default function CreateJobModal({
             {fieldErrors.budgetedDays && <span className="field-error-text">{fieldErrors.budgetedDays}</span>}
 
             <div style={{ marginTop: '0.85rem' }}>
-              <label className="field-label">Status*</label>
+              <label className="field-label">Status <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
               <Dropdown
                 value={status}
                 placeholder="Select status"

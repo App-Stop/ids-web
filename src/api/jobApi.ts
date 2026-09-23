@@ -47,7 +47,8 @@ export interface JobFinancials {
 export interface JobItem {
   _id: string
   jobIdNumber: number
-  bidNumber?: number | null
+  /** Free-form on the server (String), so not necessarily digits. */
+  bidNumber?: string | null
   estimator?: string | null
   budgetedDays?: number | null
   /** Every crew scheduled on the job now or later — broader than currentCrew. */
@@ -105,12 +106,14 @@ export type CrewAssignmentPayloadItem = CrewAssignmentWindow & CrewTarget
 
 export interface CreateJobPayload {
   jobIdNumber?: number
-  bidNumber?: number | null
+  /** Free-form on the server (String), so not necessarily digits. */
+  bidNumber?: string | null
   estimator?: string | null
   /** Whole number ≥ 1 — the server rejects 0 and fractions. */
   budgetedDays?: number | null
-  name?: string
-  generalContractor: string
+  /** The only field the server requires on create; min 2 characters. */
+  name: string
+  generalContractor?: string | null
   gcSuper?: string | null
   /**
    * Derived from the assigned crew's lead — there is no separate IDS Super
