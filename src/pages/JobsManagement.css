@@ -615,7 +615,7 @@ body.is-col-resizing * {
 .jm-stack {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   gap: calc(0.4rem * var(--table-zoom, 1));
   min-height: calc(40px * var(--table-zoom, 1));
   justify-content: center;
