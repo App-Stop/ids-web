@@ -604,6 +604,19 @@
   text-overflow: ellipsis;
 }
 
+/* Several values in one cell (a job's IDS supers), one per line. The line
+   height is what rowHeight() budgets per name. */
+.sb-meta-lines {
+  display: flex;
+  flex-direction: column;
+}
+
+.sb-meta-line {
+  line-height: calc(20px * var(--table-zoom, 1));
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .sb-col-meta--contract {
   font-weight: 600;
 }

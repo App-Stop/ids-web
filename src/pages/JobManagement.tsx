@@ -30,9 +30,9 @@ type Row = ManagedJob & {
   /** Every crew scheduled on the job now or later, from `assignedTo`. */
   crews: CrewChip[]
   /**
-   * The name stripe's colours: every crew with a stint on the job, from
-   * `assignments` — the same key the schedule board uses, so a job whose
-   * stints have all ended still shows who worked it.
+   * What the name stripe and the "Assigned to" cell show: every crew with a
+   * stint on the job, from `assignments` — the same key the schedule board
+   * uses, so a job whose stints have all ended still shows who worked it.
    */
   barCrews: CrewChip[]
   jobNo: string
@@ -781,13 +781,13 @@ export default function JobsManagement() {
                       <td>{job.estimator}</td>
                       <td className="jm-crew-cell">
                         <span className="jm-crew-list">
-                          {job.crews.length === 0 ? (
+                          {job.barCrews.length === 0 ? (
                             <span className="jm-crew-chip">
                               <i style={{ background: '#94a3b8' }} />
                               Unassigned
                             </span>
                           ) : (
-                            job.crews.map((c) => (
+                            job.barCrews.map((c) => (
                               <span key={c.id} className="jm-crew-chip">
                                 <i style={{ background: c.color }} />
                                 {c.name}

@@ -195,22 +195,28 @@ function leadNameOf(crew: {
  * object or a bare string) and then the crew's own name are only fallbacks for
  * a row whose crews carry no lead.
  */
-function metaValues(row: ScheduleJobRow): Record<(typeof META_COLS)[number]['key'], string> {
+function idsSupersOf(row: ScheduleJobRow): string[] {
   const leads = new Set<string>()
   for (const crew of row.assignedTo ?? []) leads.add(leadNameOf(crew))
   for (const a of row.assignments ?? []) {
     if (a.crew && a.status !== 'cancelled') leads.add(leadNameOf(a.crew))
   }
   leads.delete('')
+  if (leads.size) return [...leads]
 
-  let idsSuper = leads.size ? [...leads].join(', ') : '-'
-  if (idsSuper === '-' && row.idsSuper) {
+  let idsSuper = '-'
+  if (row.idsSuper) {
     idsSuper =
       typeof row.idsSuper === 'object'
         ? `${row.idsSuper.firstName || ''} ${row.idsSuper.lastName || ''}`.trim() || '-'
         : String(row.idsSuper)
   }
   if (idsSuper === '-') idsSuper = row.assignedTo?.[0]?.name || '-'
+  return [idsSuper]
+}
+
+function metaValues(row: ScheduleJobRow): Record<(typeof META_COLS)[number]['key'], string> {
+  const idsSuper = idsSupersOf(row).join(', ')
 
   return {
     bidNo: row.bidNumber === null || row.bidNumber === undefined ? '-' : `#${row.bidNumber}`,
@@ -351,6 +357,8 @@ type RowMeta = {
   /** Busiest visible day, i.e. how many chips the weekly stack must fit. */
   maxPerDay: number
   crews: Array<{ id: string; name: string; color: string }>
+  /** One per line in the IDS Super cell, which the row has to be tall enough for. */
+  idsSupers: string[]
 }
 
 /**
@@ -394,7 +402,14 @@ function buildRowMeta(row: ScheduleJobRow, days: string[], rangeEnd: string): Ro
     })
   }
 
-  return { ordered, laneOf, laneCount: Math.max(laneEnds.length, 1), maxPerDay, crews }
+  return {
+    ordered,
+    laneOf,
+    laneCount: Math.max(laneEnds.length, 1),
+    maxPerDay,
+    crews,
+    idsSupers: idsSupersOf(row),
+  }
 }
 
 /**
@@ -410,13 +425,19 @@ const WEEKLY_ADD_H = 20
 const WEEKLY_CELL_PAD = 16
 /** Monthly: strip under the bars that holds a day's Add button. */
 const MONTHLY_ADD_H = 20
+/** One name in the IDS Super cell; matches `.sb-meta-line` in the stylesheet. */
+const SUPER_LINE_H = 20
+const SUPER_CELL_PAD = 12
 
-function rowHeight(meta: RowMeta, view: ViewMode, zoom: number) {
+function rowHeight(meta: RowMeta, view: ViewMode, zoom: number, metaVisible: boolean) {
   const px =
     view === 'monthly'
       ? Math.max(meta.laneCount, 1) * 22 + 10 + MONTHLY_ADD_H
       : meta.maxPerDay * WEEKLY_CHIP_H + WEEKLY_ADD_H + WEEKLY_CELL_PAD
-  return Math.round(px * zoom)
+  // The supers stack one per line, so a job with many crews but few on any one
+  // day can need more room than its calendar cells do.
+  const supersPx = metaVisible ? meta.idsSupers.length * SUPER_LINE_H + SUPER_CELL_PAD : 0
+  return Math.round(Math.max(px, supersPx) * zoom)
 }
 
 /**
@@ -1040,9 +1061,9 @@ export default function ScheduleBoard() {
   const heightOf = useCallback(
     (jobId: string) => {
       const meta = rowMeta.get(jobId)
-      return meta ? rowHeight(meta, viewMode, zoom) : undefined
+      return meta ? rowHeight(meta, viewMode, zoom, metaVisible) : undefined
     },
-    [rowMeta, viewMode, zoom],
+    [rowMeta, viewMode, zoom, metaVisible],
   )
 
   /** ISO start day of a job, or null when it somehow has none. */
@@ -1710,7 +1731,15 @@ export default function ScheduleBoard() {
                                 }`}
                                 title={meta_[col.key]}
                               >
-                                {meta_[col.key]}
+                                {col.key === 'idsSuper' && meta && meta.idsSupers.length > 1 ? (
+                                  <span className="sb-meta-lines">
+                                    {meta.idsSupers.map((name) => (
+                                      <span key={name} className="sb-meta-line">{name}</span>
+                                    ))}
+                                  </span>
+                                ) : (
+                                  meta_[col.key]
+                                )}
                               </td>
                             ))}
                           <td className="sb-divider-col">
