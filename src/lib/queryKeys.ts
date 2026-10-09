@@ -36,6 +36,8 @@ export const queryKeys = {
     laborReport: (params?: unknown) => ['laborReport', params ?? null] as const,
   },
 
+  fingercheckSyncStatus: ['fingercheckSyncStatus'] as const,
+
   costTracking: {
     all: ['costTracking'] as const,
     report: (params?: unknown) => ['costTracking', params ?? null] as const,

@@ -5,6 +5,7 @@ export interface AssignedCrew {
   crewId: string
   name: string | null
   crewColor: string | null
+  crewLeadName?: string | null
 }
 
 /** One of the four forward months in `financials.fourMonths`. */
@@ -53,6 +54,8 @@ export interface JobItem {
   budgetedDays?: number | null
   /** Every crew scheduled on the job now or later — broader than currentCrew. */
   assignedTo?: AssignedCrew[]
+  /** Every stint on the job, past ones included. List/detail responses only. */
+  assignments?: CrewAssignment[]
   /** Omitted on create/update responses. */
   financials?: JobFinancials
   name: string
@@ -213,6 +216,7 @@ export interface AssignmentCrew {
   _id: string
   name: string | null
   crewLead: { _id: string; firstName?: string; lastName?: string; email?: string } | string | null
+  crewLeadName?: string | null
   membersCount: number
   crewColor: string | null
   status: string | null

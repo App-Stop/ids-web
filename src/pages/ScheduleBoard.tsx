@@ -31,6 +31,7 @@ import ScheduleExtendModal from '../components/dashboard/ScheduleExtendModal'
 import { Icon } from '../components/dashboard/icons'
 import ConfirmModal from '../components/dashboard/ConfirmModal'
 import JobInfoModal from '../components/dashboard/JobInfoModal'
+import LastSynced from '../components/dashboard/LastSynced'
 import {
   createCrewAssignment,
   updateCrewAssignment,
@@ -173,17 +174,37 @@ const DIVIDER_W = 10
 /** Day width used once the meta columns push the sheet past the viewport. */
 const DAY_W_META = 150
 
+/** A crew's lead as a display name, from `crewLeadName` or a populated `crewLead`. */
+function leadNameOf(crew: {
+  crewLeadName?: string | null
+  crewLead?: { firstName?: string; lastName?: string } | string | null
+}): string {
+  if (crew.crewLeadName) return crew.crewLeadName.trim()
+  const lead = crew.crewLead
+  if (lead && typeof lead === 'object') return `${lead.firstName || ''} ${lead.lastName || ''}`.trim()
+  // An unpopulated lead is a bare ObjectId, which is not a name.
+  if (typeof lead === 'string' && !/^[a-f0-9]{24}$/i.test(lead)) return lead.trim()
+  return ''
+}
+
 /**
  * The detail values for a job row, formatted for display.
  *
- * `idsSuper` may arrive as a populated user object or as a bare string. Unlike
- * Job Management this row carries no populated crew lead, only the crew's own
- * name, so that is the fallback rather than the preferred value — a crew name
- * under "IDS Super" would read as a person who isn't there.
+ * The IDS super is the lead of every crew working the job, so a job running
+ * several crews lists each lead once. The stored `idsSuper` (a populated user
+ * object or a bare string) and then the crew's own name are only fallbacks for
+ * a row whose crews carry no lead.
  */
 function metaValues(row: ScheduleJobRow): Record<(typeof META_COLS)[number]['key'], string> {
-  let idsSuper = '-'
-  if (row.idsSuper) {
+  const leads = new Set<string>()
+  for (const crew of row.assignedTo ?? []) leads.add(leadNameOf(crew))
+  for (const a of row.assignments ?? []) {
+    if (a.crew && a.status !== 'cancelled') leads.add(leadNameOf(a.crew))
+  }
+  leads.delete('')
+
+  let idsSuper = leads.size ? [...leads].join(', ') : '-'
+  if (idsSuper === '-' && row.idsSuper) {
     idsSuper =
       typeof row.idsSuper === 'object'
         ? `${row.idsSuper.firstName || ''} ${row.idsSuper.lastName || ''}`.trim() || '-'
@@ -1575,6 +1596,8 @@ export default function ScheduleBoard() {
             />
           </div>
         </div>
+
+        <LastSynced source="crewAssignments" />
 
         <DndContext
           sensors={sensors}

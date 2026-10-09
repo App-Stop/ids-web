@@ -154,6 +154,25 @@
 /* The sheet is two panes side by side: job columns on the left, the day strip
    on the right. Each scrolls horizontally on its own; only vertical scroll is
    synced (in JS), so panning the days does not drag the table with it. */
+.last-synced {
+  flex-shrink: 0;
+  margin: 0.85rem 0.25rem 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: right;
+}
+
+.last-synced__time {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.last-synced + .jm-sheet,
+.last-synced + .sb-board {
+  margin-top: 0.45rem;
+}
+
 .jm-sheet {
   --jm-name-w: calc(210px * var(--table-zoom, 1));
   display: flex;
@@ -164,7 +183,7 @@
 
 .jm-table-wrap {
   overflow: auto;
-  max-height: calc(100dvh - 220px);
+  max-height: calc(100dvh - 236px);
   border: 1px solid var(--border);
   background: var(--card-bg);
   overscroll-behavior: contain;
@@ -217,7 +236,7 @@ body.is-col-resizing .jm-pane--days {
   display: flex;
   align-items: center;
   justify-content: center;
-  max-height: calc(100dvh - 220px);
+  max-height: calc(100dvh - 236px);
   background: #c1c1c1;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);

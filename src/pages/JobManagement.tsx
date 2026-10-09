@@ -6,6 +6,7 @@ import ZoomControl from '../components/dashboard/ZoomControl'
 import CreateJobModal, { type JobFormData } from '../components/dashboard/CreateJobModal'
 import JobDetailsModal from '../components/dashboard/JobDetailsModal'
 import AssignCrewModal from '../components/dashboard/AssignCrewModal'
+import LastSynced from '../components/dashboard/LastSynced'
 import { assignableCrews, type Job, type UnassignedCrew } from '../lib/dashboardData'
 import { type JobStatus, type ManagedJob } from '../lib/jobsManagementData'
 import { useClickDragScroll } from '../hooks/useClickDragScroll'
@@ -28,6 +29,12 @@ type Row = ManagedJob & {
   note?: string
   /** Every crew scheduled on the job now or later, from `assignedTo`. */
   crews: CrewChip[]
+  /**
+   * The name stripe's colours: every crew with a stint on the job, from
+   * `assignments` — the same key the schedule board uses, so a job whose
+   * stints have all ended still shows who worked it.
+   */
+  barCrews: CrewChip[]
   jobNo: string
   bidNo: string
   estimator: string
@@ -255,6 +262,26 @@ function toRow(j: JobItem): Row {
       ? [{ id: crewObj._id || j._id, name: crewObj.name || 'Unassigned', color: crewColor }]
       : []
 
+  // One stripe per crew, in the order they first come onto the job. A response
+  // without `assignments` falls back to the chips above.
+  const barCrews: CrewChip[] = []
+  if (Array.isArray(j.assignments)) {
+    const seen = new Set<string>()
+    const ordered = j.assignments
+      .filter((a) => a.status !== 'cancelled')
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    for (const a of ordered) {
+      const id = String(a.crewId)
+      if (seen.has(id)) continue
+      seen.add(id)
+      barCrews.push({
+        id,
+        name: a.crew?.name ?? 'Crew',
+        color: crewColorFor(a.crewId, a.crew?.crewColor),
+      })
+    }
+  }
+
   const costByDate: Record<string, JobDayCost> = {}
   for (const day of j.financials?.yearCostTracking ?? []) {
     costByDate[day.date] = day
@@ -268,6 +295,7 @@ function toRow(j: JobItem): Row {
     name: j.name,
     color: crewColor,
     crews,
+    barCrews: barCrews.length ? barCrews : crews,
     jobNo: `#${numStr}`,
     bidNo: j.bidNumber === null || j.bidNumber === undefined ? '' : `#${j.bidNumber}`,
     estimator: j.estimator || '',
@@ -597,6 +625,8 @@ export default function JobsManagement() {
 
         {apiError && <p className="field-error" style={{ margin: '12px 0' }}>{apiError}</p>}
 
+        <LastSynced source="timeEntries" />
+
         <div className="jm-sheet" style={sheetZoomStyle(zoom)}>
         <div
           className={`jm-table-wrap jm-pane--main${leftCollapsed ? ' is-collapsed' : ''}`}
@@ -686,8 +716,8 @@ export default function JobsManagement() {
                   const rowId = job.rawId || job.id
                   const isSelected = selectedRowId === rowId
                   const isHovered = hoveredRowId === rowId
-                  const stripes = job.crews.length
-                    ? job.crews
+                  const stripes = job.barCrews.length
+                    ? job.barCrews
                     : [{ id: 'none', name: 'Unassigned', color: '#94a3b8' }]
                   const fin = job.financials
                   // The server's laborBudgetRemaining, or the same subtraction

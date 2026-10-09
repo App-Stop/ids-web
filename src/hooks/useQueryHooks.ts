@@ -56,6 +56,7 @@ import {
   adjustCost,
   type CostTrackingReportParams,
 } from '../api/dumpsterCostApi'
+import { getFingercheckSyncStatus } from '../api/integrationApi'
 import { queryKeys } from '../lib/queryKeys'
 
 const EMPTY_PAGINATION: Pagination = { page: 1, limit: 20, totalCount: 0, totalPages: 1 }
@@ -203,6 +204,17 @@ export function useCostTrackingReport(params?: CostTrackingReportParams, enabled
     queryKey: queryKeys.costTracking.report(params),
     queryFn: () => getCostTrackingReport(params),
     enabled,
+  })
+}
+
+// ------------------------------------------------------------ integrations
+
+/** Polled, since a sync lands on the server's schedule rather than on a write here. */
+export function useFingercheckSyncStatus() {
+  return useQuery({
+    queryKey: queryKeys.fingercheckSyncStatus,
+    queryFn: async () => (await getFingercheckSyncStatus()).data,
+    refetchInterval: 60 * 1000,
   })
 }
 
