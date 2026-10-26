@@ -99,6 +99,7 @@ export default function Revenue() {
   const [statusFilter, setStatusFilter] = useState<JobStatus | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('newest')
   const [limit, setLimit] = useState(20)
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
 
   // Debounce so a query key isn't swapped (and a request fired) per keystroke.
   useEffect(() => {
@@ -305,18 +306,29 @@ export default function Revenue() {
               )}
             </div>
           ) : (
-            <table className="ct-table ct-table--crew rv-table">
+            <table className="jm-table rv-table">
+              <colgroup>
+                <col className="jm-col-name-w" />
+                <col className="jm-col-xs" />
+                <col className="jm-col-md" />
+                <col className="jm-col-stack" />
+                <col className="jm-col-sm" />
+                <col className="jm-col-stack" />
+                <col className="jm-col-sm" />
+                <col className="jm-col-stack-lg" />
+                <col className="rv-col-share" />
+              </colgroup>
               <thead>
                 <tr>
+                  <th className="jm-sticky jm-sticky--name">Job Name</th>
                   <th>Job #</th>
-                  <th>Job Name</th>
                   <th>Status</th>
-                  <th className="rv-num">Contract</th>
-                  <th className="rv-num">Budgeted Days</th>
-                  <th className="rv-num">Revenue / Day</th>
-                  <th className="rv-num">Work Days</th>
-                  <th className="rv-num">Revenue</th>
-                  <th>Share of Total</th>
+                  <th className="jm-center">Contract Amt</th>
+                  <th className="jm-center">Budgeted Days</th>
+                  <th className="jm-center">Revenue per Day</th>
+                  <th className="jm-center">Work Days</th>
+                  <th className="jm-center">Revenue</th>
+                  <th className="jm-center">Share of Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -326,13 +338,17 @@ export default function Revenue() {
                   const share = row.revenue && totalRevenue > 0 ? row.revenue / totalRevenue : 0
                   const missingRate = row.revenuePerDay === null
                   return (
-                    <tr key={row._id}>
-                      <td className="ct-id-cell">
-                        {row.jobIdNumber != null ? `#${String(row.jobIdNumber).padStart(3, '0')}` : '—'}
+                    <tr
+                      key={row._id}
+                      className={`jm-row${selectedRowId === row._id ? ' is-selected' : ''}`}
+                      onClick={() => setSelectedRowId((prev) => (prev === row._id ? null : row._id))}
+                    >
+                      <td className="jm-name-cell jm-sticky jm-sticky--name">
+                        <span className="jm-name-inner" title={row.name ?? undefined}>
+                          <span>{row.name || 'Unnamed Job'}</span>
+                        </span>
                       </td>
-                      <td className="rv-name-cell" title={row.name ?? undefined}>
-                        {row.name || 'Unnamed Job'}
-                      </td>
+                      <td>{row.jobIdNumber != null ? String(row.jobIdNumber).padStart(3, '0') : '—'}</td>
                       <td>
                         {status && statusColor ? (
                           <span className="jm-status rv-status" style={{ color: statusColor, borderColor: statusColor }}>
@@ -342,12 +358,12 @@ export default function Revenue() {
                           '—'
                         )}
                       </td>
-                      <td className="rv-num">{formatCurrency(row.contractAmount)}</td>
-                      <td className="rv-num">{row.budgetedDays ?? '—'}</td>
-                      <td className="rv-num">{formatCurrency(row.revenuePerDay)}</td>
-                      <td className="rv-num">{row.workDayCount}</td>
+                      <td className="jm-center rv-num">{formatCurrency(row.contractAmount)}</td>
+                      <td className="jm-center rv-num">{row.budgetedDays ?? '—'}</td>
+                      <td className="jm-center rv-num">{formatCurrency(row.revenuePerDay)}</td>
+                      <td className="jm-center rv-num">{row.workDayCount}</td>
                       <td
-                        className="rv-num rv-revenue"
+                        className="jm-center rv-num rv-revenue"
                         title={missingRate ? 'Set a contract amount and budgeted days to calculate revenue' : undefined}
                       >
                         {missingRate ? <span className="rv-missing">Not set</span> : formatCurrency(row.revenue)}

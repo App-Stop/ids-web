@@ -53,12 +53,14 @@
   font-weight: 500;
 }
 
+/* Same frame as the Jobs Management sheet: square-cornered cells inside one
+   rounded, bordered scroller. */
 .rv-table-wrap {
   margin-top: 0.45rem;
   overflow: auto;
   max-height: calc(100dvh - 300px);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--card-bg);
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -69,22 +71,14 @@
   max-height: none;
 }
 
-.rv-table th.rv-num,
+.rv-col-share {
+  width: 180px;
+}
+
 .rv-table td.rv-num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.rv-table tbody tr:hover td {
-  background: var(--field-bg);
-}
-
-.rv-name-cell {
-  max-width: 320px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .rv-status {
@@ -96,7 +90,7 @@
   transform: none;
 }
 
-.rv-revenue {
+.rv-table td.rv-revenue {
   font-weight: 700;
   color: var(--ink);
 }
