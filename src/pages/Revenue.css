@@ -1,6 +1,37 @@
 /* Revenue & Analytics — the toolbar and stat cards come from Cost Tracking,
    the two-pane sheet from Jobs Management; only what differs lives here. */
 
+/* The page is one viewport tall: the sheet takes whatever height is left and
+   scrolls inside itself, so the pagination bar stays on screen below it.
+   1.7rem is .dash's top + bottom padding; the min-height lets very short
+   windows fall back to scrolling the page. */
+.rv-main {
+  display: flex;
+  flex-direction: column;
+  height: calc(100svh - 1.7rem);
+  min-height: 560px;
+  box-sizing: border-box;
+  padding-bottom: 0.4rem;
+}
+
+.rv-main .jm-sheet {
+  flex: 1 1 0;
+  min-height: 200px;
+}
+
+.rv-main .jm-table-wrap {
+  max-height: none;
+}
+
+.rv-main .jm-pagination-bar {
+  flex-shrink: 0;
+  margin-top: 0.75rem;
+}
+
+.stat-grid.rv-stats-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .rv-period-nav {
   display: flex;
   align-items: center;
@@ -84,7 +115,29 @@
   color: var(--muted);
 }
 
+/* Where the sheet stacks its two panes, the page scrolls normally again. */
+@media (max-width: 780px) {
+  .rv-main {
+    display: block;
+    height: auto;
+    min-height: 0;
+  }
+
+  .rv-main .jm-table-wrap {
+    max-height: 60dvh;
+  }
+}
+
 @media (max-width: 720px) {
+  .stat-grid.rv-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rv-period-nav .ct-date-field {
+    flex: 1;
+    min-width: 0;
+  }
+
   .rv-period-nav {
     width: 100%;
     justify-content: space-between;

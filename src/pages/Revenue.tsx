@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { MagnifyingGlass, CaretLeft, CaretRight } from '@phosphor-icons/react'
+import { MagnifyingGlass, CaretLeft, CaretRight, CalendarBlank } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Dropdown from '../components/dashboard/Dropdown'
 import ZoomControl from '../components/dashboard/ZoomControl'
@@ -16,13 +16,16 @@ import './JobsManagement.css'
 import './CostTracking.css'
 import './Revenue.css'
 
-type PeriodMode = 'weekly' | 'monthly' | 'yearly' | 'all'
+type PeriodMode = 'weekly' | 'monthly' | 'yearly' | 'custom' | 'all'
+/** The calendar periods the prev/next arrows step through. */
+type StepMode = Exclude<PeriodMode, 'custom' | 'all'>
 type SortKey = NonNullable<GetJobRevenueParams['sortBy']>
 
 const PERIOD_OPTIONS: { id: PeriodMode; label: string }[] = [
   { id: 'weekly', label: 'Weekly' },
   { id: 'monthly', label: 'Monthly' },
   { id: 'yearly', label: 'Yearly' },
+  { id: 'custom', label: 'Custom Date' },
   { id: 'all', label: 'All Time' },
 ]
 
@@ -39,7 +42,7 @@ const SORT_OPTIONS: { id: SortKey; label: string }[] = [
   { id: 'nameDesc', label: 'Name Z–A' },
 ]
 
-const PERIOD_NOUN: Record<Exclude<PeriodMode, 'all'>, string> = {
+const PERIOD_NOUN: Record<StepMode, string> = {
   weekly: 'week',
   monthly: 'month',
   yearly: 'year',
@@ -51,7 +54,7 @@ const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const COLUMN_COUNT = 6
 
 /** First and last day of the calendar week/month/year containing `anchor`. */
-function periodBounds(mode: Exclude<PeriodMode, 'all'>, anchor: Date): [Date, Date] {
+function periodBounds(mode: StepMode, anchor: Date): [Date, Date] {
   if (mode === 'weekly') {
     const monday = getMonday(anchor)
     return [monday, addDays(monday, 6)]
@@ -66,7 +69,7 @@ function periodBounds(mode: Exclude<PeriodMode, 'all'>, anchor: Date): [Date, Da
 }
 
 /** The same kind of period one step back (-1) or forward (+1). */
-function shiftAnchor(mode: Exclude<PeriodMode, 'all'>, anchor: Date, dir: 1 | -1) {
+function shiftAnchor(mode: StepMode, anchor: Date, dir: 1 | -1) {
   if (mode === 'weekly') return addDays(anchor, 7 * dir)
   if (mode === 'monthly') return new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1)
   return new Date(anchor.getFullYear() + dir, 0, 1)
@@ -75,8 +78,68 @@ function shiftAnchor(mode: Exclude<PeriodMode, 'all'>, anchor: Date, dir: 1 | -1
 function periodLabel(mode: Exclude<PeriodMode, 'all'>, [from, to]: [Date, Date]) {
   if (mode === 'yearly') return String(from.getFullYear())
   if (mode === 'monthly') return from.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  if (mode === 'custom') {
+    const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    return `${fmt(from)} - ${fmt(to)}`
+  }
   const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   return `${fmt(from)} - ${fmt(to)}, ${to.getFullYear()}`
+}
+
+/** "10-27-2026", as the toolbar date fields show it. */
+function toolbarDate(iso: string) {
+  const [y, m, d] = iso.split('-')
+  return `${m}-${d}-${y}`
+}
+
+/** A toolbar date button over a hidden native picker, like Cost Tracking's. */
+function DateField({
+  value,
+  min,
+  max,
+  onChange,
+  label,
+}: {
+  value: string
+  min?: string
+  max?: string
+  onChange: (value: string) => void
+  label: string
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+
+  return (
+    <div className="ct-date-field">
+      <button
+        type="button"
+        className="ct-date-field__trigger"
+        aria-label={label}
+        onClick={() => {
+          const input = ref.current
+          if (!input) return
+          if ('showPicker' in input && typeof input.showPicker === 'function') {
+            input.showPicker()
+          } else {
+            input.focus()
+            input.click()
+          }
+        }}
+      >
+        <span>{toolbarDate(value)}</span>
+        <CalendarBlank size={16} weight="regular" />
+      </button>
+      <input
+        ref={ref}
+        type="date"
+        value={value}
+        min={min}
+        max={max}
+        tabIndex={-1}
+        onChange={(e) => e.target.value && onChange(e.target.value)}
+        className="ct-date-field__native"
+      />
+    </div>
+  )
 }
 
 /** Every day from `from` to `to`, inclusive. */
@@ -140,6 +203,11 @@ export default function Revenue() {
   const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
   const [mode, setMode] = useState<PeriodMode>('monthly')
   const [anchor, setAnchor] = useState(() => new Date())
+  // Inclusive "YYYY-MM-DD" range for the Custom Date tab.
+  const [customRange, setCustomRange] = useState(() => {
+    const [from, to] = periodBounds('monthly', new Date())
+    return { from: toISO(from), to: toISO(to) }
+  })
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<JobStatus | null>(null)
@@ -166,7 +234,12 @@ export default function Revenue() {
   }, [search])
 
   const todayIso = toISO(new Date())
-  const bounds = mode === 'all' ? null : periodBounds(mode, anchor)
+  const bounds: [Date, Date] | null =
+    mode === 'all'
+      ? null
+      : mode === 'custom'
+        ? [fromISO(customRange.from), fromISO(customRange.to)]
+        : periodBounds(mode, anchor)
   const fromIso = bounds ? toISO(bounds[0]) : null
   const toIso = bounds ? toISO(bounds[1]) : null
   // Today's period is the latest one with any revenue — later ones are empty.
@@ -205,7 +278,7 @@ export default function Revenue() {
   const totalWorkDays = summary?.totalWorkDayCount ?? 0
   const avgPerWorkDay = totalWorkDays > 0 ? totalRevenue / totalWorkDays : null
   const hasActiveFilters = Boolean(search.trim()) || statusFilter !== null
-  const rangeText = bounds ? periodLabel(mode as Exclude<PeriodMode, 'all'>, bounds) : null
+  const rangeText = bounds && mode !== 'all' ? periodLabel(mode, bounds) : null
 
   /** Each job's revenueByDate keyed by "YYYY-MM-DD" for O(1) lookup per day column. */
   const revenueByJobDay = useMemo(
@@ -235,7 +308,7 @@ export default function Revenue() {
   // strip, park it a little in from the left edge instead. Redone whenever the
   // period changes, since the strip is a new set of days.
   const scrolledForRef = useRef<string | null>(null)
-  const stripKey = `${mode}|${fromIso}`
+  const stripKey = `${mode}|${fromIso}|${toIso}`
   useLayoutEffect(() => {
     if (scrolledForRef.current === stripKey || loading || days.length === 0) return
     const pane = dayPaneRef.current
@@ -252,8 +325,23 @@ export default function Revenue() {
   }, [stripKey, loading, days.length, dayPaneRef])
 
   function changeMode(next: PeriodMode) {
+    // Custom Date opens on whatever period was being viewed, so it starts as
+    // a tweak of that rather than from scratch.
+    if (next === 'custom' && mode !== 'custom' && fromIso && toIso) {
+      setCustomRange({ from: fromIso, to: toIso })
+    }
     setMode(next)
     setAnchor(new Date())
+  }
+
+  // A start after the end (or the reverse) drags the other bound along, so the
+  // range sent is never inverted.
+  function setCustomFrom(from: string) {
+    setCustomRange((r) => ({ from, to: from > r.to ? from : r.to }))
+  }
+
+  function setCustomTo(to: string) {
+    setCustomRange((r) => ({ from: to < r.from ? to : r.from, to }))
   }
 
   function clearFilters() {
@@ -272,7 +360,7 @@ export default function Revenue() {
     <div className="dash">
       <Sidebar active="Revenue" collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
-      <main className="dash__main jm-main">
+      <main className="dash__main jm-main rv-main">
         <div className="jm-header-row">
           <div>
             <h1 className="dash__title">Revenue &amp; Analytics</h1>
@@ -303,7 +391,20 @@ export default function Revenue() {
             ))}
           </div>
 
-          {mode !== 'all' && (
+          {mode === 'custom' && (
+            <div className="rv-period-nav">
+              <DateField
+                label="From date"
+                value={customRange.from}
+                max={customRange.to}
+                onChange={setCustomFrom}
+              />
+              <span className="ct-range-sep">TO</span>
+              <DateField label="To date" value={customRange.to} min={customRange.from} onChange={setCustomTo} />
+            </div>
+          )}
+
+          {mode !== 'all' && mode !== 'custom' && (
             <div className="rv-period-nav">
               <button
                 type="button"
@@ -356,20 +457,13 @@ export default function Revenue() {
           </div>
         </div>
 
-        <div className="stat-grid ct-stats-grid">
+        <div className="stat-grid ct-stats-grid rv-stats-grid">
           <div className="stat-card">
             <div className="stat-card__head">
               <span className="stat-card__label">Total Revenue</span>
             </div>
             <div className="stat-card__value">{formatCurrency(totalRevenue)}</div>
             <span className="stat-card__sub">{rangeText ?? 'All time'}</span>
-          </div>
-          <div className="stat-card">
-            <div className="stat-card__head">
-              <span className="stat-card__label">Work Days</span>
-            </div>
-            <div className="stat-card__value">{totalWorkDays.toLocaleString()}</div>
-            <span className="stat-card__sub">Days with crew time logged</span>
           </div>
           <div className="stat-card">
             <div className="stat-card__head">
