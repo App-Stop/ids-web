@@ -6,6 +6,7 @@ import ScheduleBoard from './pages/ScheduleBoard'
 import JobsManagement from './pages/JobManagement'
 import Crew from './pages/Crew'
 import CostTracking from './pages/CostTracking'
+import Revenue from './pages/Revenue'
 // import Timesheet from './pages/Timesheet'
 import Profile from './pages/Profile'
 import HelpCenter from './pages/HelpCenter'
@@ -27,6 +28,7 @@ function App() {
       <Route path="/schedule-board" element={<ProtectedRoute><ScheduleBoard /></ProtectedRoute>} />
       <Route path="/jobs-management" element={<ProtectedRoute><JobsManagement /></ProtectedRoute>} />
       <Route path="/cost-tracking" element={<ProtectedRoute><CostTracking /></ProtectedRoute>} />
+      <Route path="/revenue" element={<ProtectedRoute><Revenue /></ProtectedRoute>} />
       <Route path="/crew-management" element={<ProtectedRoute><Crew /></ProtectedRoute>} />
       {/* Timesheet is hidden for now — restore this route and the sidebar entry to bring it back. */}
       {/* <Route path="/timesheet" element={<ProtectedRoute><Timesheet /></ProtectedRoute>} /> */}

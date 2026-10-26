@@ -4,6 +4,7 @@ import {
   getJobs,
   getJobById,
   getSchedule,
+  getJobRevenue,
   getCrewAssignments,
   createJob,
   updateJob,
@@ -13,6 +14,7 @@ import {
   deleteCrewAssignment,
   type GetJobsParams,
   type GetScheduleParams,
+  type GetJobRevenueParams,
   type JobItem,
   type Pagination,
 } from '../api/jobApi'
@@ -101,6 +103,13 @@ export function useJobsPaged(params?: GetJobsParams, enabled: boolean = true) {
       pagination: res.pagination ?? EMPTY_PAGINATION,
     }),
     enabled,
+  })
+}
+
+export function useJobRevenue(params: GetJobRevenueParams) {
+  return useQuery({
+    queryKey: queryKeys.jobs.revenue(params),
+    queryFn: async () => (await getJobRevenue(params)).data,
   })
 }
 

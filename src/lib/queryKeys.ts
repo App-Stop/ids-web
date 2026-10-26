@@ -18,6 +18,8 @@ export const queryKeys = {
     list: (params?: unknown) => ['jobs', params ?? null] as const,
     detail: (id: string) => ['job', id] as const,
     assignments: (jobId: string) => ['crewAssignments', jobId] as const,
+    /** Under `jobs` so a job edit (contract amount, budgeted days) refetches it. */
+    revenue: (params: unknown) => ['jobs', 'revenue', params] as const,
   },
 
   schedule: {

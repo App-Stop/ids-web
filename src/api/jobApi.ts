@@ -206,6 +206,75 @@ export async function getJobById(id: string): Promise<GetJobResponse> {
   return response.data
 }
 
+// --- Revenue ----------------------------------------------------------------
+// revenue = revenuePerDay (contractAmount / budgetedDays) x distinct days with
+// time-entry activity in the range. Money is computed live; the work-day
+// counts come from an hourly server rollup, so `refreshedAt` says how fresh
+// they are.
+
+/**
+ * day/week/month/year are rolling 1/7/30/365-day windows from `startDate`
+ * (or ending today without one) — not calendar months/years. `custom` takes
+ * `from`+`to` inclusive; `all` ignores dates.
+ */
+export type RevenuePeriod = 'day' | 'week' | 'month' | 'year' | 'custom' | 'all'
+
+export interface GetJobRevenueParams {
+  period?: RevenuePeriod
+  startDate?: string
+  from?: string
+  to?: string
+  jobId?: string
+  status?: 'awarded' | 'in-progress' | 'completed' | 'all'
+  /** Matches job name, or the job number when it is all digits. */
+  search?: string
+  sortBy?: 'newest' | 'oldest' | 'nameAsc' | 'nameDesc'
+  page?: number
+  /** 1–100, backend default 20. */
+  limit?: number
+}
+
+export interface JobRevenueRow {
+  _id: string
+  jobIdNumber: number | null
+  name: string | null
+  status: string | null
+  contractAmount: number | null
+  budgetedDays: number | null
+  /** null when contractAmount or budgetedDays is unset. */
+  revenuePerDay: number | null
+  workDayCount: number
+  /** null for the same reason as revenuePerDay; such jobs add 0 to the total. */
+  revenue: number | null
+}
+
+export interface JobRevenueData {
+  period: RevenuePeriod
+  range: { from: string | null; to: string | null }
+  /** When the work-day rollup was last rebuilt; null if it never has. */
+  refreshedAt: string | null
+  /** Across every job matching the filters, not just this page. */
+  summary: {
+    totalRevenue: number
+    totalWorkDayCount: number
+    jobsWithRevenue: number
+    jobCount: number
+  }
+  jobs: JobRevenueRow[]
+  pagination: Pagination
+}
+
+export interface GetJobRevenueResponse {
+  success: boolean
+  message: string
+  data: JobRevenueData
+}
+
+export async function getJobRevenue(params?: GetJobRevenueParams): Promise<GetJobRevenueResponse> {
+  const response = await api.get<GetJobRevenueResponse>('/jobs/revenue', { params })
+  return response.data
+}
+
 // --- Crew assignments -------------------------------------------------------
 // A job's timeline is a sequence of non-overlapping crew "stints". The backend
 // rejects (409) any stint that overlaps another on the same job, or that puts

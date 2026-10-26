@@ -112,7 +112,9 @@ export function formatTimeOfDay(time: string | null | undefined) {
 
 /**
  * The label a schedule chip shows: "8:00 AM - 2:00 PM" for an hour-scoped
- * stint, or "All day" when the crew has the job round the clock.
+ * stint, "Onsite Since 7:00 AM" when the crew has clocked in but not yet out
+ * (the live Fingercheck sync stores the punch-in as a start with no end), or
+ * "All day" when the crew has the job round the clock.
  */
 export function formatTimeWindow(
   start: string | null | undefined,
@@ -120,6 +122,7 @@ export function formatTimeWindow(
 ) {
   const from = formatTimeOfDay(start)
   const to = formatTimeOfDay(end)
+  if (from && !to) return `Onsite Since ${from}`
   if (!from || !to) return 'All day'
   return `${from} - ${to}`
 }

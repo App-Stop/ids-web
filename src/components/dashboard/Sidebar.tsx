@@ -4,6 +4,7 @@ import {
   CalendarBlank,
   Hammer,
   CurrencyCircleDollar,
+  ChartLineUp,
   Users,
   // ListChecks,
   GearSix,
@@ -21,6 +22,7 @@ const OPERATIONS = [
     icon: CurrencyCircleDollar,
     path: "/cost-tracking",
   },
+  { label: "Revenue", icon: ChartLineUp, path: "/revenue" },
 ];
 
 const MANAGEMENT = [
