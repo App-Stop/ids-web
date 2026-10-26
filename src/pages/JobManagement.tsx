@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { MagnifyingGlass, Plus, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Dropdown from '../components/dashboard/Dropdown'
@@ -9,7 +9,7 @@ import AssignCrewModal from '../components/dashboard/AssignCrewModal'
 import LastSynced from '../components/dashboard/LastSynced'
 import { assignableCrews, type Job, type UnassignedCrew } from '../lib/dashboardData'
 import { type JobStatus, type ManagedJob } from '../lib/jobsManagementData'
-import { useClickDragScroll } from '../hooks/useClickDragScroll'
+import { useSplitSheet, useSyncedRowHeights } from '../hooks/useSplitSheet'
 import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import { useAppStore } from '../lib/store'
 import { type JobItem, type JobFinancials, type JobDayCost } from '../api/jobApi'
@@ -89,47 +89,6 @@ function percent(value: number | null | undefined): string {
   return `${value.toFixed(1)}%`
 }
 
-/** Day-pane width in px: default (~5 columns visible), and its drag bounds. */
-const DAY_PANE_DEFAULT_W = 520
-const DAY_PANE_MIN_W = 180
-const DAY_PANE_MAX_W = 1100
-
-/**
- * Every row height of `source`, header row first, kept live.
- *
- * The two panes are separate `<table>`s so they can scroll apart, which means
- * nothing lines their rows up on its own — a job with four crews is taller on
- * the left than its (uniform) day cells are on the right. The left table owns
- * the heights and the right one is told what they are, index for index: both
- * render one header row followed by the same jobs in the same order.
- */
-function useSyncedRowHeights(
-  source: React.RefObject<HTMLTableElement | null>,
-  deps: unknown[],
-): number[] {
-  const [heights, setHeights] = useState<number[]>([])
-
-  useLayoutEffect(() => {
-    const table = source.current
-    if (!table) return
-
-    const measure = () => {
-      const next = Array.from(table.rows).map((r) => r.getBoundingClientRect().height)
-      setHeights((prev) =>
-        prev.length === next.length && prev.every((h, i) => Math.abs(h - next[i]) < 0.5) ? prev : next,
-      )
-    }
-
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(table)
-    for (const row of Array.from(table.rows)) observer.observe(row)
-    return () => observer.disconnect()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps)
-
-  return heights
-}
 
 /** A two-line cell: top value, hairline, bottom value. Blanks stay blank. */
 function StackCell({ top, bottom }: { top?: string; bottom?: string }) {
@@ -336,29 +295,16 @@ export default function JobsManagement() {
   // falls in rather than the current week.
   const days = useMemo(() => yearDays(today.getFullYear()), [today])
 
-  // The sheet is two panes that scroll independently: the job columns on the
-  // left, the day strip on the right. Only their vertical scroll is kept in
-  // step, so the day strip pans sideways without dragging the table with it.
-  const mainPaneRef = useRef<HTMLDivElement>(null)
-  const dayPaneRef = useRef<HTMLDivElement>(null)
-  useClickDragScroll(mainPaneRef)
-  useClickDragScroll(dayPaneRef)
-  const [dayPaneWidth, setDayPaneWidth] = useState(DAY_PANE_DEFAULT_W)
-  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('jm_left_collapsed') === 'true'
-    } catch {
-      return false
-    }
-  })
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('jm_left_collapsed', String(leftCollapsed))
-    } catch {
-      // ignore
-    }
-  }, [leftCollapsed])
+  // Job columns on the left, the day strip on the right — see useSplitSheet.
+  const {
+    mainPaneRef,
+    dayPaneRef,
+    dayPaneWidth,
+    leftCollapsed,
+    syncVertical,
+    toggleLeftCollapse,
+    startPaneResize,
+  } = useSplitSheet('jm_left_collapsed')
 
   const [crewHover, setCrewHover] = useState<{ x: number; y: number; color: string; names: string[] } | null>(null)
   const { assignCrew } = useAppStore()
@@ -420,31 +366,6 @@ export default function JobsManagement() {
   // [0] is the header row; job i is at [i + 1].
   const rowHeights = useSyncedRowHeights(mainTableRef, [jobs, zoom, months.length, loading])
 
-  // Vertical only, and guarded so the echo from setting the other pane's
-  // scrollTop doesn't bounce straight back.
-  const syncingRef = useRef(false)
-  const syncVertical = useCallback((from: 'main' | 'day') => {
-    if (syncingRef.current) return
-    const source = from === 'main' ? mainPaneRef.current : dayPaneRef.current
-    const target = from === 'main' ? dayPaneRef.current : mainPaneRef.current
-    if (!source || !target || target.scrollTop === source.scrollTop) return
-    syncingRef.current = true
-    target.scrollTop = source.scrollTop
-    requestAnimationFrame(() => {
-      syncingRef.current = false
-    })
-  }, [])
-
-  function toggleLeftCollapse() {
-    setLeftCollapsed((prev) => {
-      const next = !prev
-      if (next && mainPaneRef.current && mainPaneRef.current.scrollLeft > 0) {
-        mainPaneRef.current.scrollTo({ left: 0, behavior: 'smooth' })
-      }
-      return next
-    })
-  }
-
   // A year of columns opens on Jan 1, which is rarely what anyone wants to see.
   // Park today a little in from the left edge, once, as soon as the strip has
   // been laid out. Later widths/zooms leave the user's own position alone.
@@ -464,49 +385,7 @@ export default function JobsManagement() {
       0,
       pane.scrollLeft + columnRect.left - paneRect.left - columnRect.width,
     )
-  }, [loading, jobs.length])
-
-  /** Drag the grip to resize, or click to toggle collapse of left columns. */
-  function startPaneResize(e: React.PointerEvent<HTMLDivElement>) {
-    if (e.button !== 0) return
-    e.preventDefault()
-    const startX = e.clientX
-    const startY = e.clientY
-    const startWidth =
-      leftCollapsed && dayPaneRef.current
-        ? dayPaneRef.current.getBoundingClientRect().width
-        : dayPaneWidth
-    let moved = false
-
-    const onMove = (ev: PointerEvent) => {
-      if (!moved) {
-        if (Math.abs(ev.clientX - startX) > 4 || Math.abs(ev.clientY - startY) > 4) {
-          moved = true
-          document.body.classList.add('is-col-resizing')
-        }
-      }
-      if (moved) {
-        if (leftCollapsed) {
-          setLeftCollapsed(false)
-        }
-        const next = startWidth + (startX - ev.clientX)
-        setDayPaneWidth(Math.min(DAY_PANE_MAX_W, Math.max(DAY_PANE_MIN_W, next)))
-      }
-    }
-
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      document.body.classList.remove('is-col-resizing')
-      if (!moved) {
-        toggleLeftCollapse()
-      }
-    }
-
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }
-
+  }, [loading, jobs.length, dayPaneRef])
 
   const editingJob = editingId ? jobs.find((j) => j.id === editingId) : undefined
   const activeRow = flow.type !== 'none' ? jobs.find((j) => j.rawId === flow.jobId || j.id === flow.jobId) : undefined

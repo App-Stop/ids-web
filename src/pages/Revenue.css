@@ -1,5 +1,5 @@
-/* Revenue & Analytics — builds on the Cost Tracking toolbar, stat cards and
-   table (CostTracking.css); only what differs lives here. */
+/* Revenue & Analytics — the toolbar and stat cards come from Cost Tracking,
+   the two-pane sheet from Jobs Management; only what differs lives here. */
 
 .rv-period-nav {
   display: flex;
@@ -53,32 +53,15 @@
   font-weight: 500;
 }
 
-/* Same frame as the Jobs Management sheet: square-cornered cells inside one
-   rounded, bordered scroller. */
-.rv-table-wrap {
-  margin-top: 0.45rem;
-  overflow: auto;
-  max-height: calc(100dvh - 300px);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--card-bg);
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-.rv-table-wrap--empty {
-  overflow: hidden;
-  max-height: none;
-}
-
-.rv-col-share {
-  width: 180px;
-}
-
-.rv-table td.rv-num {
+.jm-table td.rv-empty-cell {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--muted);
   font-weight: 500;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
+}
+
+.rv-empty-cell .rv-today-btn {
+  margin-left: 0.5rem;
 }
 
 .rv-status {
@@ -90,46 +73,15 @@
   transform: none;
 }
 
-.rv-table td.rv-revenue {
+.rv-revenue .jm-stack__val:first-child {
   font-weight: 700;
-  color: var(--ink);
 }
 
-.rv-missing {
-  font-weight: 500;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
-.rv-share {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  min-width: 150px;
-}
-
-.rv-share__track {
-  flex: 1;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--field-bg);
-  overflow: hidden;
-}
-
-.rv-share__fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--yellow-dark);
-}
-
-.rv-share__pct {
-  width: 3.4rem;
-  text-align: right;
-  font-size: 0.8rem;
+/* A worked day on a job with no revenue rate — marked, but not money. */
+.jm-day-cost.rv-day-unpriced {
+  font-size: calc(0.75rem * var(--table-zoom, 1));
   font-weight: 600;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
 
 @media (max-width: 720px) {
@@ -146,9 +98,5 @@
   .rv-dd {
     flex: 1;
     width: auto;
-  }
-
-  .rv-table-wrap {
-    max-height: none;
   }
 }

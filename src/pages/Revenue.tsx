@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react'
-import { MagnifyingGlass, CaretLeft, CaretRight, ChartLineUp } from '@phosphor-icons/react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { MagnifyingGlass, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import Sidebar from '../components/dashboard/Sidebar'
 import Dropdown from '../components/dashboard/Dropdown'
+import ZoomControl from '../components/dashboard/ZoomControl'
 import { useSidebarCollapsed } from '../hooks/useSidebarCollapsed'
+import { useSplitSheet, useSyncedRowHeights } from '../hooks/useSplitSheet'
 import { useJobRevenue } from '../hooks/useQueryHooks'
 import { getErrorMessage } from '../lib/errors'
 import type { GetJobRevenueParams } from '../api/jobApi'
-import { addDays, getMonday, toISO } from '../lib/scheduleData'
+import { addDays, fromISO, getMonday, toISO } from '../lib/scheduleData'
+import { SHEET_ZOOM_DEFAULT, sheetZoomStyle, stepSheetZoom } from '../lib/sheetZoom'
 import { STATUS_COLORS, STATUS_LABELS, type JobStatus } from '../lib/jobsManagementData'
 import './Dashboard.css'
 import './JobsManagement.css'
@@ -42,6 +45,11 @@ const PERIOD_NOUN: Record<Exclude<PeriodMode, 'all'>, string> = {
   yearly: 'year',
 }
 
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** Left-pane columns, for the loading/empty row's colSpan. */
+const COLUMN_COUNT = 6
+
 /** First and last day of the calendar week/month/year containing `anchor`. */
 function periodBounds(mode: Exclude<PeriodMode, 'all'>, anchor: Date): [Date, Date] {
   if (mode === 'weekly') {
@@ -71,6 +79,17 @@ function periodLabel(mode: Exclude<PeriodMode, 'all'>, [from, to]: [Date, Date])
   return `${fmt(from)} - ${fmt(to)}, ${to.getFullYear()}`
 }
 
+/** Every day from `from` to `to`, inclusive. */
+function daysBetween(from: Date, to: Date): Date[] {
+  const out: Date[] = []
+  for (let d = new Date(from); d <= to; d = addDays(d, 1)) out.push(d)
+  return out
+}
+
+function shortDate(d: Date) {
+  return `${d.getMonth() + 1}-${d.getDate()}-${String(d.getFullYear()).slice(2)}`
+}
+
 const currency = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
@@ -78,8 +97,15 @@ const currency = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
 })
 
+/** Exact money for the summary cards. */
 function formatCurrency(value: number | null | undefined) {
   return value == null ? '—' : currency.format(value)
+}
+
+/** Short money for the sheet, as Jobs Management shows it: $4,213. */
+function money(value: number | null | undefined): string {
+  if (value === null || value === undefined) return ''
+  return `$${Math.round(value).toLocaleString()}`
 }
 
 /** "10-27-2026, 2:05 PM" in the viewer's timezone, like the Last Synced line. */
@@ -90,6 +116,26 @@ function formatRefreshedAt(value: string) {
   return `${date}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
 }
 
+function StackCell({ top, bottom }: { top?: string; bottom?: string }) {
+  return (
+    <div className="jm-stack">
+      <span className="jm-stack__val">{top ?? ''}</span>
+      <span className="jm-stack__rule" />
+      <span className="jm-stack__val">{bottom ?? ''}</span>
+    </div>
+  )
+}
+
+function SplitHeader({ top, bottom }: { top: string; bottom: string }) {
+  return (
+    <span className="jm-th-stack jm-th-stack--split">
+      <span>{top}</span>
+      <span className="jm-th-stack__rule" />
+      <span>{bottom}</span>
+    </span>
+  )
+}
+
 export default function Revenue() {
   const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
   const [mode, setMode] = useState<PeriodMode>('monthly')
@@ -98,8 +144,20 @@ export default function Revenue() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<JobStatus | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('newest')
-  const [limit, setLimit] = useState(20)
+  const [limit, setLimit] = useState(10)
+  const [zoom, setZoom] = useState(SHEET_ZOOM_DEFAULT)
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
+  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null)
+
+  const {
+    mainPaneRef,
+    dayPaneRef,
+    dayPaneWidth,
+    leftCollapsed,
+    syncVertical,
+    toggleLeftCollapse,
+    startPaneResize,
+  } = useSplitSheet('rv_left_collapsed')
 
   // Debounce so a query key isn't swapped (and a request fired) per keystroke.
   useEffect(() => {
@@ -107,11 +165,12 @@ export default function Revenue() {
     return () => clearTimeout(timer)
   }, [search])
 
+  const todayIso = toISO(new Date())
   const bounds = mode === 'all' ? null : periodBounds(mode, anchor)
   const fromIso = bounds ? toISO(bounds[0]) : null
   const toIso = bounds ? toISO(bounds[1]) : null
   // Today's period is the latest one with any revenue — later ones are empty.
-  const isCurrentPeriod = toIso !== null && toIso >= toISO(new Date())
+  const isCurrentPeriod = toIso !== null && toIso >= todayIso
 
   // Any change to the period or filters snaps back to page 1 — the stored page
   // is keyed to them rather than reset in an effect.
@@ -133,7 +192,7 @@ export default function Revenue() {
 
   const revenueQuery = useJobRevenue(params)
   const data = revenueQuery.data
-  const rows = data?.jobs ?? []
+  const rows = useMemo(() => data?.jobs ?? [], [data])
   const summary = data?.summary
   const pagination = data?.pagination
   const totalPages = Math.max(pagination?.totalPages ?? 1, 1)
@@ -148,6 +207,50 @@ export default function Revenue() {
   const hasActiveFilters = Boolean(search.trim()) || statusFilter !== null
   const rangeText = bounds ? periodLabel(mode as Exclude<PeriodMode, 'all'>, bounds) : null
 
+  /** Each job's revenueByDate keyed by "YYYY-MM-DD" for O(1) lookup per day column. */
+  const revenueByJobDay = useMemo(
+    () => new Map(rows.map((row) => [row._id, new Map(row.revenueByDate.map((d) => [d.date, d.revenue]))])),
+    [rows],
+  )
+
+  // The day strip is the selected period. All Time has no bounds of its own,
+  // so it runs from the earliest worked day on this page up to today.
+  const days = useMemo(() => {
+    if (fromIso && toIso) return daysBetween(fromISO(fromIso), fromISO(toIso))
+    let first: string | null = null
+    for (const row of rows) {
+      const day = row.revenueByDate[0]?.date
+      if (day && (!first || day < first)) first = day
+    }
+    if (!first) return []
+    const last = first > todayIso ? first : todayIso
+    return daysBetween(fromISO(first), fromISO(last))
+  }, [fromIso, toIso, rows, todayIso])
+
+  const mainTableRef = useRef<HTMLTableElement>(null)
+  // [0] is the header row; job i is at [i + 1].
+  const rowHeights = useSyncedRowHeights(mainTableRef, [rows, zoom, loading])
+
+  // A month or a year of columns opens on its first day; when today is in the
+  // strip, park it a little in from the left edge instead. Redone whenever the
+  // period changes, since the strip is a new set of days.
+  const scrolledForRef = useRef<string | null>(null)
+  const stripKey = `${mode}|${fromIso}`
+  useLayoutEffect(() => {
+    if (scrolledForRef.current === stripKey || loading || days.length === 0) return
+    const pane = dayPaneRef.current
+    if (!pane) return
+    scrolledForRef.current = stripKey
+    const column = pane.querySelector<HTMLElement>('thead .jm-day-col.is-today')
+    if (!column) {
+      pane.scrollLeft = 0
+      return
+    }
+    const paneRect = pane.getBoundingClientRect()
+    const columnRect = column.getBoundingClientRect()
+    pane.scrollLeft = Math.max(0, pane.scrollLeft + columnRect.left - paneRect.left - columnRect.width)
+  }, [stripKey, loading, days.length, dayPaneRef])
+
   function changeMode(next: PeriodMode) {
     setMode(next)
     setAnchor(new Date())
@@ -159,15 +262,28 @@ export default function Revenue() {
     setStatusFilter(null)
   }
 
+  const emptyMessage = hasActiveFilters
+    ? 'No jobs match your search and filters'
+    : rangeText
+      ? `No work logged in ${rangeText}`
+      : 'No work logged yet'
+
   return (
     <div className="dash">
       <Sidebar active="Revenue" collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
-      <main className="dash__main ct-main">
-        <div className="ct-head-row">
+      <main className="dash__main jm-main">
+        <div className="jm-header-row">
           <div>
             <h1 className="dash__title">Revenue &amp; Analytics</h1>
             <p className="dash__subtitle">Revenue earned per job from days worked on site</p>
+          </div>
+          <div className="page-header__right">
+            <ZoomControl
+              zoom={zoom}
+              onZoomIn={() => setZoom((z) => stepSheetZoom(z, 1))}
+              onZoomOut={() => setZoom((z) => stepSheetZoom(z, -1))}
+            />
           </div>
         </div>
 
@@ -263,7 +379,7 @@ export default function Revenue() {
               {(summary?.jobsWithRevenue ?? 0).toLocaleString()}
               <span className="rv-stat-of"> / {(summary?.jobCount ?? 0).toLocaleString()}</span>
             </div>
-            <span className="stat-card__sub">Of the jobs matching your filters</span>
+            <span className="stat-card__sub">Of the jobs worked in this period</span>
           </div>
           <div className="stat-card">
             <div className="stat-card__head">
@@ -274,114 +390,225 @@ export default function Revenue() {
           </div>
         </div>
 
+        {error && <div style={{ color: '#ef4444', margin: '12px 0', fontSize: '14px' }}>{error}</div>}
+
         <p className="last-synced">
           Work days updated : <span className="last-synced__time">{refreshedAt ?? (loading ? '…' : '-')}</span>
           <span className="rv-refresh-note"> · refreshed hourly</span>
         </p>
 
-        {error && <div style={{ color: '#ef4444', margin: '12px 0', fontSize: '14px' }}>{error}</div>}
-
-        <div className={`rv-table-wrap${!loading && rows.length === 0 ? ' rv-table-wrap--empty' : ''}`}>
-          {loading ? (
-            <div className="ct-empty">
-              <p className="ct-empty__text">Loading revenue data...</p>
-            </div>
-          ) : rows.length === 0 ? (
-            <div className="ct-empty">
-              <span className="ct-empty__icon" aria-hidden>
-                {hasActiveFilters ? <MagnifyingGlass size={26} /> : <ChartLineUp size={26} />}
-              </span>
-              <h3 className="ct-empty__title">No jobs to show</h3>
-              <p className="ct-empty__text">
-                {hasActiveFilters
-                  ? 'Nothing matches your current search and filters. Clear them to see every job.'
-                  : 'There are no jobs yet.'}
-              </p>
-              {hasActiveFilters && (
-                <div className="ct-empty__actions">
-                  <button type="button" className="btn btn--outline" onClick={clearFilters}>
-                    Clear filters
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <table className="jm-table rv-table">
-              <colgroup>
-                <col className="jm-col-name-w" />
-                <col className="jm-col-xs" />
-                <col className="jm-col-md" />
-                <col className="jm-col-stack" />
-                <col className="jm-col-sm" />
-                <col className="jm-col-stack" />
-                <col className="jm-col-sm" />
-                <col className="jm-col-stack-lg" />
-                <col className="rv-col-share" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th className="jm-sticky jm-sticky--name">Job Name</th>
-                  <th>Job #</th>
-                  <th>Status</th>
-                  <th className="jm-center">Contract Amt</th>
-                  <th className="jm-center">Budgeted Days</th>
-                  <th className="jm-center">Revenue per Day</th>
-                  <th className="jm-center">Work Days</th>
-                  <th className="jm-center">Revenue</th>
-                  <th className="jm-center">Share of Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const status = row.status as JobStatus | null
-                  const statusColor = status ? STATUS_COLORS[status] : undefined
-                  const share = row.revenue && totalRevenue > 0 ? row.revenue / totalRevenue : 0
-                  const missingRate = row.revenuePerDay === null
-                  return (
-                    <tr
-                      key={row._id}
-                      className={`jm-row${selectedRowId === row._id ? ' is-selected' : ''}`}
-                      onClick={() => setSelectedRowId((prev) => (prev === row._id ? null : row._id))}
-                    >
-                      <td className="jm-name-cell jm-sticky jm-sticky--name">
-                        <span className="jm-name-inner" title={row.name ?? undefined}>
-                          <span>{row.name || 'Unnamed Job'}</span>
-                        </span>
-                      </td>
-                      <td>{row.jobIdNumber != null ? String(row.jobIdNumber).padStart(3, '0') : '—'}</td>
-                      <td>
-                        {status && statusColor ? (
-                          <span className="jm-status rv-status" style={{ color: statusColor, borderColor: statusColor }}>
-                            {STATUS_LABELS[status]}
-                          </span>
+        <div className="jm-sheet" style={sheetZoomStyle(zoom)}>
+          <div
+            className={`jm-table-wrap jm-pane--main${leftCollapsed ? ' is-collapsed' : ''}`}
+            style={
+              leftCollapsed
+                ? { width: 'var(--jm-name-w)' }
+                : { width: `calc(100% - ${dayPaneWidth}px - 14px)` }
+            }
+            ref={mainPaneRef}
+            onScroll={() => syncVertical('main')}
+          >
+            <div className="jm-table-zoom" style={sheetZoomStyle(zoom)}>
+              <table className="jm-table" ref={mainTableRef}>
+                <colgroup>
+                  <col className="jm-col-name-w" />
+                  <col className="jm-col-xs" />
+                  <col className="jm-col-md" />
+                  <col className="jm-col-stack" />
+                  <col className="jm-col-stack" />
+                  <col className="jm-col-stack-lg" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th className="jm-sticky jm-sticky--name">Job Name</th>
+                    <th>Job #</th>
+                    <th>Status</th>
+                    <th className="jm-center">
+                      <SplitHeader top="Contract Amt" bottom="Budgeted Days" />
+                    </th>
+                    <th className="jm-center">
+                      <SplitHeader top="Revenue per Day" bottom="Work Days" />
+                    </th>
+                    <th className="jm-center">
+                      <SplitHeader top="Revenue" bottom="Share of Total" />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading || rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={COLUMN_COUNT} className="crew-empty-cell rv-empty-cell">
+                        {loading ? (
+                          'Loading revenue...'
                         ) : (
-                          '—'
+                          <>
+                            {emptyMessage}
+                            {hasActiveFilters && (
+                              <button type="button" className="rv-today-btn" onClick={clearFilters}>
+                                Clear filters
+                              </button>
+                            )}
+                          </>
                         )}
                       </td>
-                      <td className="jm-center rv-num">{formatCurrency(row.contractAmount)}</td>
-                      <td className="jm-center rv-num">{row.budgetedDays ?? '—'}</td>
-                      <td className="jm-center rv-num">{formatCurrency(row.revenuePerDay)}</td>
-                      <td className="jm-center rv-num">{row.workDayCount}</td>
-                      <td
-                        className="jm-center rv-num rv-revenue"
-                        title={missingRate ? 'Set a contract amount and budgeted days to calculate revenue' : undefined}
-                      >
-                        {missingRate ? <span className="rv-missing">Not set</span> : formatCurrency(row.revenue)}
-                      </td>
-                      <td>
-                        <div className="rv-share">
-                          <span className="rv-share__track">
-                            <span className="rv-share__fill" style={{ width: `${share * 100}%` }} />
-                          </span>
-                          <span className="rv-share__pct">{share > 0 ? `${(share * 100).toFixed(1)}%` : '—'}</span>
-                        </div>
-                      </td>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
+                  ) : (
+                    rows.map((row) => {
+                      const status = row.status as JobStatus | null
+                      const statusColor = status ? STATUS_COLORS[status] : undefined
+                      const share = row.revenue && totalRevenue > 0 ? (row.revenue / totalRevenue) * 100 : null
+                      return (
+                        <tr
+                          key={row._id}
+                          className={`jm-row${selectedRowId === row._id ? ' is-selected' : ''}${hoveredRowId === row._id ? ' is-hovered' : ''}`}
+                          onClick={() => setSelectedRowId((prev) => (prev === row._id ? null : row._id))}
+                          onMouseEnter={() => setHoveredRowId(row._id)}
+                          onMouseLeave={() => setHoveredRowId(null)}
+                        >
+                          <td className="jm-name-cell jm-sticky jm-sticky--name">
+                            <span className="jm-name-inner" title={row.name ?? undefined}>
+                              <span>{row.name || 'Unnamed Job'}</span>
+                            </span>
+                          </td>
+                          <td>{row.jobIdNumber != null ? String(row.jobIdNumber).padStart(3, '0') : ''}</td>
+                          <td>
+                            {status && statusColor && (
+                              <span className="jm-status rv-status" style={{ color: statusColor, borderColor: statusColor }}>
+                                {STATUS_LABELS[status]}
+                              </span>
+                            )}
+                          </td>
+                          <td className="jm-center">
+                            <StackCell
+                              top={money(row.contractAmount)}
+                              bottom={row.budgetedDays == null ? '' : String(row.budgetedDays)}
+                            />
+                          </td>
+                          <td className="jm-center">
+                            <StackCell top={money(row.revenuePerDay)} bottom={String(row.workDayCount)} />
+                          </td>
+                          <td
+                            className="jm-center rv-revenue"
+                            title={
+                              row.revenuePerDay === null
+                                ? 'Set a contract amount and budgeted days to calculate revenue'
+                                : undefined
+                            }
+                          >
+                            <StackCell
+                              top={row.revenuePerDay === null ? 'Not set' : money(row.revenue)}
+                              bottom={share === null ? '' : `${share.toFixed(1)}%`}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div
+            className={`jm-pane-grip${leftCollapsed ? ' is-collapsed' : ''}`}
+            role="separator"
+            tabIndex={0}
+            aria-orientation="vertical"
+            aria-label={leftCollapsed ? 'Expand columns' : 'Collapse columns'}
+            title={leftCollapsed ? 'Click to expand columns' : 'Click to collapse columns'}
+            onPointerDown={startPaneResize}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                toggleLeftCollapse()
+              }
+            }}
+          >
+            <div className="jm-pane-grip__toggle" aria-hidden>
+              {leftCollapsed ? <CaretRight size={13} weight="bold" /> : <CaretLeft size={13} weight="bold" />}
+            </div>
+            <span className="jm-grip" />
+          </div>
+
+          {/* Its own scroller: panning the day strip sideways leaves the job
+              columns where they are. Only vertical scroll is shared. */}
+          <div
+            className={`jm-table-wrap jm-pane--days${leftCollapsed ? ' is-expanded' : ''}`}
+            style={
+              leftCollapsed
+                ? { width: 'calc(100% - var(--jm-name-w) - 14px)' }
+                : { width: `${dayPaneWidth}px` }
+            }
+            ref={dayPaneRef}
+            onScroll={() => syncVertical('day')}
+          >
+            <div className="jm-table-zoom" style={sheetZoomStyle(zoom)}>
+              <table className="jm-table jm-table--days">
+                <colgroup>
+                  {days.map((d) => (
+                    <col key={`c-d-${d.getTime()}`} className="jm-col-day" />
+                  ))}
+                </colgroup>
+                <thead>
+                  <tr style={rowHeights[0] ? { height: `${rowHeights[0]}px` } : undefined}>
+                    {days.map((d) => {
+                      const isToday = toISO(d) === todayIso
+                      return (
+                        <th key={`h-d-${d.getTime()}`} className={`jm-center jm-day-col${isToday ? ' is-today' : ''}`}>
+                          <span className="jm-th-stack">
+                            <span>{isToday ? `Today, ${WEEKDAY_SHORT[d.getDay()]}` : WEEKDAY_SHORT[d.getDay()]}</span>
+                            <span className="jm-day-col__date">{shortDate(d)}</span>
+                          </span>
+                        </th>
+                      )
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading || rows.length === 0 ? (
+                    <tr style={rowHeights[1] ? { height: `${rowHeights[1]}px` } : undefined}>
+                      <td colSpan={Math.max(days.length, 1)} className="crew-empty-cell" />
+                    </tr>
+                  ) : (
+                    rows.map((row, rowIndex) => {
+                      const byDay = revenueByJobDay.get(row._id)
+                      return (
+                        <tr
+                          key={row._id}
+                          className={`jm-row${selectedRowId === row._id ? ' is-selected' : ''}${hoveredRowId === row._id ? ' is-hovered' : ''}`}
+                          style={rowHeights[rowIndex + 1] ? { height: `${rowHeights[rowIndex + 1]}px` } : undefined}
+                          onClick={() => setSelectedRowId((prev) => (prev === row._id ? null : row._id))}
+                          onMouseEnter={() => setHoveredRowId(row._id)}
+                          onMouseLeave={() => setHoveredRowId(null)}
+                        >
+                          {days.map((d) => {
+                            const iso = toISO(d)
+                            const worked = byDay?.has(iso) ?? false
+                            const revenue = byDay?.get(iso) ?? null
+                            return (
+                              <td
+                                key={`${row._id}-d-${d.getTime()}`}
+                                className={`jm-center jm-day-col${iso === todayIso ? ' is-today' : ''}`}
+                              >
+                                {worked &&
+                                  (revenue === null ? (
+                                    <span className="jm-day-cost rv-day-unpriced" title="Worked — no revenue rate set">
+                                      Worked
+                                    </span>
+                                  ) : (
+                                    <span className="jm-day-cost">{money(revenue)}</span>
+                                  ))}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <div className="jm-pagination-bar">
@@ -392,10 +619,8 @@ export default function Revenue() {
               value={String(limit)}
               onChange={(v) => setLimit(Number(v))}
               options={[
+                { id: '5', label: '5 per page' },
                 { id: '10', label: '10 per page' },
-                { id: '20', label: '20 per page' },
-                { id: '50', label: '50 per page' },
-                { id: '100', label: '100 per page' },
               ]}
             />
           </div>

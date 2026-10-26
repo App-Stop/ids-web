@@ -230,10 +230,22 @@ export interface GetJobRevenueParams {
   search?: string
   sortBy?: 'newest' | 'oldest' | 'nameAsc' | 'nameDesc'
   page?: number
-  /** 1–100, backend default 20. */
+  /** 1–10, backend default 10. */
   limit?: number
 }
 
+/** One worked day: the job's revenuePerDay, realized because work was logged. */
+export interface JobRevenueDay {
+  /** "YYYY-MM-DD" (UTC). */
+  date: string
+  /** null when the job has no revenuePerDay. */
+  revenue: number | null
+}
+
+/**
+ * Only jobs with at least one worked day in the range are returned, those
+ * with a revenue rate first; `sortBy` orders within each group.
+ */
 export interface JobRevenueRow {
   _id: string
   jobIdNumber: number | null
@@ -246,6 +258,8 @@ export interface JobRevenueRow {
   workDayCount: number
   /** null for the same reason as revenuePerDay; such jobs add 0 to the total. */
   revenue: number | null
+  /** Worked days in the range, ascending; their revenues sum to `revenue`. */
+  revenueByDate: JobRevenueDay[]
 }
 
 export interface JobRevenueData {
