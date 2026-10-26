@@ -516,7 +516,7 @@ export default function Revenue() {
                   <tr>
                     <th className="jm-sticky jm-sticky--name">Job Name</th>
                     <th>Job #</th>
-                    <th>Status</th>
+                    <th className="jm-center">Status</th>
                     <th className="jm-center">
                       <SplitHeader top="Contract Amt" bottom="Budgeted Days" />
                     </th>
@@ -565,7 +565,7 @@ export default function Revenue() {
                             </span>
                           </td>
                           <td>{row.jobIdNumber != null ? String(row.jobIdNumber).padStart(3, '0') : ''}</td>
-                          <td>
+                          <td className="jm-center">
                             {status && statusColor && (
                               <span className="jm-status rv-status" style={{ color: statusColor, borderColor: statusColor }}>
                                 {STATUS_LABELS[status]}
