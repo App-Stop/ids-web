@@ -15,7 +15,7 @@ export interface JobMonthFinancials {
   /** e.g. "September 2026" */
   label: string
   totalLaborCost: number
-  /** revenuePerDay x work-days that month; null when revenuePerDay is null. */
+  /** The month's work days, each at that day's own rate; null when revenuePerDay is null. */
   revenueParked: number | null
 }
 
@@ -38,7 +38,10 @@ export interface JobFinancials {
   cumulativeRevenue: number | null
   laborBudgetRemaining: number | null
   percentLaborBudgetRemaining: number | null
-  /** contractAmount / budgetedDays; null when either is unset. */
+  /**
+   * Today's rate: (contractAmount + approved CO total in effect today) /
+   * budgetedDays; null when either is unset.
+   */
   revenuePerDay: number | null
   /** Always 4 entries: the current calendar month plus the next three. */
   fourMonths: JobMonthFinancials[]
@@ -67,7 +70,16 @@ export interface JobItem {
   currentCrew?: string | any | null
   startDate: string
   endDate: string
+  /** The original contract. Change orders never modify it. */
   contractAmount: number
+  /** Sum of approved change orders; 0 when there are none. */
+  changeOrderTotal?: number
+  /** Sum of pending change orders — not applied to anything yet. */
+  pendingChangeOrderTotal?: number
+  /** contractAmount + changeOrderTotal. Missing or null falls back to contractAmount. */
+  revisedContractAmount?: number | null
+  /** Pending and approved, sorted by `number`. */
+  changeOrders?: ChangeOrder[]
   laborBudget: number
   laborBudgetUsed?: number
   note: string | null
@@ -207,8 +219,9 @@ export async function getJobById(id: string): Promise<GetJobResponse> {
 }
 
 // --- Revenue ----------------------------------------------------------------
-// revenue = revenuePerDay (contractAmount / budgetedDays) x distinct days with
-// time-entry activity in the range. Money is computed live; the work-day
+// revenue = the distinct days with time-entry activity in the range, each priced
+// at that day's rate: (contractAmount + approved CO total in effect that day) /
+// budgetedDays. Money is computed live; the work-day
 // counts come from an hourly server rollup, so `refreshedAt` says how fresh
 // they are.
 
@@ -234,7 +247,10 @@ export interface GetJobRevenueParams {
   limit?: number
 }
 
-/** One worked day: the job's revenuePerDay, realized because work was logged. */
+/**
+ * One worked day, priced at that day's rate. Approved change orders count
+ * from the UTC day they were approved, so the rate can differ day to day.
+ */
 export interface JobRevenueDay {
   /** "YYYY-MM-DD" (UTC). */
   date: string
@@ -252,8 +268,10 @@ export interface JobRevenueRow {
   name: string | null
   status: string | null
   contractAmount: number | null
+  /** contractAmount + approved change orders. */
+  revisedContractAmount?: number | null
   budgetedDays: number | null
-  /** null when contractAmount or budgetedDays is unset. */
+  /** Today's rate (includes COs in effect today); null when contractAmount or budgetedDays is unset. */
   revenuePerDay: number | null
   workDayCount: number
   /** null for the same reason as revenuePerDay; such jobs add 0 to the total. */
@@ -286,6 +304,121 @@ export interface GetJobRevenueResponse {
 
 export async function getJobRevenue(params?: GetJobRevenueParams): Promise<GetJobRevenueResponse> {
   const response = await api.get<GetJobRevenueResponse>('/jobs/revenue', { params })
+  return response.data
+}
+
+// --- Change orders ----------------------------------------------------------
+// A change order adjusts a job's contract by a signed amount. Only approved COs
+// count toward revisedContractAmount, and for revenue only from the UTC day
+// they were approved. Approval is one-way. Deleting renumbers the rest 1..n,
+// so a CO's `number` is not stable across a delete.
+
+export type ChangeOrderStatus = 'pending' | 'approved'
+
+export interface ChangeOrder {
+  _id: string
+  /** Shown as `CO${number}`. */
+  number: number
+  /** Signed, never 0. */
+  amount: number
+  note: string | null
+  status: ChangeOrderStatus
+  /** null on pending COs, and on approved ones created before statuses existed. */
+  approvedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** One job's contract summary, as every CO endpoint returns it. */
+export interface JobChangeOrders {
+  jobId: string
+  jobIdNumber: number
+  name: string
+  contractAmount: number
+  changeOrderTotal: number
+  pendingChangeOrderTotal: number
+  revisedContractAmount: number | null
+  changeOrders: ChangeOrder[]
+}
+
+export interface CreateChangeOrderPayload {
+  /** A JSON number, positive or negative, not 0. */
+  amount: number
+  note?: string
+  /** The server defaults to pending. */
+  status?: ChangeOrderStatus
+}
+
+/**
+ * Send at least one field. `amount` replaces the CO's value (the new full
+ * value, not the difference); `status: 'approved'` approves it.
+ */
+export type UpdateChangeOrderPayload = Partial<CreateChangeOrderPayload>
+
+export interface ChangeOrderResponse {
+  success: boolean
+  message: string
+  /** `changeOrder` is absent on delete and on the per-job list. */
+  data: JobChangeOrders & { changeOrder?: ChangeOrder }
+}
+
+export interface GetAllChangeOrdersParams {
+  jobId?: string
+  /** Job name, or job number when numeric. */
+  search?: string
+  /** Jobs with at least one CO in that status. */
+  status?: ChangeOrderStatus
+  page?: number
+  /** 1–100, backend default 10. */
+  limit?: number
+}
+
+export interface GetAllChangeOrdersResponse {
+  success: boolean
+  message: string
+  data: JobChangeOrders[]
+  pagination: Pagination
+}
+
+export async function getJobChangeOrders(jobId: string): Promise<ChangeOrderResponse> {
+  const response = await api.get<ChangeOrderResponse>(`/jobs/${jobId}/change-orders`)
+  return response.data
+}
+
+export async function getChangeOrder(jobId: string, changeOrderId: string): Promise<ChangeOrderResponse> {
+  const response = await api.get<ChangeOrderResponse>(`/jobs/${jobId}/change-orders/${changeOrderId}`)
+  return response.data
+}
+
+/** Only jobs with at least one CO, most recently updated first. */
+export async function getAllChangeOrders(params?: GetAllChangeOrdersParams): Promise<GetAllChangeOrdersResponse> {
+  const response = await api.get<GetAllChangeOrdersResponse>('/jobs/change-orders', { params })
+  return response.data
+}
+
+export async function createChangeOrder(
+  jobId: string,
+  payload: CreateChangeOrderPayload,
+): Promise<ChangeOrderResponse> {
+  const response = await api.post<ChangeOrderResponse>(`/jobs/${jobId}/change-orders`, payload)
+  return response.data
+}
+
+/** 400 when moving an approved CO back to pending, or when applying it would put the revised total below 1. */
+export async function updateChangeOrder(
+  jobId: string,
+  changeOrderId: string,
+  payload: UpdateChangeOrderPayload,
+): Promise<ChangeOrderResponse> {
+  const response = await api.patch<ChangeOrderResponse>(
+    `/jobs/${jobId}/change-orders/${changeOrderId}`,
+    payload,
+  )
+  return response.data
+}
+
+export async function deleteChangeOrder(jobId: string, changeOrderId: string): Promise<ChangeOrderResponse> {
+  const response = await api.delete<ChangeOrderResponse>(`/jobs/${jobId}/change-orders/${changeOrderId}`)
   return response.data
 }
 

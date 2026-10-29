@@ -12,6 +12,9 @@ import {
   createCrewAssignment,
   updateCrewAssignment,
   deleteCrewAssignment,
+  createChangeOrder,
+  updateChangeOrder,
+  deleteChangeOrder,
   type GetJobsParams,
   type GetScheduleParams,
   type GetJobRevenueParams,
@@ -339,6 +342,40 @@ export function useCrewAssignmentMutations() {
       onSuccess: invalidateAll,
     }),
     invalidateAll,
+  }
+}
+
+/**
+ * A change order moves the contract and every revenue figure (job list, job
+ * detail, revenue page, cost-tracking report), so each write invalidates them
+ * all. Callers should still render the totals straight from the response.
+ */
+export function useChangeOrderMutations() {
+  const { invalidateAll } = useInvalidateServerState()
+
+  return {
+    createChangeOrderMutation: useMutation({
+      mutationFn: ({ jobId, payload }: { jobId: string; payload: Parameters<typeof createChangeOrder>[1] }) =>
+        createChangeOrder(jobId, payload),
+      onSuccess: invalidateAll,
+    }),
+    updateChangeOrderMutation: useMutation({
+      mutationFn: ({
+        jobId,
+        changeOrderId,
+        payload,
+      }: {
+        jobId: string
+        changeOrderId: string
+        payload: Parameters<typeof updateChangeOrder>[2]
+      }) => updateChangeOrder(jobId, changeOrderId, payload),
+      onSuccess: invalidateAll,
+    }),
+    deleteChangeOrderMutation: useMutation({
+      mutationFn: ({ jobId, changeOrderId }: { jobId: string; changeOrderId: string }) =>
+        deleteChangeOrder(jobId, changeOrderId),
+      onSuccess: invalidateAll,
+    }),
   }
 }
 

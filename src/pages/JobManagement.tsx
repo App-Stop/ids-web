@@ -43,6 +43,11 @@ type Row = ManagedJob & {
   financials?: JobFinancials
   /** `yearCostTracking` keyed by "YYYY-MM-DD" for O(1) lookup per day column. */
   costByDate: Record<string, JobDayCost>
+  /** Original + approved change orders. `contract` stays the original for the edit form. */
+  revisedContract: number
+  changeOrderTotal: number
+  pendingChangeOrderTotal: number
+  changeOrderCount: number
 }
 
 /**
@@ -82,6 +87,11 @@ function isSameDay(a: Date, b: Date) {
 function money(value: number | null | undefined): string {
   if (value === null || value === undefined) return ''
   return `$${Math.round(value).toLocaleString()}`
+}
+
+/** money() with an explicit sign, for change-order deltas: +$500 / −$200. */
+function signedMoney(value: number): string {
+  return `${value < 0 ? '−' : '+'}${money(Math.abs(value))}`
 }
 
 function percent(value: number | null | undefined): string {
@@ -264,6 +274,10 @@ function toRow(j: JobItem): Row {
     gcSuper: gcSuperVal,
     idsSuper: idsSuperVal,
     contract: toAmount(j.contractAmount),
+    revisedContract: toAmount(j.revisedContractAmount ?? j.contractAmount),
+    changeOrderTotal: toAmount(j.changeOrderTotal),
+    pendingChangeOrderTotal: toAmount(j.pendingChangeOrderTotal),
+    changeOrderCount: j.changeOrders?.length ?? 0,
     startDate: formattedStart,
     endDate: formattedEnd,
     status: normalizedStatus,
@@ -544,7 +558,7 @@ export default function JobsManagement() {
                 <th>Contractor</th>
                 <th className="jm-center">
                   <span className="jm-th-stack jm-th-stack--split">
-                    <span>Contract Amt</span>
+                    <span title="Original contract plus approved change orders">Contract Amt</span>
                     <span className="jm-th-stack__rule" />
                     <span>Budgeted Labor</span>
                   </span>
@@ -605,10 +619,12 @@ export default function JobsManagement() {
                     fin?.laborBudgetRemaining ?? job.laborBudgetTotal - job.laborBudgetUsed
                   // "Percent of Total": one day's revenue as a share of the
                   // whole contract. The API has no such field, so it is derived
-                  // from the two it does return.
+                  // from the two it does return. revenuePerDay is today's rate,
+                  // change orders included, so it is measured against the
+                  // revised contract.
                   const percentOfTotal =
-                    fin?.revenuePerDay && job.contract > 0
-                      ? (fin.revenuePerDay / job.contract) * 100
+                    fin?.revenuePerDay && job.revisedContract > 0
+                      ? (fin.revenuePerDay / job.revisedContract) * 100
                       : null
                   const monthsByKey = new Map((fin?.fourMonths ?? []).map((m) => [m.month, m]))
                   return (
@@ -676,8 +692,30 @@ export default function JobsManagement() {
                         </span>
                       </td>
                       <td>{job.gc}</td>
-                      <td className="jm-center">
-                        <StackCell top={money(job.contract)} bottom={money(job.laborBudgetTotal)} />
+                      <td
+                        className="jm-center jm-contract-cell"
+                        title={
+                          job.changeOrderCount > 0
+                            ? [
+                                `Original ${money(job.contract)}`,
+                                `Approved COs ${signedMoney(job.changeOrderTotal)}`,
+                                job.pendingChangeOrderTotal !== 0
+                                  ? `Pending ${signedMoney(job.pendingChangeOrderTotal)} (not counted)`
+                                  : '',
+                              ]
+                                .filter(Boolean)
+                                .join('\n')
+                            : undefined
+                        }
+                      >
+                        <StackCell top={money(job.revisedContract)} bottom={money(job.laborBudgetTotal)} />
+                        {job.changeOrderCount > 0 && (
+                          <span
+                            className={`jm-co-badge${job.pendingChangeOrderTotal !== 0 ? ' has-pending' : ''}`}
+                          >
+                            {job.changeOrderCount} CO
+                          </span>
+                        )}
                       </td>
                       <td className="jm-center">
                         <StackCell
@@ -888,6 +926,7 @@ export default function JobsManagement() {
           crew={toCrew(activeRow)}
           note={activeRow.note ?? ''}
           status={activeRow.status}
+          manageChangeOrders
           onDone={() => setFlow({ type: 'none' })}
           onChangeStatus={(next) => handleStatusChange(activeRow.rawId || activeRow.id, next)}
           onEditJob={() => {

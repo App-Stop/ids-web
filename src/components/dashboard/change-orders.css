@@ -1,0 +1,332 @@
+/* Change orders — the ledger and inline form inside the job details modal. */
+
+.detail-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.co-section {
+  margin-top: 1.25rem;
+}
+
+.co-section__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.co-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--field-bg);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+}
+
+.co-optional {
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+/* ---- ledger ---- */
+
+.co-ledger {
+  margin-top: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.co-ledger__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 40px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.86rem;
+}
+
+.co-ledger__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+}
+
+.co-ledger__amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.co-ledger__amount.is-pos {
+  color: #15803d;
+}
+
+.co-ledger__amount.is-neg {
+  color: #dc2626;
+}
+
+.co-ledger__row--base {
+  background: var(--field-bg);
+}
+
+.co-ledger__row--total {
+  border-top: 1px solid var(--border);
+}
+
+.co-ledger__row--revised {
+  border-top: none;
+  padding-top: 0;
+}
+
+.co-ledger__row--revised .co-ledger__label,
+.co-ledger__row--revised .co-ledger__amount {
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.co-ledger__row--pending {
+  border-top: 1px dashed var(--border);
+}
+
+.co-ledger__row--pending .co-ledger__label,
+.co-ledger__row--pending .co-ledger__amount {
+  color: #b45309;
+  font-weight: 500;
+}
+
+.co-item {
+  border-top: 1px solid var(--border);
+}
+
+/* Pending COs are shown but visibly not part of the total. */
+.co-item.is-pending .co-ledger__amount {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.co-num {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.co-badge {
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.co-badge--pending {
+  color: #d97706;
+  background: #fffbeb;
+}
+
+.co-badge--approved {
+  color: #16a34a;
+  background: #f0fdf4;
+}
+
+.co-meta {
+  color: var(--muted);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.co-note {
+  margin: -0.25rem 0 0;
+  padding: 0 0.75rem 0.55rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- row actions ---- */
+
+.co-actions {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.co-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.co-action:hover {
+  background: var(--field-bg);
+  color: var(--ink);
+}
+
+.co-action--approve:hover {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.co-action--delete:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.co-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin: 0 0.75rem 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.co-confirm--approve {
+  background: #f0fdf4;
+}
+
+.co-confirm--delete {
+  background: #fef2f2;
+}
+
+.co-confirm__btns {
+  display: inline-flex;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+/* ---- form ---- */
+
+.co-form {
+  margin: 0.6rem 0;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fcfcfd;
+}
+
+.co-item .co-form {
+  margin: 0 0.75rem 0.75rem;
+}
+
+.co-form__title {
+  margin-bottom: 0.6rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.co-form__label {
+  margin-top: 0.75rem;
+}
+
+.co-form__amount {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.co-form__money {
+  flex: 1;
+  min-width: 0;
+  background: #fff;
+}
+
+.co-sign {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--field-bg);
+}
+
+.co-sign__btn {
+  padding: 0 0.7rem;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.co-sign__btn.is-active {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.co-sign__btn.is-add {
+  color: #15803d;
+}
+
+.co-sign__btn.is-deduct {
+  color: #dc2626;
+}
+
+.co-check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.co-check__hint {
+  flex-basis: 100%;
+  padding-left: 1.4rem;
+  font-weight: 400;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.co-preview {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.co-preview strong {
+  color: var(--ink);
+}
+
+.co-preview__warn {
+  color: #dc2626;
+}
+
+.co-error {
+  margin: 0.5rem 0 0;
+}
+
+.co-form__actions {
+  margin-top: 0.75rem;
+}

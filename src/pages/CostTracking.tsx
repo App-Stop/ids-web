@@ -49,7 +49,10 @@ type JobCostRow = {
   date: string
   /** ISO end date of the job — a row shows whenever it overlaps the range. */
   endDate: string
+  /** The original contract amount. */
   contract: number
+  /** Original plus approved change orders; what "Total Contract" shows. */
+  revisedContract: number
   laborBudgetTotal: number
   laborBudgetUsed: number
   balanceLeft: number
@@ -378,6 +381,7 @@ export default function CostTracking() {
                 date: grp.costByDate[0]?.date || new Date().toISOString().slice(0, 10),
                 endDate: grp.costByDate[grp.costByDate.length - 1]?.date || new Date().toISOString().slice(0, 10),
                 contract: (grp as any).contractAmount ?? 0,
+                revisedContract: (grp as any).revisedContractAmount ?? (grp as any).contractAmount ?? 0,
                 laborBudgetTotal: (grp as any).laborBudget ?? 0,
                 laborBudgetUsed: grp.totalLaborCost,
                 balanceLeft: (grp as any).laborBudgetBalance ?? 0,
@@ -908,7 +912,18 @@ export default function CostTracking() {
                         </span>
                       </button>
                     </td>
-                    {metaVisible && <td className="ct-money">{formatMoney(row.contract)}</td>}
+                    {metaVisible && (
+                      <td
+                        className="ct-money"
+                        title={
+                          row.revisedContract !== row.contract
+                            ? `Original ${formatMoney(row.contract)}, revised by change orders`
+                            : undefined
+                        }
+                      >
+                        {formatMoney(row.revisedContract)}
+                      </td>
+                    )}
                     {metaVisible && <td>{formatMoney(row.laborBudgetTotal)}</td>}
                     {metaVisible && <td>{formatMoney(row.balanceLeft)}</td>}
                     {metaVisible && <td>{`${(row.percentSpent * 100).toFixed(1)}%`}</td>}

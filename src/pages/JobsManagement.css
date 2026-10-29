@@ -1027,3 +1027,28 @@ body.is-col-resizing * {
     max-width: none;
   }
 }
+
+/* Contract cell on a job with change orders: the top value is the revised
+   contract, and a corner tag says how many COs moved it. */
+.jm-contract-cell {
+  position: relative;
+}
+
+.jm-co-badge {
+  position: absolute;
+  top: calc(3px * var(--table-zoom, 1));
+  right: calc(4px * var(--table-zoom, 1));
+  padding: 0 calc(5px * var(--table-zoom, 1));
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #16a34a;
+  font-size: calc(0.62rem * var(--table-zoom, 1));
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+/* Amber while any CO is still awaiting approval. */
+.jm-co-badge.has-pending {
+  background: #fffbeb;
+  color: #d97706;
+}

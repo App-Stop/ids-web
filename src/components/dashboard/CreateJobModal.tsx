@@ -1018,7 +1018,10 @@ export default function CreateJobModal({
             <div className="field-row job-form-modal__money-row">
               <div>
                 <label className="field-label">
-                  Contracted Amount <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span>
+                  {/* Always the original — change orders are added from the job details, and
+                      sending the revised figure here would count them twice. */}
+                  {isEdit ? 'Original Contract Amount' : 'Contracted Amount'}{' '}
+                  <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span>
                 </label>
                 <div className={`field-money${fieldErrors.contractAmount ? ' field-money--error' : ''}`}>
                   <span>$</span>

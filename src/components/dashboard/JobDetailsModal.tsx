@@ -3,9 +3,11 @@ import Modal from './Modal'
 import Avatar from './Avatar'
 import ConfirmModal from './ConfirmModal'
 import Dropdown from './Dropdown'
+import ChangeOrdersSection, { type ContractSummary } from './ChangeOrdersSection'
 import { Icon } from './icons'
 import { STATUS_COLORS, STATUS_LABELS, type JobStatus } from '../../lib/jobsManagementData'
 import { formatMoney, type Job, type UnassignedCrew } from '../../lib/dashboardData'
+import { signedDollars } from '../../lib/changeOrders'
 import { getJobById, getCrewAssignments, type JobItem, type CrewAssignment } from '../../api/jobApi'
 import { crewColorFor, formatTimeWindow, formatMdy } from '../../lib/scheduleData'
 import '../../pages/Dashboard.css'
@@ -29,6 +31,7 @@ export default function JobDetailsModal({
   onSaveNote,
   onChangeStatus,
   onEditJob,
+  manageChangeOrders = false,
 }: {
   job: Job
   crew: UnassignedCrew | null
@@ -46,6 +49,8 @@ export default function JobDetailsModal({
   onChangeStatus?: (next: JobStatus) => void
   /** When provided, an "Edit Job" button opens the full job form. */
   onEditJob?: () => void
+  /** Show the change-orders ledger with add/edit/approve/delete. */
+  manageChangeOrders?: boolean
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [editingNote, setEditingNote] = useState(false)
@@ -54,6 +59,8 @@ export default function JobDetailsModal({
   const [statusDraft, setStatusDraft] = useState<JobStatus | undefined>(status)
   /** Every crew booked on this job, with the hours each one works. */
   const [assignments, setAssignments] = useState<CrewAssignment[]>([])
+  /** Contract + change orders; replaced wholesale by each CO write's response. */
+  const [contract, setContract] = useState<ContractSummary | null>(null)
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(Boolean(job.id && !job.id.startsWith('#tmp')))
 
   useEffect(() => {
@@ -70,6 +77,13 @@ export default function JobDetailsModal({
         ])
         if (res.success && res.data) {
           setFetchedJob(res.data)
+          setContract({
+            contractAmount: res.data.contractAmount ?? 0,
+            changeOrderTotal: res.data.changeOrderTotal ?? 0,
+            pendingChangeOrderTotal: res.data.pendingChangeOrderTotal ?? 0,
+            revisedContractAmount: res.data.revisedContractAmount ?? res.data.contractAmount ?? null,
+            changeOrders: res.data.changeOrders ?? [],
+          })
           if (res.data.note) {
             setNoteDraft(res.data.note)
           }
@@ -195,8 +209,17 @@ export default function JobDetailsModal({
 
       <div className="detail-grid">
         <div>
-          <span className="detail-label">Contract Amount</span>
-          <span className="detail-value">{formatMoney(displayJob.contractAmount)}</span>
+          <span className="detail-label">
+            {contract && contract.changeOrders.length > 0 ? 'Revised Contract' : 'Contract Amount'}
+          </span>
+          <span className="detail-value">
+            {formatMoney(contract?.revisedContractAmount ?? displayJob.contractAmount)}
+          </span>
+          {contract && contract.changeOrderTotal !== 0 && (
+            <span className="detail-sub">
+              Original {formatMoney(contract.contractAmount)} · {signedDollars(contract.changeOrderTotal)} COs
+            </span>
+          )}
         </div>
         <div>
           <span className="detail-label">Labor Budget</span>
@@ -205,6 +228,10 @@ export default function JobDetailsModal({
           </span>
         </div>
       </div>
+
+      {manageChangeOrders && contract && fetchedJob && (
+        <ChangeOrdersSection jobId={fetchedJob._id} summary={contract} onChange={setContract} />
+      )}
 
       <hr className="divider" />
 

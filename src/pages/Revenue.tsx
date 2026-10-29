@@ -521,7 +521,7 @@ export default function Revenue() {
                       <SplitHeader top="Contract Amt" bottom="Budgeted Days" />
                     </th>
                     <th className="jm-center">
-                      <SplitHeader top="Revenue per Day" bottom="Work Days" />
+                      <SplitHeader top="Current Rate / Day" bottom="Work Days" />
                     </th>
                     <th className="jm-center">
                       <SplitHeader top="Revenue" bottom="Share of Total" />
@@ -572,9 +572,16 @@ export default function Revenue() {
                               </span>
                             )}
                           </td>
-                          <td className="jm-center">
+                          <td
+                            className="jm-center"
+                            title={
+                              row.revisedContractAmount != null && row.revisedContractAmount !== row.contractAmount
+                                ? `Original ${money(row.contractAmount)}, revised by change orders`
+                                : undefined
+                            }
+                          >
                             <StackCell
-                              top={money(row.contractAmount)}
+                              top={money(row.revisedContractAmount ?? row.contractAmount)}
                               bottom={row.budgetedDays == null ? '' : String(row.budgetedDays)}
                             />
                           </td>
